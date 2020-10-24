@@ -1,4 +1,4 @@
-# CalcCLI
+# [CalcCLI](https://github.com/Unfit-Donkey/CalcCLI)
 CalcCLI is a simple, open-source command-line calculator written in C.
 Features include: complex numbers, everyday functions, custom functions, graphing, derivatives, units, and base conversion.
 

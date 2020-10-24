@@ -1,5 +1,6 @@
 /*
     This project is maintained by Benjamin Cates (github.com/Unfit-Donkey)
+    This project is available on GitHub at https://github.com/Unfit-Donkey/CalcCLI
     See README.md for more information
     See Calc.h for information on each function
     Do ./build on Mac and Linux or ./build.bat on Windows

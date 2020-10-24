@@ -1,5 +1,5 @@
 /*
-    This header file has comments on each function and allows for functions in CalcForC.c to be in any order.
+    This header file has comments on each function and allows for functions in CalcCLI.c to be in any order.
 */
 #include <stdlib.h>
 #include <stdint.h>
