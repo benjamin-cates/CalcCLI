@@ -11,27 +11,29 @@
 #define CLOCKS_PER_SEC 1
 #include <time.h>
 //Definitions
-//NULL pointer with val
-#define NULL ((void *)0)
-//Number of units
-#define unitCount 26
-//Number of immutable functions
-#define immutableFunctions 65
-/*
-    Unit type
-    {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
-    (unit_t>>(0*8))&255 is the length component
-    (unit_t>>(1*8))&255 is the mass component
-    (unit_t>>(2*8))&255 is the time component
-    ...
-    unit_t can be converted into an array of 8 signed bytes using this method
-    m^2 = 0x02 {2} m^2
-    m/s^2 = 0xFE0001 {1,0,-2} m * s^-2
-    Joule = 0xFE0102 {2,1,-2} m^2 * kg * s^-2
-*/
-#define unit_t unsigned long long
-//Number of metric prefixes
-#define metricCount 17
+#ifndef unit_t
+    //NULL pointer with val
+    #define NULL ((void *)0)
+    //Number of units
+    #define unitCount 26
+    //Number of immutable functions
+    #define immutableFunctions 65
+    /*
+        Unit type
+        {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
+        (unit_t>>(0*8))&255 is the length component
+        (unit_t>>(1*8))&255 is the mass component
+        (unit_t>>(2*8))&255 is the time component
+        ...
+        unit_t can be converted into an array of 8 signed bytes using this method
+        m^2 = 0x02 {2} m^2
+        m/s^2 = 0xFE0001 {1,0,-2} m * s^-2
+        Joule = 0xFE0102 {2,1,-2} m^2 * kg * s^-2
+    */
+    #define unit_t unsigned long long
+    //Number of metric prefixes
+    #define metricCount 17
+#endif
 //Structs
 /**
  * Complex number with unit
@@ -88,36 +90,36 @@ typedef struct FunctionStruct {
     char nameLen;
 } Function;
 //Degree ratio, 1 if radian, pi/180 if degrees
-double degrat = 1;
+extern double degrat;
 //Size of the history array
-int historySize;
+extern int historySize;
 //Number of items in history
-int historyCount = 0;
+extern int historyCount;
 //Use verbosity
-bool verbose = false;
+extern bool verbose;
 //Error has occured
-bool globalError = false;
+extern bool globalError;
 //Number with r=0, i=0, and u=0
-Number NULLNUM;
+extern Number NULLNUM;
 //History array
-Number* history;
+extern Number* history;
 //All predefined units
-unitStandard* unitList;
+extern unitStandard* unitList;
 //Tree with op=0 and value=0
-Tree NULLOPERATION;
+extern Tree NULLOPERATION;
 //Number of functions
-int numFunctions = immutableFunctions;
+extern int numFunctions;
 //Array length of functions
-int functionArrayLength = immutableFunctions + 10;
+extern int functionArrayLength;
 //List of all functions (operation IDs)
-Function* functions;
+extern Function* functions;
 //Metric prefixes
-const char metricNums[] = { 'y', 'z', 'a', 'f', 'p', 'n', 'u', 'm', 'c', 'k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y' };
+extern const char metricNums[];
 //Metric prefix values
-const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
+extern const double metricNumValues[];
 //Metric base units, used for toStringUnit
-const char* baseUnits[] = { "m", "kg", "s", "A", "K", "mol", "$", "bit" };
-const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+extern const char* baseUnits[];
+extern const char numberChars[];
 //Functions
 /**
  * Prints an error message as printf("Error: "+format,message), then sets globalError to true
