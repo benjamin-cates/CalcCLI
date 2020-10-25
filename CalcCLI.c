@@ -1,4 +1,12 @@
 #include "Calc.h"
+void error(char* format, char* message) {
+    //Print error
+    printf("Error: ");
+    printf(format, message);
+    printf("\n");
+    //Set error to true
+    globalError = true;
+};
 void CLI_cleanup() {
     cleanup();
     printf(" Quitting\n");

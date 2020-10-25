@@ -1455,14 +1455,6 @@ char* inputClean(char* input) {
         printf("Input cleaned to '%s'\n", out);
     return out;
 }
-void error(char* format, char* message) {
-    //Print error
-    printf("Error: ");
-    printf(format, message);
-    printf("\n");
-    //Set error to true
-    globalError = true;
-};
 void cleanup() {
     int i;
     //Free functions
