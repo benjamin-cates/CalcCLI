@@ -1287,8 +1287,7 @@ Number calculate(char* eq, double base) {
     char* cleanInput = inputClean(eq);
     if(globalError) return NULLNUM;
     //Generate tree
-    if(base == 10) base = 0;
-    Tree tree = generateTree(cleanInput, NULL, base);
+    Tree tree = generateTree(base==0?cleanInput:eq, NULL, base);
     free(cleanInput);
     if(globalError) return NULLNUM;
     //Compute tree
@@ -1594,7 +1593,7 @@ void graphEquation(char* equation, double left, double right, double top, double
         double startMod = fmod(yvalues[i], 1);
         double endMod = fmod(yvalues[i + 1], 1);
         // -, ", or _
-        if(abs(start - end) < 0.6) {
+        if(fabs(start - end) < 0.6) {
             if(start < rows && start > 0 && end < rows && end > 0) {
                 double avg = (start + end) / 2;
                 double avgMod = fmod(avg, 1);
@@ -1761,21 +1760,43 @@ void runLine(char* input) {
                 input[i] = '\0';
                 break;
             }
-            Number base = calculate(input + 5, 10);
+            Number base = calculate(input + 5, 0);
             if(base.r > 36 || base.r < 1) {
                 error("base out of bounds", NULL);
                 globalError = false;
                 return;
             }
-            Number out = calculate(input + expStart, 10);
+            Number out = calculate(input + expStart, 0);
             appendToHistory(out, base.r, true);
         }
         else if(input[1] == 'd' && input[2] == 'e' && input[3] == 'g' && input[4] == 's' && input[5] == 'e' && input[6] == 't' && input[7] == ' ') {
             if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
             else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
             else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
-            else degrat = calculate(input + 7, 10).r;
+            else degrat = calculate(input + 7, 0).r;
             printf("Degree ratio set to %g\n", degrat);
+        }
+        else if(input[1]=='u'&&input[2]=='n'&&input[3]=='i'&&input[4]=='t') {
+            int i,unitStart=0;
+            for(i=5;i<strlen(input);i++) if(input[i]==' ') {
+                unitStart=i+1;
+                input[i]='\0';
+                break;
+            }
+            Number unit=calculate(input+5,10);
+            Number value=calculate(input+unitStart,0);
+            if(unit.u!=value.u) {
+                char* unitOne=toStringUnit(unit.u);
+                char* unitTwo=toStringUnit(value.u);
+                printf("Error: units %s and %s are not compatible\n",unitOne,unitTwo);
+                free(unitOne);
+                free(unitTwo);
+                return;
+            }
+            Number out=compDivide(value,unit);
+            char* numString=toStringNumber(out,10);
+            printf("= %s %s\n",numString,input+5);
+            free(numString);
         }
         else {
             printf("Error: command '%s' not recognized.\n", input + 1);
@@ -1783,7 +1804,7 @@ void runLine(char* input) {
     }
     //Else compute it as a value
     else {
-        Number out = calculate(input, 10);
+        Number out = calculate(input, 0);
         if(!globalError) appendToHistory(out, 10, true);
     }
     globalError = false;
