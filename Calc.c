@@ -241,9 +241,11 @@ void appendToHistory(Number num, double base, bool print) {
         history = realloc(history, (historySize + 25) * sizeof(Number));
         historySize += 25;
     }
-    char* ansString = toStringNumber(num, base);
-    if(print) printf("$%d = %s\n", historyCount, ansString);
-    free(ansString);
+    if(print) {
+        char* ansString = toStringNumber(num, base);
+        printf("$%d = %s\n", historyCount, ansString);
+        free(ansString);
+    }
     history[historyCount] = num;
     historyCount++;
 }

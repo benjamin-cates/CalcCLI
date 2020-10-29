@@ -1,6 +1,9 @@
 /*
     This header file has comments on each function and allows for functions in CalcCLI.c to be in any order.
 */
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -11,10 +14,12 @@
 #define CLOCKS_PER_SEC 1
 #include <time.h>
 //Definitions
-#ifndef unit_t
+#ifndef NULL
     //NULL pointer with val
     #define NULL ((void *)0)
-    //Number of units
+#endif
+#ifndef unit_t
+    //Number of units#
     #define unitCount 26
     //Number of immutable functions
     #define immutableFunctions 65
@@ -351,6 +356,9 @@ void runLine(char* input);
  * @return output, must be free()d
  */
 char* inputClean(char* input);
+#ifdef __cplusplus
+}
+#endif
 #pragma region Operation IDs
 //These definitons are to ease readability of the program and to allow flexibility
 #define op_val 0
