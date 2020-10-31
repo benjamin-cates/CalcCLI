@@ -643,8 +643,8 @@ Number computeTree(Tree tree, Number* args, int argLen) {
     }
     //Log, rounding, arg, and abs
     if(tree.op < 38) {
-        if(tree.op == op_sqrt) return compPower(one, newValue(1/2, 0, 0));
-        if(tree.op == op_cbrt) return compPower(one, newValue(1/3, 0, 0));
+        if(tree.op == op_sqrt) return compPower(one, newValue(0.5, 0, 0));
+        if(tree.op == op_cbrt) return compPower(one, newValue(0.3333333333333333, 0, 0));
         if(tree.op == op_exp) {
             double epowr = exp(one.r);
             return newValue(epowr * cos(one.i), epowr * sin(one.i), one.u);
