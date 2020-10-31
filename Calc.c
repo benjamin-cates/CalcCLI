@@ -643,8 +643,8 @@ Number computeTree(Tree tree, Number* args, int argLen) {
     }
     //Log, rounding, arg, and abs
     if(tree.op < 38) {
-        if(tree.op == op_sqrt) return compPower(one, newValue(0.5, 0, 0));
-        if(tree.op == op_cbrt) return compPower(one, newValue(0.333333333333333333, 0, 0));
+        if(tree.op == op_sqrt) return compPower(one, newValue(1/2, 0, 0));
+        if(tree.op == op_cbrt) return compPower(one, newValue(1/3, 0, 0));
         if(tree.op == op_exp) {
             double epowr = exp(one.r);
             return newValue(epowr * cos(one.i), epowr * sin(one.i), one.u);
@@ -1299,6 +1299,123 @@ Tree derivative(Tree tree) {
             return newOperation(allocateArgs(p1, p2, 0, 0), 2, op_add);
         }
     }
+    //Trigonomety
+    if(tree.op < 27) {
+        Tree DOne = derivative(tree.branch[0]);
+        if(tree.op < 15) {
+            Tree out;
+            if(tree.op == op_sin) {
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cos);
+            }
+            if(tree.op == op_cos) {
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_sin);
+                out = newOperation(allocateArg(out, 0), 1, op_neg);
+            }
+            if(tree.op == op_tan) {
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_sec);
+                out = newOperation(allocateArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
+            }
+            if(tree.op == op_cot) {
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_csc);
+                out = newOperation(allocateArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
+                out = newOperation(allocateArg(out, 0), 1, op_neg);
+            }
+            if(tree.op == op_sec) {
+                Tree sec = newOperation(allocateArg(tree.branch[0], 1), 1, op_sec);
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_tan);
+                out = newOperation(allocateArgs(sec, out, 0, 0), 2, op_mult);
+            }
+            if(tree.op == op_csc) {
+                Tree csc = newOperation(allocateArg(tree.branch[0], 1), 1, op_csc);
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cot);
+                out = newOperation(allocateArgs(csc, out, 0, 0), 2, op_mult);
+                out = newOperation(allocateArg(out, 0), 1, op_neg);
+            }
+            if(treeIsOne(DOne)) return out;
+            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_mult);
+        }
+        if(tree.op < 18) {
+            Tree out;
+            if(tree.op == op_sinh)
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cosh);
+            if(tree.op == op_cosh)
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cosh);
+            if(tree.op == op_tanh) {
+                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_tanh);
+                out = newOperation(allocateArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
+                out = newOperation(allocateArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
+            }
+            if(treeIsOne(DOne)) return out;
+            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_mult);
+        }
+        if(tree.op < 24) {
+            Tree out;
+            if(tree.op == op_asin || tree.op == op_acos) {
+                out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+                out = newOperation(allocateArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
+                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+            }
+            if(tree.op == op_atan || tree.op == op_acot) {
+                out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_add);
+            }
+            if(tree.op == op_asec || tree.op == op_acsc) {
+                Tree abs = newOperation(allocateArg(tree.branch[0], 1), 1, op_abs);
+                out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_sub);
+                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+                out = newOperation(allocateArgs(abs, out, 0, 0), 2, op_div);
+            }
+            //Negate
+            if(tree.op == op_acos || tree.op == op_acot || tree.op == op_acsc)
+                out = newOperation(allocateArg(out, 0), 1, op_neg);
+            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_div);
+        }
+        if(tree.op < 27) {
+            Tree out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+            if(tree.op == op_asinh) {
+                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_add);
+                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+            }
+            if(tree.op == op_acosh) {
+                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_sub);
+                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+            }
+            if(tree.op == op_atanh) {
+                out = newOperation(allocateArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
+            }
+            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_div);
+        }
+    }
+    //Ln, arg, abs
+    if(tree.op<38) {
+        Tree DOne=derivative(tree.branch[0]);
+        if(tree.op==op_sqrt) {
+            Tree out=newOperation(allocateArg(tree.branch[0],1),1,op_sqrt);
+            out=newOperation(allocateArgs(out,newOpVal(2,0,0),0,0),2,op_mult);
+            return newOperation(allocateArgs(DOne,out,0,0),2,op_div);
+        }
+        if(tree.op==op_cbrt) {
+            freeTree(DOne);
+            Tree cbrt=newOperation(allocateArgs(tree.branch[0],newOpVal(1/3,0,0),1,0),2,op_pow);
+            Tree out=derivative(cbrt);
+            freeTree(cbrt);
+            return out;
+        }
+        if(tree.op==op_exp) {
+            Tree out=newOperation(allocateArg(tree.branch[0],1),1,op_exp);
+            if(treeIsOne(DOne)) return out;
+            return newOperation(allocateArgs(DOne,out,0,0),2,op_div);
+        }
+        if(tree.op==op_ln)
+            return newOperation(allocateArgs(DOne,tree.branch[0],0,1),2,op_div);
+        freeTree(DOne);
+    }
+    //Rounding
+    if(tree.op<50) {
+        if(tree.op==op_round||tree.op==op_floor||tree.op==op_ceil)
+            return newOpVal(0,0,0);
+    }
     error("not all functions are supported in dx currently", NULL);
     return NULLOPERATION;
 }
@@ -1307,7 +1424,7 @@ Number calculate(char* eq, double base) {
     char* cleanInput = inputClean(eq);
     if(globalError) return NULLNUM;
     //Generate tree
-    Tree tree = generateTree(base==0?cleanInput:eq, NULL, base);
+    Tree tree = generateTree(base == 0 ? cleanInput : eq, NULL, base);
     free(cleanInput);
     if(globalError) return NULLNUM;
     //Compute tree
@@ -1590,7 +1707,7 @@ void runLine(char* input) {
                 if(strcmp(input + 5, functions[i].name) == 0) {
                     if(i < immutableFunctions) {
                         error("Error: '%s' is immutable\n", input + 5);
-                        globalError=false;
+                        globalError = false;
                         return;
                     }
                     printf("Function '%s' has been deleted.\n", functions[i].name);
@@ -1603,7 +1720,7 @@ void runLine(char* input) {
                     return;
                 }
             error("Function '%s' not found\n", input + 5);
-            globalError=false;
+            globalError = false;
         }
         else if(input[1] == 'g' && input[2] == ' ') {
             //Graph
@@ -1702,26 +1819,26 @@ void runLine(char* input) {
             else degrat = calculate(input + 7, 0).r;
             printf("Degree ratio set to %g\n", degrat);
         }
-        else if(input[1]=='u'&&input[2]=='n'&&input[3]=='i'&&input[4]=='t') {
-            int i,unitStart=0;
-            for(i=5;i<strlen(input);i++) if(input[i]==' ') {
-                unitStart=i+1;
-                input[i]='\0';
+        else if(input[1] == 'u' && input[2] == 'n' && input[3] == 'i' && input[4] == 't') {
+            int i, unitStart = 0;
+            for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
+                unitStart = i + 1;
+                input[i] = '\0';
                 break;
             }
-            Number unit=calculate(input+5,10);
-            Number value=calculate(input+unitStart,0);
-            if(unit.u!=value.u) {
-                char* unitOne=toStringUnit(unit.u);
-                char* unitTwo=toStringUnit(value.u);
-                printf("Error: units %s and %s are not compatible\n",unitOne,unitTwo);
+            Number unit = calculate(input + 5, 10);
+            Number value = calculate(input + unitStart, 0);
+            if(unit.u != value.u) {
+                char* unitOne = toStringUnit(unit.u);
+                char* unitTwo = toStringUnit(value.u);
+                printf("Error: units %s and %s are not compatible\n", unitOne, unitTwo);
                 free(unitOne);
                 free(unitTwo);
                 return;
             }
-            Number out=compDivide(value,unit);
-            char* numString=toStringNumber(out,10);
-            printf("= %s %s\n",numString,input+5);
+            Number out = compDivide(value, unit);
+            char* numString = toStringNumber(out, 10);
+            printf("= %s %s\n", numString, input + 5);
             free(numString);
         }
         else {
