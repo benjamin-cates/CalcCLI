@@ -218,7 +218,7 @@ unit_t unitInteract(unit_t one, unit_t two, char op, double twor);
  * @param argCount Number of arguments
  * @param op OperatorID
  */
-Tree newOperation(Tree* args, int argCount, int op);
+Tree newOp(Tree* args, int argCount, int op);
 /**
  * Returns a new operation with id 0 and value val
  */
@@ -234,13 +234,13 @@ Tree newOpVal(double r, double i, unit_t u);
  * @param copyone bool whether to copy one before malloc
  * @param copytwo bool whether to copy two before malloc
  */
-Tree* allocateArgs(Tree one, Tree two, bool copyone, bool copytwo);
+Tree* allocArgs(Tree one, Tree two, bool copyone, bool copytwo);
 /**
  * Mallocs one argument and returns the pointer, copies if true
  * @param one operation to malloc
  * @param copy whether to treeCopy(one)
  */
-Tree* allocateArg(Tree one, bool copy);
+Tree* allocArg(Tree one, bool copy);
 //Operation Tests
 /**
  * Returns true if in.op==0 and in.val==0

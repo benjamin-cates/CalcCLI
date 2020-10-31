@@ -359,7 +359,7 @@ bool treeEqual(Tree one, Tree two) {
     return true;
 }
 //Constructors
-Tree newOperation(Tree* branches, int argCount, int opID) {
+Tree newOp(Tree* branches, int argCount, int opID) {
     Tree out;
     out.branch = branches;
     out.argCount = argCount;
@@ -380,7 +380,7 @@ Tree newOpVal(double r, double i, unit_t u) {
     out.value.u = u;
     return out;
 }
-Tree* allocateArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
+Tree* allocArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
     Tree* out = malloc(2 * sizeof(Tree));
     if(copyOne)
         out[0] = treeCopy(one, NULL, 0, 0, 0);
@@ -392,7 +392,7 @@ Tree* allocateArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
         out[1] = two;
     return out;
 }
-Tree* allocateArg(Tree one, bool copy) {
+Tree* allocArg(Tree one, bool copy) {
     Tree* out = malloc(sizeof(Tree));
     if(copy)
         out[0] = treeCopy(one, NULL, 0, 0, 0);
@@ -1036,7 +1036,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                         return NULLOPERATION;
                     }
                 }
-                ops[i] = newOperation(args, commaCount, funcID);
+                ops[i] = newOp(args, commaCount, funcID);
             }
             else {
                 int opID = findFunction(section);
@@ -1066,7 +1066,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                 if(opID == 0)
                     ops[i] = newOpValue(num);
                 else
-                    ops[i] = newOperation(NULL, 0, opID);
+                    ops[i] = newOp(NULL, 0, opID);
             }
         }
         else if((first > 41 && first < 48) || first == '^' || first == '%') {
@@ -1099,7 +1099,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                 opID = op_sub;
             else
                 error("'%s' is not a valid operator", section);
-            ops[i] = newOperation(NULL, 0, opID);
+            ops[i] = newOp(NULL, 0, opID);
             continue;
         }
         else if(first == '(') {
@@ -1155,7 +1155,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
         }
         if(nextNegative && !(first > 41 && first < 48) && first != '^' && first != '%') {
             nextNegative = false;
-            ops[i] = newOperation(allocateArg(ops[i], false), 1, op_neg);
+            ops[i] = newOp(allocArg(ops[i], false), 1, op_neg);
         }
     }
     //Compile operations into operation tree
@@ -1176,7 +1176,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
     for(i = 0; i < operationCount - offset - 1; i++) {
         ops[i] = ops[i + offset];
         if((ops[i].op < 3 || ops[i].op > 8 || (ops[i].op != 0 && ops[i].argCount != 0)) && (ops[i + offset + 1].op < 3 || ops[i + offset + 1].op > 8 || (ops[i + offset + 1].op != 0 && ops[i + offset + 1].argCount != 0))) {
-            ops[i] = newOperation(allocateArgs(ops[i], ops[i + offset + 1], 0, 0), 2, op_mult);
+            ops[i] = newOp(allocArgs(ops[i], ops[i + offset + 1], 0, 0), 2, op_mult);
             offset++;
             totalOpsCount--;
         }
@@ -1194,7 +1194,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                     error("missing argument in operation", NULL);
                     return NULLOPERATION;
                 }
-                ops[j] = newOperation(allocateArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, i);
+                ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, i);
                 ops[j - 1] = ops[j];
                 j--;
                 totalOpsCount -= 2;
@@ -1223,37 +1223,37 @@ Tree derivative(Tree tree) {
         //DOne is the derivative of one
         //DTwo is the derivative of two
         Tree DOne = derivative(tree.branch[0]);
-        if(tree.op == op_neg) return newOperation(allocateArg(DOne, 0), 1, op_neg);
+        if(tree.op == op_neg) return newOp(allocArg(DOne, 0), 1, op_neg);
         Tree DTwo = derivative(tree.branch[1]);
         if(globalError)
             return NULLOPERATION;
         if(tree.op == op_add || tree.op == op_sub)
-            return newOperation(allocateArgs(DOne, DTwo, 0, 0), 2, tree.op);
+            return newOp(allocArgs(DOne, DTwo, 0, 0), 2, tree.op);
         if(tree.op == op_mult) {
             //f(x)*g'(x) + g(x)*f'(x)
             Tree DoneTwo, DtwoOne;
             if(!treeIsZero(DOne))
-                DoneTwo = newOperation(allocateArgs(tree.branch[1], DOne, 1, 0), 2, op_mult);
+                DoneTwo = newOp(allocArgs(tree.branch[1], DOne, 1, 0), 2, op_mult);
             else
                 DoneTwo = newOpVal(0, 0, 0);
             if(!treeIsZero(DTwo))
-                DtwoOne = newOperation(allocateArgs(tree.branch[0], DTwo, 1, 0), 2, op_mult);
+                DtwoOne = newOp(allocArgs(tree.branch[0], DTwo, 1, 0), 2, op_mult);
             else
                 return DoneTwo;
             if(treeIsZero(DoneTwo))
                 return DtwoOne;
             else
-                return newOperation(allocateArgs(DoneTwo, DtwoOne, 0, 0), 2, op_add);
+                return newOp(allocArgs(DoneTwo, DtwoOne, 0, 0), 2, op_add);
         }
         if(tree.op == op_div) {
             //(f'x*gx - g'x*fx) / (gx)^2
             Tree DoneTwo, DtwoOne, out;
             if(!treeIsZero(DOne))
-                DoneTwo = newOperation(allocateArgs(DOne, tree.branch[1], 0, 1), 2, op_mult);
+                DoneTwo = newOp(allocArgs(DOne, tree.branch[1], 0, 1), 2, op_mult);
             else
                 DoneTwo = newOpVal(0, 0, 0);
             if(!treeIsZero(DTwo))
-                DtwoOne = newOperation(allocateArgs(DTwo, tree.branch[0], 0, 1), 2, op_mult);
+                DtwoOne = newOp(allocArgs(DTwo, tree.branch[0], 0, 1), 2, op_mult);
             else
                 DtwoOne = newOpVal(0, 0, 0);
             if(treeIsZero(DoneTwo))
@@ -1261,9 +1261,9 @@ Tree derivative(Tree tree) {
             else if(treeIsZero(DtwoOne))
                 out = DoneTwo;
             else
-                out = newOperation(allocateArgs(DoneTwo, DtwoOne, 0, 0), 2, op_sub);
-            Tree gxSq = newOperation(allocateArgs(tree.branch[1], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
-            return newOperation(allocateArgs(out, gxSq, 0, 0), 2, op_div);
+                out = newOp(allocArgs(DoneTwo, DtwoOne, 0, 0), 2, op_sub);
+            Tree gxSq = newOp(allocArgs(tree.branch[1], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+            return newOp(allocArgs(out, gxSq, 0, 0), 2, op_div);
         }
         if(tree.op == op_mod) {
             error("modulo not supported in dx.", NULL);
@@ -1273,30 +1273,30 @@ Tree derivative(Tree tree) {
             //fx^gx * g'x * ln(fx)  +  fx^(g(x)-1) * gx * f'x
             Tree p1, p2;
             if(!treeIsZero(DTwo)) {
-                Tree fxgx = newOperation(allocateArgs(tree.branch[0], tree.branch[1], 1, 1), 2, op_pow);
-                Tree lnfx = newOperation(allocateArg(tree.branch[0], 1), 1, op_ln);
-                Tree fxgxlnfx = newOperation(allocateArgs(fxgx, lnfx, 0, 0), 2, op_mult);
+                Tree fxgx = newOp(allocArgs(tree.branch[0], tree.branch[1], 1, 1), 2, op_pow);
+                Tree lnfx = newOp(allocArg(tree.branch[0], 1), 1, op_ln);
+                Tree fxgxlnfx = newOp(allocArgs(fxgx, lnfx, 0, 0), 2, op_mult);
                 if(treeIsOne(DTwo))
                     p1 = fxgxlnfx;
                 else
-                    p1 = newOperation(allocateArgs(fxgxlnfx, DTwo, 0, 0), 2, op_mult);
+                    p1 = newOp(allocArgs(fxgxlnfx, DTwo, 0, 0), 2, op_mult);
             }
             else
                 p1 = newOpVal(0, 0, 0);
             if(!treeIsZero(DOne)) {
-                Tree gm1 = newOperation(allocateArgs(tree.branch[1], newOpVal(1, 0, 0), 1, 0), 2, op_sub);
-                Tree fxgm1 = newOperation(allocateArgs(tree.branch[0], gm1, 1, 0), 2, op_pow);
-                Tree fxgm1gx = newOperation(allocateArgs(fxgm1, tree.branch[1], 0, 1), 2, op_mult);
+                Tree gm1 = newOp(allocArgs(tree.branch[1], newOpVal(1, 0, 0), 1, 0), 2, op_sub);
+                Tree fxgm1 = newOp(allocArgs(tree.branch[0], gm1, 1, 0), 2, op_pow);
+                Tree fxgm1gx = newOp(allocArgs(fxgm1, tree.branch[1], 0, 1), 2, op_mult);
                 if(treeIsOne(DOne))
                     p2 = fxgm1gx;
                 else
-                    p2 = newOperation(allocateArgs(fxgm1gx, DOne, 0, 0), 2, op_mult);
+                    p2 = newOp(allocArgs(fxgm1gx, DOne, 0, 0), 2, op_mult);
             }
             else
                 return p1;
             if(treeIsZero(p1))
                 return p2;
-            return newOperation(allocateArgs(p1, p2, 0, 0), 2, op_add);
+            return newOp(allocArgs(p1, p2, 0, 0), 2, op_add);
         }
     }
     //Trigonomety
@@ -1305,110 +1305,110 @@ Tree derivative(Tree tree) {
         if(tree.op < 15) {
             Tree out;
             if(tree.op == op_sin) {
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cos);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_cos);
             }
             if(tree.op == op_cos) {
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_sin);
-                out = newOperation(allocateArg(out, 0), 1, op_neg);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_sin);
+                out = newOp(allocArg(out, 0), 1, op_neg);
             }
             if(tree.op == op_tan) {
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_sec);
-                out = newOperation(allocateArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_sec);
+                out = newOp(allocArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
             }
             if(tree.op == op_cot) {
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_csc);
-                out = newOperation(allocateArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
-                out = newOperation(allocateArg(out, 0), 1, op_neg);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_csc);
+                out = newOp(allocArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
+                out = newOp(allocArg(out, 0), 1, op_neg);
             }
             if(tree.op == op_sec) {
-                Tree sec = newOperation(allocateArg(tree.branch[0], 1), 1, op_sec);
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_tan);
-                out = newOperation(allocateArgs(sec, out, 0, 0), 2, op_mult);
+                Tree sec = newOp(allocArg(tree.branch[0], 1), 1, op_sec);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_tan);
+                out = newOp(allocArgs(sec, out, 0, 0), 2, op_mult);
             }
             if(tree.op == op_csc) {
-                Tree csc = newOperation(allocateArg(tree.branch[0], 1), 1, op_csc);
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cot);
-                out = newOperation(allocateArgs(csc, out, 0, 0), 2, op_mult);
-                out = newOperation(allocateArg(out, 0), 1, op_neg);
+                Tree csc = newOp(allocArg(tree.branch[0], 1), 1, op_csc);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_cot);
+                out = newOp(allocArgs(csc, out, 0, 0), 2, op_mult);
+                out = newOp(allocArg(out, 0), 1, op_neg);
             }
             if(treeIsOne(DOne)) return out;
-            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_mult);
+            return newOp(allocArgs(DOne, out, 0, 0), 2, op_mult);
         }
         if(tree.op < 18) {
             Tree out;
             if(tree.op == op_sinh)
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cosh);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_cosh);
             if(tree.op == op_cosh)
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_cosh);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_cosh);
             if(tree.op == op_tanh) {
-                out = newOperation(allocateArg(tree.branch[0], 1), 1, op_tanh);
-                out = newOperation(allocateArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
-                out = newOperation(allocateArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
+                out = newOp(allocArg(tree.branch[0], 1), 1, op_tanh);
+                out = newOp(allocArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_pow);
+                out = newOp(allocArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
             }
             if(treeIsOne(DOne)) return out;
-            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_mult);
+            return newOp(allocArgs(DOne, out, 0, 0), 2, op_mult);
         }
         if(tree.op < 24) {
             Tree out;
             if(tree.op == op_asin || tree.op == op_acos) {
-                out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
-                out = newOperation(allocateArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
-                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+                out = newOp(allocArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+                out = newOp(allocArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
+                out = newOp(allocArg(out, 0), 1, op_sqrt);
             }
             if(tree.op == op_atan || tree.op == op_acot) {
-                out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
-                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_add);
+                out = newOp(allocArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+                out = newOp(allocArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_add);
             }
             if(tree.op == op_asec || tree.op == op_acsc) {
-                Tree abs = newOperation(allocateArg(tree.branch[0], 1), 1, op_abs);
-                out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
-                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_sub);
-                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
-                out = newOperation(allocateArgs(abs, out, 0, 0), 2, op_div);
+                Tree abs = newOp(allocArg(tree.branch[0], 1), 1, op_abs);
+                out = newOp(allocArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+                out = newOp(allocArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_sub);
+                out = newOp(allocArg(out, 0), 1, op_sqrt);
+                out = newOp(allocArgs(abs, out, 0, 0), 2, op_div);
             }
             //Negate
             if(tree.op == op_acos || tree.op == op_acot || tree.op == op_acsc)
-                out = newOperation(allocateArg(out, 0), 1, op_neg);
-            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_div);
+                out = newOp(allocArg(out, 0), 1, op_neg);
+            return newOp(allocArgs(DOne, out, 0, 0), 2, op_div);
         }
         if(tree.op < 27) {
-            Tree out = newOperation(allocateArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
+            Tree out = newOp(allocArgs(tree.branch[0], newOpVal(2, 0, 0), 1, 0), 2, op_pow);
             if(tree.op == op_asinh) {
-                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_add);
-                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+                out = newOp(allocArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_add);
+                out = newOp(allocArg(out, 0), 1, op_sqrt);
             }
             if(tree.op == op_acosh) {
-                out = newOperation(allocateArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_sub);
-                out = newOperation(allocateArg(out, 0), 1, op_sqrt);
+                out = newOp(allocArgs(out, newOpVal(1, 0, 0), 0, 0), 2, op_sub);
+                out = newOp(allocArg(out, 0), 1, op_sqrt);
             }
             if(tree.op == op_atanh) {
-                out = newOperation(allocateArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
+                out = newOp(allocArgs(newOpVal(1, 0, 0), out, 0, 0), 2, op_sub);
             }
-            return newOperation(allocateArgs(DOne, out, 0, 0), 2, op_div);
+            return newOp(allocArgs(DOne, out, 0, 0), 2, op_div);
         }
     }
     //Ln, arg, abs
     if(tree.op<38) {
         Tree DOne=derivative(tree.branch[0]);
         if(tree.op==op_sqrt) {
-            Tree out=newOperation(allocateArg(tree.branch[0],1),1,op_sqrt);
-            out=newOperation(allocateArgs(out,newOpVal(2,0,0),0,0),2,op_mult);
-            return newOperation(allocateArgs(DOne,out,0,0),2,op_div);
+            Tree out=newOp(allocArg(tree.branch[0],1),1,op_sqrt);
+            out=newOp(allocArgs(out,newOpVal(2,0,0),0,0),2,op_mult);
+            return newOp(allocArgs(DOne,out,0,0),2,op_div);
         }
         if(tree.op==op_cbrt) {
             freeTree(DOne);
-            Tree cbrt=newOperation(allocateArgs(tree.branch[0],newOpVal(1/3,0,0),1,0),2,op_pow);
+            Tree cbrt=newOp(allocArgs(tree.branch[0],newOpVal(1/3,0,0),1,0),2,op_pow);
             Tree out=derivative(cbrt);
             freeTree(cbrt);
             return out;
         }
         if(tree.op==op_exp) {
-            Tree out=newOperation(allocateArg(tree.branch[0],1),1,op_exp);
+            Tree out=newOp(allocArg(tree.branch[0],1),1,op_exp);
             if(treeIsOne(DOne)) return out;
-            return newOperation(allocateArgs(DOne,out,0,0),2,op_div);
+            return newOp(allocArgs(DOne,out,0,0),2,op_div);
         }
         if(tree.op==op_ln)
-            return newOperation(allocateArgs(DOne,tree.branch[0],0,1),2,op_div);
+            return newOp(allocArgs(DOne,tree.branch[0],0,1),2,op_div);
         freeTree(DOne);
     }
     //Rounding
