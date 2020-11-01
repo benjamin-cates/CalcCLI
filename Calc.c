@@ -266,7 +266,7 @@ char* doubleToString(double num, double base) {
     //Create exponent suffix, if necessary
     int expLen = 0, exp = 0;
     char expString[8];
-    if(magnitude > 14 || magnitude < -14) exp = floor(magnitude);
+    if(magnitude > 14 || magnitude < -14) exp = floor(magnitude*1.000000000000001);
     if(exp != 0) {
         snprintf(expString, 7, "e%d", exp);
         expLen = strlen(expString);
@@ -274,7 +274,7 @@ char* doubleToString(double num, double base) {
     }
     //Calculate power of highest digit
     double power;
-    if(exp == 0) power = pow(base, floor(magnitude));
+    if(exp == 0) power = pow(base, floor(magnitude*1.000000000000001));
     else power = 1;
     if(power < 1) power = 1;
     //Main loop
