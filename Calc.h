@@ -20,7 +20,7 @@ extern "C" {
 #endif
 #ifndef unit_t
     //Number of units#
-    #define unitCount 26
+    #define unitCount 59
     //Number of immutable functions
     #define immutableFunctions 65
     /*
@@ -59,9 +59,9 @@ typedef struct NumberStruct {
  */
 typedef struct UnitStandardStuct {
     char* name;
+    double multiplier;
     unit_t baseUnits;
     //Multiplier is negative when it supports metric prefixes
-    double multiplier;
 } unitStandard;
 /**
  * Operation tree. Value and args are in a union, so changing one with change the other.
@@ -109,7 +109,7 @@ extern Number NULLNUM;
 //History array
 extern Number* history;
 //All predefined units
-extern unitStandard* unitList;
+extern const unitStandard unitList[];
 //Tree with op=0 and value=0
 extern Tree NULLOPERATION;
 //Number of functions

@@ -15,13 +15,75 @@ bool verbose = false;
 bool globalError = false;
 Number NULLNUM;
 Number* history;
-unitStandard* unitList;
+const unitStandard unitList[] = {
+    {"m", -1.0, 0x1},                  //Meter
+    {"kg", 1.0, 0x100},                //Kilogram
+    {"g", -0.001, 0x100},            //Gram
+    {"s", -1.0, 0x10000},              //Second
+    {"A", -1.0, 0x1000000},            //Ampere
+    {"K", -1.0, 0x100000000},          //Kelvin
+    {"mol", -1.0, 0x10000000000},      //Mole
+    {"$", 1.0, 0x1000000000000},       //Dollar
+    {"b", -1.0, 0x100000000000000},    //Bit
+    {"B", -8.0, 0x100000000000000},    //Byte
+    {"bps", -1.0, 0x100000000FF0000}, //Bits per second
+    {"Bps", -8.0, 0x100000000FF0000}, //Bytes per second
+    {"J", -1.0, 0xFE0102},            //Joule
+    {"W", -1.0, 0xFD0102},            //Watt
+    {"V", -1.0, 0x01FD0102},          //Volt
+    {"ohm", -1.0, 0xFEFD0102},        //Ohm
+    {"H", -1.0, 0xFEFE0102},          //Henry
+    {"Wb", -1.0, 0xFFFE0102},         //Weber
+    {"Hz", -1.0, 0xFF0000},           //Hertz
+    {"S", -1.0, 0x203FFFE},           //Siemens
+    {"F", -1.0, 0x204FFFE},           //Farad
+    {"T", -1.0, 0xFFFE0100},          //Tesla
+    {"Pa", -1.0, 0xFE01FF},           //Pascal
+    {"N", -1.0, 0xFE0101},            //Newton
+    {"Sv", -1.0, 0xFE0002},           //Sievert
+    {"kat", -1.0, 0x10000FF0000},     //Katal
+    {"min",60.0,0x010000},
+    {"hr",3600.0,0x010000},
+    {"day",86400.0,0x010000},
+    {"kph",0.277777777777777,0xFF0001},
+    {"mph",0.4470388888888888,0xFF0001},
+    {"mach",0.5144444444444,0xFF0001},
+    {"c",299792458.0,0xFF0001},
+    {"ft",0.3048,0x01},
+    {"mi",1609.344,0x01},
+    {"yd",0.9144,0x01},
+    {"in",0.0254,0x01},
+    {"nmi",1852.0,0x01},
+    {"pc",-30857000000000000.0,0x01},
+    {"acre",4046.8564224,0x02},
+    {"are",-1000.0,0x02},
+    {"ct",0.0002,0x0100},
+    {"mi",1609.344,0x0100},
+    {"st",6.35029318,0x0100},
+    {"ln",0.45359237,0x0100},
+    {"oz",0.028349523125,0x0100},
+    {"tn",1000.0,0x0100},
+    {"gallon",0.00454609,0x03},
+    {"cup",0.0002365882365,0x03},
+    {"floz",0.0000295735295625,0x03},
+    {"tbsp",0.00001478676478125,0x03},
+    {"tsp",0.000000492892159375,0x03},
+    {"Ah",-3600.0,0x01010000},
+    {"Wh",-3600.0,0xFE0102},
+    {"eV",-0.0000000000000000001602176620898,0xFE0102},
+    {"atm",101352.0,0xFE01FF},
+    {"bar",-100000.0,0xFE01FF},
+    {"psi",6894.75729316836133,0xFE01FF},
+    {"btu",1054.3503,0xFE0102},
+    {"F",0.55555555555555,0x0100000000},
+
+};
 Tree NULLOPERATION;
 int numFunctions = immutableFunctions;
 int functionArrayLength = immutableFunctions + 10;
 Function* functions;
-const char metricNums[] = "yzafpnumckMGTPEZY";
-const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
+const char metricNums[] = "yzafpnumchkMGTPEZY";
+const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 100, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
 const char* baseUnits[] = { "m", "kg", "s", "A", "K", "mol", "$", "bit" };
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 #pragma endregion
@@ -1586,7 +1648,6 @@ void cleanup() {
     //Free global array
     free(functions);
     free(history);
-    free(unitList);
 }
 void startup() {
     //Constants
@@ -1662,34 +1723,6 @@ void startup() {
     functions[op_rand] = newFunction("rand", NULL, 0, NULL);
     functions[op_sum] = newFunction("sum", NULL, 4, NULL);
     functions[op_product] = newFunction("product", NULL, 4, NULL);
-    //Define unit standards
-    unitList = calloc(26, sizeof(unitStandard));
-    unitList[0] = newUnit("m", -1, 0x1);                  //Meter
-    unitList[1] = newUnit("kg", 1, 0x100);                //Kilogram
-    unitList[2] = newUnit("g", -0.001, 0x100);            //Gram
-    unitList[3] = newUnit("s", -1, 0x10000);              //Second
-    unitList[4] = newUnit("A", -1, 0x1000000);            //Ampere
-    unitList[5] = newUnit("K", -1, 0x100000000);          //Kelvin
-    unitList[6] = newUnit("mol", -1, 0x10000000000);      //Mole
-    unitList[7] = newUnit("$", 1, 0x1000000000000);       //Dollar
-    unitList[8] = newUnit("b", -1, 0x100000000000000);    //Bit
-    unitList[9] = newUnit("B", -8, 0x100000000000000);    //Byte
-    unitList[10] = newUnit("bps", -1, 0x100000000FF0000); //Bits per second
-    unitList[11] = newUnit("Bps", -8, 0x100000000FF0000); //Bytes per second
-    unitList[12] = newUnit("J", -1, 0xFE0102);            //Joule
-    unitList[13] = newUnit("W", -1, 0xFD0102);            //Watt
-    unitList[14] = newUnit("V", -1, 0x01FD0102);          //Volt
-    unitList[15] = newUnit("ohm", -1, 0xFEFD0102);        //Ohm
-    unitList[16] = newUnit("H", -1, 0xFEFE0102);          //Henry
-    unitList[17] = newUnit("Wb", -1, 0xFFFE0102);         //Weber
-    unitList[18] = newUnit("Hz", -1, 0xFF0000);           //Hertz
-    unitList[19] = newUnit("S", -1, 0x203FFFE);           //Siemens
-    unitList[20] = newUnit("F", -1, 0x204FFFE);           //Farad
-    unitList[21] = newUnit("T", -1, 0xFFFE0100);          //Tesla
-    unitList[22] = newUnit("Pa", -1, 0xFE01FF);           //Pascal
-    unitList[23] = newUnit("N", -1, 0xFE0101);            //Newton
-    unitList[24] = newUnit("Sv", -1, 0xFE0002);           //Sievert
-    unitList[25] = newUnit("kat", -1, 0x10000FF0000);     //Katal
 }
 void runLine(char* input) {
     int i;
