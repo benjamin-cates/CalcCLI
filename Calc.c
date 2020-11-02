@@ -266,7 +266,7 @@ char* doubleToString(double num, double base) {
     //Create exponent suffix, if necessary
     int expLen = 0, exp = 0;
     char expString[8];
-    if(magnitude > 14 || magnitude < -14) exp = floor(magnitude*1.000000000000001);
+    if(magnitude > 14 || magnitude < -14) exp = floor(magnitude * 1.000000000000001);
     if(exp != 0) {
         snprintf(expString, 7, "e%d", exp);
         expLen = strlen(expString);
@@ -274,7 +274,7 @@ char* doubleToString(double num, double base) {
     }
     //Calculate power of highest digit
     double power;
-    if(exp == 0) power = pow(base, floor(magnitude*1.000000000000001));
+    if(exp == 0) power = pow(base, floor(magnitude * 1.000000000000001));
     else power = 1;
     if(power < 1) power = 1;
     //Main loop
@@ -938,10 +938,6 @@ Tree generateTree(char* eq, char* argNames, double base) {
             printf(" (units, base=%g)", base);
         printf("\nInput: %s\n", eq);
     }
-    if(strlen(eq) == 0) {
-        error("no equation", NULL);
-        return NULLOPERATION;
-    }
     //Divide into sections
     int i, brackets = 0, sectionCount = 0, pType = 0, eqLength = strlen(eq);
     int sections[eqLength + 1];
@@ -955,12 +951,12 @@ Tree generateTree(char* eq, char* argNames, double base) {
         }
         if(eq[i] == ')')
             if(--brackets < 0) {
-                error("bracket mismatch", NULL);
+                error("bracket mismatch 1", NULL);
                 return NULLOPERATION;
             }
         if(eq[i] == ']') {
-            if(brackets-- < 0) {
-                error("bracket mismatch", NULL);
+            if(--brackets < 0) {
+                error("bracket mismatch 2", NULL);
                 return NULLOPERATION;
             }
             if(i != eqLength - 1)
@@ -983,62 +979,55 @@ Tree generateTree(char* eq, char* argNames, double base) {
                     continue;
                 }
         }
-        if(brackets == 0) {
-            if(((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') && pType != 1) {
-                pType = 1;
-                sections[sectionCount++] = i;
-            }
-            else if(((eq[i] >= '*' && eq[i] <= '/' && eq[i] != '.') || eq[i] == '%' || eq[i] == '^') && pType != 2) {
-                pType = 2;
-                sections[sectionCount++] = i;
-            }
-            else if(((eq[i] >= 'a' && eq[i] <= 'z') || (useUnits && ((eq[i] >= 'A' && eq[i] <= 'Z') || eq[i] == '$') && (pType != 1 || (eq[i] > 'A' + (int)base - 10)))) && pType != 3) {
-                if(i != 0 && eq[i - 1] == '0' && (eq[i] == 'b' || eq[i] == 'x' || eq[i] == 'd' || eq[i] == 'o'))
-                    continue;
-                pType = 3;
-                sections[sectionCount++] = i;
-            }
+        if(brackets != 0) continue;
+        if(((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') && pType != 1) {
+            pType = 1;
+            sections[sectionCount++] = i;
+        }
+        else if(((eq[i] >= '*' && eq[i] <= '/' && eq[i] != '.') || eq[i] == '%' || eq[i] == '^') && pType != 2) {
+            pType = 2;
+            sections[sectionCount++] = i;
+        }
+        else if(((eq[i] >= 'a' && eq[i] <= 'z') || (useUnits && ((eq[i] >= 'A' && eq[i] <= 'Z') || eq[i] == '$') && (pType != 1 || (eq[i] > 'A' + (int)base - 10)))) && pType != 3) {
+            if(i != 0 && eq[i - 1] == '0' && (eq[i] == 'b' || eq[i] == 'x' || eq[i] == 'd' || eq[i] == 'o'))
+                continue;
+            pType = 3;
+            sections[sectionCount++] = i;
         }
         if(i == 0 && sectionCount == 0)
             sectionCount++;
     }
-    sections[sectionCount] = strlen(eq);
+    sections[sectionCount] = eqLength;
     if(brackets != 0) {
-        error("bracket mismatch", NULL);
+        error("bracket mismatch 0", NULL);
         return NULLOPERATION;
     }
     //Generate operations from strings
     Tree ops[sectionCount];
-    if(verbose)
-        printf("Sections(%d): ", sectionCount);
+    if(verbose) printf("Sections(%d): ", sectionCount);
     //set to true when it comes across *- or /- or ^- or %-
     bool nextNegative = false;
     for(i = 0; i < sectionCount; i++) {
         //Get section substring
         int j, sectionLength = sections[i + 1] - sections[i];
         char section[sectionLength + 1];
-        for(j = sections[i]; j < sections[i + 1]; j++)
-            section[j - sections[i]] = eq[j];
+        memcpy(section, eq + sections[i], sectionLength);
         section[sectionLength] = '\0';
         if(verbose)
             printf("%s, ", section);
         //Parse section
         char first = eq[sections[i]];
-        if(first >= '0' && first <= '9') {
+        if(first >= '0' && first <= '9' || first == '.') {
             //Number
             double numBase = base;
             bool useBase = false;
             if(first == '0') {
-                if(eq[sections[i] + 1] >= 'a')
-                    useBase = true;
-                if(eq[sections[i] + 1] == 'b')
-                    numBase = 2;
-                if(eq[sections[i] + 1] == 'o')
-                    numBase = 8;
-                if(eq[sections[i] + 1] == 'd')
-                    numBase = 10;
-                if(eq[sections[i] + 1] == 'x')
-                    numBase = 16;
+                char base = eq[sections[i] + 1];
+                if(base >= 'a') useBase = true;
+                if(base == 'b') numBase = 2;
+                if(base == 'o') numBase = 8;
+                if(base == 'd') numBase = 10;
+                if(base == 'x') numBase = 16;
             }
             double numr = parseNumber(section + (useBase ? 2 : 0), numBase);
             ops[i] = newOpVal(numr, 0, 0);
@@ -1048,7 +1037,6 @@ Tree generateTree(char* eq, char* argNames, double base) {
                 //Function
                 int j;
                 int commas[sectionLength];
-                memset(commas, 0, sizeof(commas));
                 int commaCount = 1;
                 int openBracket = 0;
                 int brackets = 0;
@@ -1058,19 +1046,17 @@ Tree generateTree(char* eq, char* argNames, double base) {
                         openBracket = j;
                     if(section[j] == '(')
                         brackets++;
-                    if(section[j] == ')')
+                    else if(section[j] == ')')
                         brackets--;
                     if(section[j] == ',' && brackets == 1)
                         commas[commaCount++] = j;
                 }
                 commas[0] = openBracket;
                 commas[commaCount] = sectionLength - 1;
-                char name[openBracket + 1];
-                memcpy(name, section, openBracket);
-                name[openBracket] = '\0';
-                int funcID = findFunction(name);
+                section[openBracket] = '\0';
+                int funcID = findFunction(section);
                 if(funcID == 0) {
-                    error("function '%s' does not exist", name);
+                    error("function '%s' does not exist", section);
                     return NULLOPERATION;
                 }
                 if(functions[funcID].argCount != commaCount) {
@@ -1101,6 +1087,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                 ops[i] = newOp(args, commaCount, funcID);
             }
             else {
+                //Variables or units
                 int opID = findFunction(section);
                 Number num = NULLNUM;
                 if(sectionLength == 1 && argNames != NULL) {
@@ -1116,6 +1103,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                         return NULLOPERATION;
                     }
                 }
+                //Check for errors
                 else if(opID == 0) {
                     error("Variable '%s' not found", section);
                     return NULLOPERATION;
@@ -1125,52 +1113,44 @@ Tree generateTree(char* eq, char* argNames, double base) {
                         error("no arguments for function '%s'", section);
                         return NULLOPERATION;
                     }
+                //Set operation
                 if(opID == 0)
                     ops[i] = newOpValue(num);
                 else
                     ops[i] = newOp(NULL, 0, opID);
             }
         }
-        else if((first > 41 && first < 48) || first == '^' || first == '%') {
+        else if((first >= '*' && first <= '/') || first == '^' || first == '%') {
             int opID = 0;
             //For negative operations eg. *-
-            if(strlen(section) > 1) {
+            if(first == '*' && section[1] == '*')
+                opID = op_pow;
+            else if(sectionLength > 1) {
                 if(section[1] == '-')
                     nextNegative = true;
                 else
                     error("'%s' not a valid operator", section);
             }
-            if(first == '-' && i == 0) {
+            else if(first == '-' && i == 0) {
+                //This operation is multplied by the next value, it is a place holder
                 ops[i] = newOpVal(1, 0, 0);
                 nextNegative = true;
                 continue;
             }
-            if(first == '^')
-                opID = op_pow;
-            else if(first == '%')
-                opID = op_mod;
-            else if(first == '*' && section[1] == '*')
-                opID = op_pow;
-            else if(first == '*')
-                opID = op_mult;
-            else if(first == '/')
-                opID = op_div;
-            else if(first == '+')
-                opID = op_add;
-            else if(first == '-')
-                opID = op_sub;
-            else
-                error("'%s' is not a valid operator", section);
+            else if(first == '^') opID = op_pow;
+            else if(first == '%') opID = op_mod;
+            else if(first == '*') opID = op_mult;
+            else if(first == '/') opID = op_div;
+            else if(first == '+') opID = op_add;
+            else if(first == '-') opID = op_sub;
+            else error("'%s' is not a valid operator", section);
             ops[i] = newOp(NULL, 0, opID);
             continue;
         }
         else if(first == '(') {
             //Round bracket
             section[sectionLength - 1] = '\0';
-            char exp[sectionLength - 1];
-            memset(exp, 0, sizeof(exp));
-            memcpy(exp, section + 1, sectionLength - 2);
-            ops[i] = generateTree(exp, argNames, 0);
+            ops[i] = generateTree(section + 1, argNames, 0);
             if(globalError)
                 return NULLOPERATION;
         }
@@ -1204,10 +1184,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
             }
             else
                 section[sectionLength - 1] = '\0';
-            char exp[strlen(section) + 1];
-            memset(exp, 0, sizeof(exp));
-            memcpy(exp, section + 1, strlen(section) - 1);
-            ops[i] = generateTree(exp, argNames, base);
+            ops[i] = generateTree(section + 1, argNames, base);
             if(globalError)
                 return NULLOPERATION;
         }
@@ -1215,17 +1192,15 @@ Tree generateTree(char* eq, char* argNames, double base) {
             error("unable to parse '%s'", section);
             return NULLOPERATION;
         }
-        if(nextNegative && !(first > 41 && first < 48) && first != '^' && first != '%') {
+        if(nextNegative && !(first > '*' && first < '/') && first != '^' && first != '%') {
             nextNegative = false;
             ops[i] = newOp(allocArg(ops[i], false), 1, op_neg);
         }
     }
-    //Compile operations into operation tree
-    int operationCount = sectionCount;
-    int totalOpsCount = operationCount;
+    //Compile operations into tree
     if(verbose) {
         printf("\nOperation List(%d): ", sectionCount);
-        for(i = 0; i < operationCount; i++) {
+        for(i = 0; i < sectionCount; i++) {
             if(i != 0)
                 printf(", ");
             char* operationString = treeToString(ops[i], false, argNames);
@@ -1235,39 +1210,39 @@ Tree generateTree(char* eq, char* argNames, double base) {
     }
     int offset = 0;
     //Side-by-side multiplication
-    for(i = 0; i < operationCount - offset - 1; i++) {
+    for(i = 1; i < sectionCount; i++) {
         ops[i] = ops[i + offset];
-        if((ops[i].op < 3 || ops[i].op > 8 || (ops[i].op != 0 && ops[i].argCount != 0)) && (ops[i + offset + 1].op < 3 || ops[i + offset + 1].op > 8 || (ops[i + offset + 1].op != 0 && ops[i + offset + 1].argCount != 0))) {
-            ops[i] = newOp(allocArgs(ops[i], ops[i + offset + 1], 0, 0), 2, op_mult);
-            offset++;
-            totalOpsCount--;
-        }
+        //Check if ineligible
+        if(ops[i].op >= op_pow && ops[i].op <= op_sub && ops[i].argCount == 0) continue;
+        if(ops[i - 1].op >= op_pow && ops[i - 1].op <= op_sub && ops[i - 1].argCount == 0) continue;
+        //Combine them
+        ops[i-1] = newOp(allocArgs(ops[i - 1], ops[i], 0, 0), 2, op_mult);
+        offset++;
+        sectionCount--;
+        i--;
     }
     ops[i] = ops[i + offset];
     //Condense operations: ^%*/+-
     for(i = 3; i < 9; i++) {
         offset = 0;
-        operationCount = totalOpsCount;
         int j;
-        for(j = 0; j < operationCount - offset; j++) {
+        for(j = 0; j < sectionCount + offset; j++) {
             ops[j] = ops[j + offset];
-            if(ops[j].op == i && ops[j].argCount == 0) {
-                if(j == 0 || j == operationCount - 1 - offset) {
-                    error("missing argument in operation", NULL);
-                    return NULLOPERATION;
-                }
-                ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, i);
-                ops[j - 1] = ops[j];
-                j--;
-                totalOpsCount -= 2;
-                offset += 2;
+            if(ops[j].op != i || ops[j].argCount != 0) continue;
+            if(j == 0 || j == sectionCount - 1) {
+                error("missing argument in operation", NULL);
+                return NULLOPERATION;
             }
+            ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, i);
+            ops[j - 1] = ops[j];
+            j--;
+            sectionCount -= 2;
+            offset += 2;
         }
     }
     if(verbose) {
         char* operationString = treeToString(ops[0], false, argNames);
-        printf("\nFinal Tree: %s\n", operationString);
-        printf("Tree Count: %d\n", totalOpsCount);
+        printf("\nFinal Tree(%d): %s\n", sectionCount, operationString);
         free(operationString);
     }
     return ops[0];
@@ -1450,33 +1425,33 @@ Tree derivative(Tree tree) {
         }
     }
     //Ln, arg, abs
-    if(tree.op<38) {
-        Tree DOne=derivative(tree.branch[0]);
-        if(tree.op==op_sqrt) {
-            Tree out=newOp(allocArg(tree.branch[0],1),1,op_sqrt);
-            out=newOp(allocArgs(out,newOpVal(2,0,0),0,0),2,op_mult);
-            return newOp(allocArgs(DOne,out,0,0),2,op_div);
+    if(tree.op < 38) {
+        Tree DOne = derivative(tree.branch[0]);
+        if(tree.op == op_sqrt) {
+            Tree out = newOp(allocArg(tree.branch[0], 1), 1, op_sqrt);
+            out = newOp(allocArgs(out, newOpVal(2, 0, 0), 0, 0), 2, op_mult);
+            return newOp(allocArgs(DOne, out, 0, 0), 2, op_div);
         }
-        if(tree.op==op_cbrt) {
+        if(tree.op == op_cbrt) {
             freeTree(DOne);
-            Tree cbrt=newOp(allocArgs(tree.branch[0],newOpVal(1/3,0,0),1,0),2,op_pow);
-            Tree out=derivative(cbrt);
+            Tree cbrt = newOp(allocArgs(tree.branch[0], newOpVal(1 / 3, 0, 0), 1, 0), 2, op_pow);
+            Tree out = derivative(cbrt);
             freeTree(cbrt);
             return out;
         }
-        if(tree.op==op_exp) {
-            Tree out=newOp(allocArg(tree.branch[0],1),1,op_exp);
+        if(tree.op == op_exp) {
+            Tree out = newOp(allocArg(tree.branch[0], 1), 1, op_exp);
             if(treeIsOne(DOne)) return out;
-            return newOp(allocArgs(DOne,out,0,0),2,op_div);
+            return newOp(allocArgs(DOne, out, 0, 0), 2, op_div);
         }
-        if(tree.op==op_ln)
-            return newOp(allocArgs(DOne,tree.branch[0],0,1),2,op_div);
+        if(tree.op == op_ln)
+            return newOp(allocArgs(DOne, tree.branch[0], 0, 1), 2, op_div);
         freeTree(DOne);
     }
     //Rounding
-    if(tree.op<50) {
-        if(tree.op==op_round||tree.op==op_floor||tree.op==op_ceil)
-            return newOpVal(0,0,0);
+    if(tree.op < 50) {
+        if(tree.op == op_round || tree.op == op_floor || tree.op == op_ceil)
+            return newOpVal(0, 0, 0);
     }
     error("not all functions are supported in dx currently", NULL);
     return NULLOPERATION;
@@ -1583,6 +1558,10 @@ int findFunction(char* name) {
 #pragma endregion
 #pragma region Main Program
 char* inputClean(char* input) {
+    if(input[0] == '\0') {
+        error("no equation", NULL);
+        return NULL;
+    }
     //Allocate out
     char* out = calloc(strlen(input) + 1, 1);
     int outPos = 0, i = 0;
