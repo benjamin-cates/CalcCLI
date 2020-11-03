@@ -1857,6 +1857,10 @@ void runLine(char* input) {
             printf("Error: command '%s' not recognized.\n", input + 1);
         }
     }
+    else if(input[0] == '#' || (input[0]=='/'&&input[0]=='/')) {
+        //If it is a comment, ignore
+        return;
+    }
     //Else compute it as a value
     else {
         Number out = calculate(input, 0);
