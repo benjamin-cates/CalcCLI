@@ -9,7 +9,7 @@ void error(char* format, char* message) {
 };
 void CLI_cleanup() {
     cleanup();
-    printf(" Quitting\n");
+    printf("\b\b-quit\n");
     exit(0);
 }
 void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
