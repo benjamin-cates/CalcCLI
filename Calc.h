@@ -183,6 +183,19 @@ Number compSqrt(Number one);
  * @param one number to pass to the gamma function
  */
 Number compGamma(Number one);
+/**
+ * Returns the trigonometric result of num, based on type
+ * @param type Type of operation to run (ex. op_sin)
+ * @param num The input into the function
+ */
+Number compTrig(int type, Number num);
+/**
+ * Returns the binary operation of one and two, based on type
+ * @param type Type of operation to run (ex. op_and)
+ * @param one First input
+ * @param two Second input
+ */
+Number compBinOp(int type, Number one, Number two);
 //Units
 /**
  * Returns a new unit standard

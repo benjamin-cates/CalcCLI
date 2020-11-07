@@ -379,6 +379,114 @@ Number compGamma(Number one) {
     double exi = sin(-t.i) * ex;
     return newValue(out.r * exr - out.i * exi, out.i * exr + out.r * exi, one.u);
 }
+Number compTrig(int type, Number num) {
+    //Trigonometric functions
+    if(type < 18) {
+        num.r *= degrat;
+        num.i *= degrat;
+        if(type == op_sin)
+            return compSine(num);
+        if(type == op_cos)
+            return newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
+        if(type == op_tan)
+            return compDivide(compSine(num), newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
+        Number out;
+        bool reciprocal = false;
+        // csc, sec, tan
+        if(type > 11) {
+            reciprocal = true;
+            type -= 3;
+        }
+        if(type == op_sin)
+            out = compSine(num);
+        if(type == op_cos)
+            out = newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
+        if(type == op_tan)
+            out = compDivide(compSine(num), newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
+        if(reciprocal) {
+            double denom = out.r * out.r + (out.i * out.i);
+            out.r /= denom;
+            out.i /= -denom;
+        }
+        return out;
+    }
+    //Inverse trigonometric functions
+    else {
+        //https://proofwiki.org/wiki/Definition:Inverse_Sine/Arcsine
+        int opID = type;
+        Number out;
+        if(type > 20 && type < 24) {
+            unit_t unit = num.u;
+            num = compDivide(newValue(1, 0, 0), num);
+            num.u = unit;
+            opID -= 3;
+        }
+        if(opID == op_asin || opID == op_acos) {
+            Number Sq = compSqrt(newValue(1 - num.r * num.r - num.i * num.i, -2 * num.r * num.i, 0));
+            double temp = num.r;
+            num.r = Sq.r - num.i;
+            num.i = Sq.i + temp;
+            if(opID == 19)
+                out = newValue(1.570796326794896619 - atan2(num.i, num.r), 0.5 * log(num.r * num.r + num.i * num.i), num.u);
+            else out = newValue(atan2(num.i, num.r), -0.5 * log(num.r * num.r + num.i * num.i), num.u);
+        }
+        if(opID == op_tan) {
+            Number out = compDivide(newValue(-num.r, 1 - num.i, 0), newValue(num.r, 1 + num.i, 0));
+            out = newValue(0.5 * atan2(out.i, out.r), -0.25 * log(out.r * out.r + out.i * out.i), num.u);
+        }
+        //Hyperbolic Arccosine and hyperbolic sine
+        if(type == op_acosh || type == op_asinh) {
+            double sqR = num.r * num.r - num.i * num.i;
+            double sqI = num.r * num.i * 2;
+            if(type == op_asinh) sqR += 1;
+            else sqR -= 1;
+            Number sqrt = compSqrt(newValue(sqR, sqI, 0));
+            sqrt.r += num.r;
+            sqrt.i += num.i;
+            out = newValue(0.5 * log(sqrt.r * sqrt.r + sqrt.i * sqrt.i), atan2(sqrt.i, sqrt.r), num.u);
+        }
+        //Hyperbolic Arctangent
+        if(type == op_atanh) {
+            Number p1 = newValue(num.r + 1, num.i, 0);
+            Number p2 = newValue(1 - num.r, -num.i, 0);
+            Number div = compDivide(p1, p2);
+            out = newValue(0.25 * log(div.r * div.r + div.i * div.i), 0.5 * atan2(div.i, div.r), num.u);
+        }
+        out.r /= degrat;
+        out.i /= degrat;
+        return out;
+    }
+}
+Number compBinOp(int type, Number one, Number two) {
+    if(type == op_not) {
+        if(one.r != 0)
+            one.r = (double)~((long)one.r);
+        if(one.i != 0)
+            one.i = (double)~((long)one.i);
+        return one;
+    }
+    else if(type == op_and) {
+        one.r = (double)(((long)one.r) & ((long)two.r));
+        one.i = (double)(((long)one.i) & ((long)two.i));
+    }
+    else if(type == op_or) {
+        one.r = (double)(((long)one.r) | ((long)two.r));
+        one.i = (double)(((long)one.i) | ((long)two.i));
+    }
+    else if(type == op_xor) {
+        one.r = (double)(((long)one.r) ^ ((long)two.r));
+        one.i = (double)(((long)one.i) ^ ((long)two.i));
+    }
+    else if(type == op_ls) {
+        one.r = (double)(((long)one.r) << ((long)two.r));
+        one.i = (double)(((long)one.i) << ((long)two.i));
+    }
+    else if(type == op_rs) {
+        one.r = (double)(((long)one.r) >> ((long)two.r));
+        one.i = (double)(((long)one.i) >> ((long)two.i));
+    }
+    return one;
+}
 #pragma endregion
 #pragma region Trees
 //Comparison
@@ -626,82 +734,7 @@ Number computeTree(Tree tree, Number* args, int argLen) {
     }
     //Trigonometric functions
     if(tree.op < 27) {
-        //Trigonometric functions
-        if(tree.op < 18) {
-            one.r *= degrat;
-            one.i *= degrat;
-            if(tree.op == op_sin)
-                return compSine(one);
-            if(tree.op == op_cos)
-                return newValue(cos(one.r) * cosh(one.i), sin(one.r) * sinh(one.i), one.u);
-            if(tree.op == op_tan)
-                return compDivide(compSine(one), newValue(cos(one.r) * cosh(one.i), sin(one.r) * sinh(one.i), 0));
-            Number out;
-            bool reciprocal = false;
-            // csc, sec, tan
-            if(tree.op > 11) {
-                reciprocal = true;
-                tree.op -= 3;
-            }
-            if(tree.op == op_sin)
-                out = compSine(one);
-            if(tree.op == op_cos)
-                out = newValue(cos(one.r) * cosh(one.i), sin(one.r) * sinh(one.i), one.u);
-            if(tree.op == op_tan)
-                out = compDivide(compSine(one), newValue(cos(one.r) * cosh(one.i), sin(one.r) * sinh(one.i), 0));
-            if(reciprocal) {
-                double denom = out.r * out.r + (out.i * out.i);
-                out.r /= denom;
-                out.i /= -denom;
-            }
-            return out;
-        }
-        //Inverse trigonometric functions
-        else {
-            //https://proofwiki.org/wiki/Definition:Inverse_Sine/Arcsine
-            int opID = tree.op;
-            Number out;
-            if(tree.op > 20 && tree.op < 24) {
-                unit_t unit = one.u;
-                one = compDivide(newValue(1, 0, 0), one);
-                one.u = unit;
-                opID -= 3;
-            }
-            if(opID == op_asin || opID == op_acos) {
-                Number Sq = compSqrt(newValue(1 - one.r * one.r - one.i * one.i, -2 * one.r * one.i, 0));
-                double temp = one.r;
-                one.r = Sq.r - one.i;
-                one.i = Sq.i + temp;
-                if(opID == 19)
-                    out = newValue(1.570796326794896619 - atan2(one.i, one.r), 0.5 * log(one.r * one.r + one.i * one.i), one.u);
-                else out = newValue(atan2(one.i, one.r), -0.5 * log(one.r * one.r + one.i * one.i), one.u);
-            }
-            if(opID == op_tan) {
-                Number out = compDivide(newValue(-one.r, 1 - one.i, 0), newValue(one.r, 1 + one.i, 0));
-                out = newValue(0.5 * atan2(out.i, out.r), -0.25 * log(out.r * out.r + out.i * out.i), one.u);
-            }
-            //Hyperbolic Arccosine and hyperbolic sine
-            if(tree.op == op_acosh || tree.op == op_asinh) {
-                double sqR = one.r * one.r - one.i * one.i;
-                double sqI = one.r * one.i * 2;
-                if(tree.op == op_asinh) sqR += 1;
-                else sqR -= 1;
-                Number sqrt = compSqrt(newValue(sqR, sqI, 0));
-                sqrt.r += one.r;
-                sqrt.i += one.i;
-                out = newValue(0.5 * log(sqrt.r * sqrt.r + sqrt.i * sqrt.i), atan2(sqrt.i, sqrt.r), one.u);
-            }
-            //Hyperbolic Arctangent
-            if(tree.op == op_atanh) {
-                Number p1 = newValue(one.r + 1, one.i, 0);
-                Number p2 = newValue(1 - one.r, -one.i, 0);
-                Number div = compDivide(p1, p2);
-                out = newValue(0.25 * log(div.r * div.r + div.i * div.i), 0.5 * atan2(div.i, div.r), one.u);
-            }
-            out.r /= degrat;
-            out.i /= degrat;
-            return out;
-        }
+        return compTrig(tree.op,one);
     }
     //Log, rounding, arg, and abs
     if(tree.op < 38) {
@@ -811,34 +844,7 @@ Number computeTree(Tree tree, Number* args, int argLen) {
     }
     //Binary Operations
     if(tree.op < 56) {
-        if(tree.op == op_not) {
-            if(one.r != 0)
-                one.r = (double)~((long)one.r);
-            if(one.i != 0)
-                one.i = (double)~((long)one.i);
-            return one;
-        }
-        else if(tree.op == op_and) {
-            one.r = (double)(((long)one.r) & ((long)two.r));
-            one.i = (double)(((long)one.i) & ((long)two.i));
-        }
-        else if(tree.op == op_or) {
-            one.r = (double)(((long)one.r) | ((long)two.r));
-            one.i = (double)(((long)one.i) | ((long)two.i));
-        }
-        else if(tree.op == op_xor) {
-            one.r = (double)(((long)one.r) ^ ((long)two.r));
-            one.i = (double)(((long)one.i) ^ ((long)two.i));
-        }
-        else if(tree.op == op_ls) {
-            one.r = (double)(((long)one.r) << ((long)two.r));
-            one.i = (double)(((long)one.i) << ((long)two.i));
-        }
-        else if(tree.op == op_rs) {
-            one.r = (double)(((long)one.r) >> ((long)two.r));
-            one.i = (double)(((long)one.i) >> ((long)two.i));
-        }
-        return one;
+        return compBinOp(tree.op,one,two);
     }
     //Constants
     if(tree.op < 63) {
@@ -1216,7 +1222,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
         if(ops[i].op >= op_pow && ops[i].op <= op_sub && ops[i].argCount == 0) continue;
         if(ops[i - 1].op >= op_pow && ops[i - 1].op <= op_sub && ops[i - 1].argCount == 0) continue;
         //Combine them
-        ops[i-1] = newOp(allocArgs(ops[i - 1], ops[i], 0, 0), 2, op_mult);
+        ops[i - 1] = newOp(allocArgs(ops[i - 1], ops[i], 0, 0), 2, op_mult);
         offset++;
         sectionCount--;
         i--;
@@ -1857,7 +1863,7 @@ void runLine(char* input) {
             printf("Error: command '%s' not recognized.\n", input + 1);
         }
     }
-    else if(input[0] == '#' || (input[0]=='/'&&input[0]=='/')) {
+    else if(input[0] == '#' || (input[0] == '/' && input[0] == '/')) {
         //If it is a comment, ignore
         return;
     }
