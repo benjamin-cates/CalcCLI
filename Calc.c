@@ -255,11 +255,23 @@ char* doubleToString(double num, double base) {
         return out;
     }
     if(isnan(num)) {
-        char* out = malloc(4);
-        out[0] = 'N';
-        out[1] = 'a';
-        out[2] = 'N';
-        out[3] = '\0';
+        int pos=0;
+        char* out = malloc(5);
+        if(num<0) out[pos++]='-';
+        out[pos] = 'N';
+        out[pos+1] = 'a';
+        out[pos+2] = 'N';
+        out[pos+3] = '\0';
+        return out;
+    }
+    if(isinf(num)) {
+        int pos=0;
+        char* out=malloc(5);
+        if(num<0) out[pos++]='-';
+        out[pos] = 'I';
+        out[pos+1] = 'n';
+        out[pos+2] = 'f';
+        out[pos+3] = '\0';
         return out;
     }
     //Allocate string
