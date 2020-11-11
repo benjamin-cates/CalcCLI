@@ -507,6 +507,9 @@ Number compBinOp(int type, Number one, Number two) {
 }
 #pragma endregion
 #pragma region Values
+void valueConvert(Value* one,Value* two) {
+    //Throw if(one.type!=two.type) valueConvert(&one,&two); to make them have the same type
+}
 Value newValNum(double r, double i, unit_t u) {
     Value out;
     out.type = 0;
@@ -540,9 +543,7 @@ bool valIsEqual(Value one, Value two) {
     return true;
 }
 Value valMult(Value one, Value two) {
-    if(one.type != two.type) {
-
-    }
+    if(one.type != two.type) valueConvert(&one,&two);
     if(one.type == value_num) {
         Value out;
         out.type = 0;
@@ -553,9 +554,7 @@ Value valMult(Value one, Value two) {
     }
 }
 Value valAdd(Value one, Value two) {
-    if(one.type != two.type) {
-
-    }
+    if(one.type != two.type) valueConvert(&one,&two);
     if(one.type == value_num) {
         Value out;
         out.type = value_num;
@@ -578,9 +577,7 @@ Value valNegate(Value one) {
     }
 }
 Value valDivide(Value one, Value two) {
-    if(one.type != two.type) {
-
-    }
+    if(one.type != two.type) valueConvert(&one,&two);
     if(one.type == value_num) {
         Value out;
         out.type = 0;
@@ -592,9 +589,7 @@ Value valDivide(Value one, Value two) {
     }
 }
 Value valPower(Value one, Value two) {
-    if(one.type != two.type) {
-
-    }
+    if(one.type != two.type) valueConvert(&one,&two);
     if(one.type == value_num) {
         double logabs = log(one.r * one.r + one.i * one.i);
         double arg = atan2(one.i, one.r);
@@ -608,9 +603,7 @@ Value valPower(Value one, Value two) {
     }
 }
 Value valModulo(Value one, Value two) {
-    if(one.type != two.type) {
-
-    }
+    if(one.type != two.type) valueConvert(&one,&two);
     if(one.type == value_num) {
         double r = fmod(one.r, two.r);
         double i = fmod(one.i, two.i);
@@ -848,11 +841,8 @@ Value computeTree(Tree tree, Value* args, int argLen) {
     if(tree.op < 9) {
         if(tree.op == op_i)
             return newValNum(0, 1, 0);
-        if(tree.op == op_neg) {
-            one.r = -one.r;
-            one.i = -one.i;
-            return one;
-        }
+        if(tree.op == op_neg)
+            return valNegate(one);
         if(tree.op == op_pow)
             return valPower(one, two);
         if(tree.op == op_mod)
@@ -960,24 +950,28 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             return one;
         }
         if(tree.op == op_grthan) {
+            if(one.type != two.type) valueConvert(&one,&two);
             if(one.r > two.r)
                 return newValNum(1, 0, 0);
             else
                 return newValNum(0, 0, 0);
         }
         if(tree.op == op_equal) {
+            if(one.type != two.type) valueConvert(&one,&two);
             if(one.r == two.r && one.r == two.r)
                 return newValNum(1, 0, 0);
             else
                 return newValNum(0, 0, 0);
         }
         if(tree.op == op_min) {
+            if(one.type != two.type) valueConvert(&one,&two);
             if(one.r > two.r)
                 return two;
             else
                 return one;
         }
         if(tree.op == op_max) {
+            if(one.type != two.type) valueConvert(&one,&two);
             if(one.r > two.r)
                 return one;
             else
@@ -985,20 +979,20 @@ Value computeTree(Tree tree, Value* args, int argLen) {
         }
         if(tree.op == op_lerp) {
             //(1 - c) * one + c * two;
+            if(one.type != two.type) valueConvert(&one,&two);
             Value c = computeTree(tree.branch[2], args, argLen);
             Value p1 = newValNum((1 - c.r) * one.r + one.i * c.i, (1 - c.r) * one.i - one.r * c.i, 0);
             Value p2 = newValNum(c.r * two.r - c.i * two.i, c.r * two.i + two.r * c.i, 0);
             return newValNum(p1.r + p2.r, p1.i + p2.i, unitInteract(one.u, two.u, '+', 0));
         }
         if(tree.op == op_dist) {
+            if(one.type != two.type) valueConvert(&one,&two);
             return newValNum(sqrt(pow(fabs(one.r - two.r), 2) + pow(fabs(one.i - two.i), 2)), 0, 0);
         }
     }
     //Binary Operations
     if(tree.op < 56) {
-        if(one.type != two.type && tree.op != op_not) {
-
-        }
+        if(one.type != two.type && tree.op != op_not) valueConvert(&one,&two);
         if(one.type == value_num) {
             Value out;
             out.type = value_num;
