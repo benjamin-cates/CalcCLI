@@ -39,6 +39,7 @@ extern "C" {
     //Number of metric prefixes
     #define metricCount 17
 #endif
+#define value_num 0
 //Structs
 /**
  * Complex number with unit
@@ -51,6 +52,25 @@ typedef struct NumberStruct {
     double i;
     unit_t u;
 } Number;
+/**
+ * Value that can contain a number or any other type
+ * @param type type of value (0 for numbers)
+ * @param num Number when type==0
+ * @param r Real component when type==0
+ * @param i Imaginary component when type==0
+ * @param u Unit component type==0
+*/
+typedef struct ValueStruct {
+    int type;
+    union {
+        Number num;
+        struct {
+            double r;
+            double i;
+            unit_t u;
+        };
+    };
+} Value;
 /**
  * Unit standard (ie. ft, m, kg)
  * @param name unit name (ex. ft)
@@ -73,7 +93,7 @@ typedef struct UnitStandardStuct {
 typedef struct TreeStruct {
     int op;
     union {
-        Number value;
+        Value value;
         struct {
             struct TreeStruct* branch;
             char argCount;
@@ -106,8 +126,10 @@ extern bool verbose;
 extern bool globalError;
 //Number with r=0, i=0, and u=0
 extern Number NULLNUM;
+//Value with number 0
+extern Value NULLVAL;
 //History array
-extern Number* history;
+extern Value* history;
 //All predefined units
 extern const unitStandard unitList[];
 //Tree with op=0 and value=0
@@ -139,7 +161,7 @@ void error(char* format, char* message);
  * @param i Imaginary component
  * @param u Unit component
  */
-Number newValue(double r, double i, unit_t u);
+Number newNum(double r, double i, unit_t u);
 /**
  * Returns a double parsed from the string
  * @param num Text of the number
@@ -164,7 +186,7 @@ char* doubleToString(double num, double base);
  * @param num Number to append
  * @param base Base to output in
  */
-void appendToHistory(Number num, double base, bool print);
+void appendToHistory(Value num, double base, bool print);
 //Returns one*two
 Number compMultiply(Number one, Number two);
 //Returns pow(one,two) or one^two
@@ -196,6 +218,31 @@ Number compTrig(int type, Number num);
  * @param two Second input
  */
 Number compBinOp(int type, Number one, Number two);
+//Values
+/**
+ * Create a numeral value from r, i, and u
+ */
+Value newValNum(double r, double i, unit_t u);
+/**
+ * Frees any array buffers stored in a value (vectors or matrices only.
+ */
+void freeValue(Value val);
+/**
+ * Copies the value if it is a matrix of vector.
+ */
+Value copyValue(Value val);
+/**
+ * Returns the string version of a value. Return char* must be freed.
+ */
+char* valueToString(Value val, double base);
+Value valMult(Value one, Value two);
+Value valAdd(Value one, Value two);
+Value valDivide(Value one, Value two);
+Value valPower(Value one, Value two);
+Value valModulo(Value one, Value two);
+Value valNegate(Value one);
+Value valLn(Value one);
+bool valIsEqual(Value one, Value two);
 //Units
 /**
  * Returns a new unit standard
@@ -235,7 +282,7 @@ Tree newOp(Tree* args, int argCount, int op);
 /**
  * Returns a new operation with id 0 and value val
  */
-Tree newOpValue(Number val);
+Tree newOpValue(Value val);
 /**
  * Shortcut for newOpValue(newValue(r,i,u))
  */
@@ -317,7 +364,7 @@ char* treeToString(Tree op, bool bracket, char* args);
  * @param op Tree to compute
  * @param args Arguments (only used for functions)
  */
-Number computeTree(Tree op, Number* args, int argLen);
+Value computeTree(Tree op, Value* args, int argLen);
 /**
  * Generates an operation tree from an equation
  * @param eq Equation
@@ -348,7 +395,7 @@ void graphEquation(char* equation, double left, double right, double top, double
  * @param eq Equation
  * @param base Base to calculate in
  */
-Number calculate(char* eq, double base);
+Value calculate(char* eq, double base);
 /**
  * Frees units, functions, and history. Must be run after every call of startup() to prevent leaks
  */

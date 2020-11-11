@@ -14,7 +14,8 @@ int historyCount = 0;
 bool verbose = false;
 bool globalError = false;
 Number NULLNUM;
-Number* history;
+Value* history;
+Value NULLVAL;
 const unitStandard unitList[] = {
     {"m", -1.0, 0x1},                  //Meter
     {"kg", 1.0, 0x100},                //Kilogram
@@ -106,13 +107,13 @@ Number getUnitName(char* name) {
     for(i = 0; i < unitCount; i++) {
         if(useMetric != -1 && unitList[i].multiplier < 0)
             if(strcmp(name + 1, unitList[i].name) == 0) {
-                return newValue(fabs(unitList[i].multiplier) * metricNumValues[useMetric], 0, unitList[i].baseUnits);
+                return newNum(fabs(unitList[i].multiplier) * metricNumValues[useMetric], 0, unitList[i].baseUnits);
             }
         if(strcmp(name, unitList[i].name) == 0) {
-            return newValue(fabs(unitList[i].multiplier), 0, unitList[i].baseUnits);
+            return newNum(fabs(unitList[i].multiplier), 0, unitList[i].baseUnits);
         }
     }
-    return newValue(1, 0, 0);
+    return newNum(1, 0, 0);
 }
 char* toStringUnit(unit_t unit) {
     if(unit == 0)
@@ -189,7 +190,7 @@ unit_t unitInteract(unit_t one, unit_t two, char op, double twor) {
 }
 #pragma endregion
 #pragma region Numbers
-Number newValue(double r, double i, unit_t u) {
+Number newNum(double r, double i, unit_t u) {
     Number out;
     out.r = r;
     out.i = i;
@@ -253,6 +254,14 @@ char* doubleToString(double num, double base) {
         out[0] = '0';
         return out;
     }
+    if(isnan(num)) {
+        char* out = malloc(4);
+        out[0] = 'N';
+        out[1] = 'a';
+        out[2] = 'N';
+        out[3] = '\0';
+        return out;
+    }
     //Allocate string
     char* out = calloc(24, 1);
     int outPos = 0;
@@ -298,13 +307,13 @@ char* doubleToString(double num, double base) {
 
     return out;
 }
-void appendToHistory(Number num, double base, bool print) {
+void appendToHistory(Value num, double base, bool print) {
     if(historySize - 1 == historyCount) {
-        history = realloc(history, (historySize + 25) * sizeof(Number));
+        history = realloc(history, (historySize + 25) * sizeof(Value));
         historySize += 25;
     }
     if(print) {
-        char* ansString = toStringNumber(num, base);
+        char* ansString = valueToString(num, base);
         printf("$%d = %s\n", historyCount, ansString);
         free(ansString);
     }
@@ -312,7 +321,7 @@ void appendToHistory(Number num, double base, bool print) {
     historyCount++;
 }
 Number compMultiply(Number one, Number two) {
-    return newValue(one.r * two.r - one.i * two.i, one.r * two.i + one.i * two.r, unitInteract(one.u, two.u, '*', 0));
+    return newNum(one.r * two.r - one.i * two.i, one.r * two.i + one.i * two.r, unitInteract(one.u, two.u, '*', 0));
 }
 Number compPower(Number one, Number two) {
     double logabs = log(one.r * one.r + one.i * one.i);
@@ -323,25 +332,22 @@ Number compPower(Number one, Number two) {
     double cis = two.i * 0.5 * logabs + two.r * arg;
     if(isnan(cis))
         cis = 0;
-    return newValue(p1 * cos(cis), p1 * sin(cis), unitInteract(one.u, two.u, '^', two.r));
+    return newNum(p1 * cos(cis), p1 * sin(cis), unitInteract(one.u, two.u, '^', two.r));
 }
 Number compDivide(Number one, Number two) {
     double denominator = two.r * two.r + (two.i * two.i);
     double numeratorR = one.r * two.r + one.i * two.i;
     double numeratorI = one.r * -two.i + one.i * two.r;
-    return newValue(numeratorR / denominator, numeratorI / denominator, unitInteract(one.u, two.u, '/', 0));
+    return newNum(numeratorR / denominator, numeratorI / denominator, unitInteract(one.u, two.u, '/', 0));
 }
 Number compSine(Number one) {
-    return newValue(sin(one.r) * cosh(one.i), cos(one.r) * sinh(one.i), one.u);
-}
-Number compSubtract(Number one, Number two) {
-    return newValue(one.r - two.r, one.i - two.i, unitInteract(one.u, two.u, '+', 0));
+    return newNum(sin(one.r) * cosh(one.i), cos(one.r) * sinh(one.i), one.u);
 }
 Number compSqrt(Number one) {
     double abs = sqrt(one.r * one.r + one.i * one.i);
     double sgnI = one.i / fabs(one.i);
     if(one.i == 0) sgnI = 1;
-    return newValue(sqrt((abs + one.r) / 2), sgnI * sqrt((abs - one.r) / 2), unitInteract(one.u, 0, '^', 0.5));
+    return newNum(sqrt((abs + one.r) / 2), sgnI * sqrt((abs - one.r) / 2), unitInteract(one.u, 0, '^', 0.5));
 }
 Number compGamma(Number one) {
     //https://en.wikipedia.org/wiki/Lanczos_approximation#Simple_implementation
@@ -359,11 +365,11 @@ Number compGamma(Number one) {
             error("cannot call factorial of a negative integer", NULL);
             return NULLNUM;
         }
-        return newValue(3.14159265358979323 * denom.r / denomSq, 3.14159265358979323 * -denom.i / denomSq, one.u);
+        return newNum(3.14159265358979323 * denom.r / denomSq, 3.14159265358979323 * -denom.i / denomSq, one.u);
     }
     int g = 8;
     double p[] = { 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7 };
-    Number x = newValue(0.99999999999980993, 0, 0);
+    Number x = newNum(0.99999999999980993, 0, 0);
     int i;
     for(i = 0; i < g; i++) {
         double denom = (one.r + i) * (one.r + i) + one.i * one.i;
@@ -377,7 +383,7 @@ Number compGamma(Number one) {
     double ex = exp(-t.r) * 2.5066282746310002;
     double exr = cos(-t.i) * ex;
     double exi = sin(-t.i) * ex;
-    return newValue(out.r * exr - out.i * exi, out.i * exr + out.r * exi, one.u);
+    return newNum(out.r * exr - out.i * exi, out.i * exr + out.r * exi, one.u);
 }
 Number compTrig(int type, Number num) {
     //Trigonometric functions
@@ -387,9 +393,9 @@ Number compTrig(int type, Number num) {
         if(type == op_sin)
             return compSine(num);
         if(type == op_cos)
-            return newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
+            return newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
         if(type == op_tan)
-            return compDivide(compSine(num), newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
+            return compDivide(compSine(num), newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
         Number out;
         bool reciprocal = false;
         // csc, sec, tan
@@ -400,9 +406,9 @@ Number compTrig(int type, Number num) {
         if(type == op_sin)
             out = compSine(num);
         if(type == op_cos)
-            out = newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
+            out = newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
         if(type == op_tan)
-            out = compDivide(compSine(num), newValue(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
+            out = compDivide(compSine(num), newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
         if(reciprocal) {
             double denom = out.r * out.r + (out.i * out.i);
             out.r /= denom;
@@ -417,22 +423,22 @@ Number compTrig(int type, Number num) {
         Number out;
         if(type > 20 && type < 24) {
             unit_t unit = num.u;
-            num = compDivide(newValue(1, 0, 0), num);
+            num = compDivide(newNum(1, 0, 0), num);
             num.u = unit;
             opID -= 3;
         }
         if(opID == op_asin || opID == op_acos) {
-            Number Sq = compSqrt(newValue(1 - num.r * num.r - num.i * num.i, -2 * num.r * num.i, 0));
+            Number Sq = compSqrt(newNum(1 - num.r * num.r - num.i * num.i, -2 * num.r * num.i, 0));
             double temp = num.r;
             num.r = Sq.r - num.i;
             num.i = Sq.i + temp;
             if(opID == 19)
-                out = newValue(1.570796326794896619 - atan2(num.i, num.r), 0.5 * log(num.r * num.r + num.i * num.i), num.u);
-            else out = newValue(atan2(num.i, num.r), -0.5 * log(num.r * num.r + num.i * num.i), num.u);
+                out = newNum(1.570796326794896619 - atan2(num.i, num.r), 0.5 * log(num.r * num.r + num.i * num.i), num.u);
+            else out = newNum(atan2(num.i, num.r), -0.5 * log(num.r * num.r + num.i * num.i), num.u);
         }
         if(opID == op_tan) {
-            Number out = compDivide(newValue(-num.r, 1 - num.i, 0), newValue(num.r, 1 + num.i, 0));
-            out = newValue(0.5 * atan2(out.i, out.r), -0.25 * log(out.r * out.r + out.i * out.i), num.u);
+            Number out = compDivide(newNum(-num.r, 1 - num.i, 0), newNum(num.r, 1 + num.i, 0));
+            out = newNum(0.5 * atan2(out.i, out.r), -0.25 * log(out.r * out.r + out.i * out.i), num.u);
         }
         //Hyperbolic Arccosine and hyperbolic sine
         if(type == op_acosh || type == op_asinh) {
@@ -440,17 +446,17 @@ Number compTrig(int type, Number num) {
             double sqI = num.r * num.i * 2;
             if(type == op_asinh) sqR += 1;
             else sqR -= 1;
-            Number sqrt = compSqrt(newValue(sqR, sqI, 0));
+            Number sqrt = compSqrt(newNum(sqR, sqI, 0));
             sqrt.r += num.r;
             sqrt.i += num.i;
-            out = newValue(0.5 * log(sqrt.r * sqrt.r + sqrt.i * sqrt.i), atan2(sqrt.i, sqrt.r), num.u);
+            out = newNum(0.5 * log(sqrt.r * sqrt.r + sqrt.i * sqrt.i), atan2(sqrt.i, sqrt.r), num.u);
         }
         //Hyperbolic Arctangent
         if(type == op_atanh) {
-            Number p1 = newValue(num.r + 1, num.i, 0);
-            Number p2 = newValue(1 - num.r, -num.i, 0);
+            Number p1 = newNum(num.r + 1, num.i, 0);
+            Number p2 = newNum(1 - num.r, -num.i, 0);
             Number div = compDivide(p1, p2);
-            out = newValue(0.25 * log(div.r * div.r + div.i * div.i), 0.5 * atan2(div.i, div.r), num.u);
+            out = newNum(0.25 * log(div.r * div.r + div.i * div.i), 0.5 * atan2(div.i, div.r), num.u);
         }
         out.r /= degrat;
         out.i /= degrat;
@@ -486,6 +492,125 @@ Number compBinOp(int type, Number one, Number two) {
         one.i = (double)(((long)one.i) >> ((long)two.i));
     }
     return one;
+}
+#pragma endregion
+#pragma region Values
+Value newValNum(double r, double i, unit_t u) {
+    Value out;
+    out.type = 0;
+    out.r = r;
+    out.i = i;
+    out.u = u;
+    return out;
+}
+void freeValue(Value val) {
+
+}
+char* valueToString(Value val, double base) {
+    if(val.type == value_num) {
+        return toStringNumber(val.num, base);
+    }
+    return NULL;
+}
+Value copyValue(Value val) {
+    Value out;
+    out.type = val.type;
+    if(val.type == value_num) out.num = val.num;
+    return out;
+}
+bool valIsEqual(Value one, Value two) {
+    if(one.type != two.type) return false;
+    if(one.type == value_num) {
+        if(one.r != two.r) return false;
+        if(one.i != two.i) return false;
+        if(one.u != two.u) return false;
+    }
+    return true;
+}
+Value valMult(Value one, Value two) {
+    if(one.type != two.type) {
+
+    }
+    if(one.type == value_num) {
+        Value out;
+        out.type = 0;
+        out.r = one.r * two.r - one.i * two.i;
+        out.i = one.r * two.i + two.r * one.i;
+        out.u = unitInteract(one.u, two.u, '*', 0);
+        return out;
+    }
+}
+Value valAdd(Value one, Value two) {
+    if(one.type != two.type) {
+
+    }
+    if(one.type == value_num) {
+        Value out;
+        out.type = value_num;
+        out.r = one.r + two.r;
+        out.i = one.i + two.i;
+        if(one.u == 0) out.u = two.u;
+        else if(two.u == 0) out.u = one.u;
+        else error("cannot add two different units", NULL);
+        return out;
+    }
+}
+Value valNegate(Value one) {
+    if(one.type == value_num) {
+        Value out;
+        out.type = value_num;
+        out.r = -one.r;
+        out.i = -one.i;
+        out.u = one.u;
+        return out;
+    }
+}
+Value valDivide(Value one, Value two) {
+    if(one.type != two.type) {
+
+    }
+    if(one.type == value_num) {
+        Value out;
+        out.type = 0;
+        double denominator = two.r * two.r + (two.i * two.i);
+        out.r = (one.r * two.r + one.i * two.i) / denominator;
+        out.i = (one.r * -two.i + one.i * two.r) / denominator;
+        out.u = unitInteract(one.u, two.u, '/', 0);
+        return out;
+    }
+}
+Value valPower(Value one, Value two) {
+    if(one.type != two.type) {
+
+    }
+    if(one.type == value_num) {
+        double logabs = log(one.r * one.r + one.i * one.i);
+        double arg = atan2(one.i, one.r);
+        if(one.r == 0 && one.i == 0)
+            arg = 0;
+        double p1 = exp(two.r * 0.5 * logabs - two.i * arg);
+        double cis = two.i * 0.5 * logabs + two.r * arg;
+        if(isnan(cis))
+            cis = 0;
+        return newValNum(p1 * cos(cis), p1 * sin(cis), unitInteract(one.u, two.u, '^', two.r));
+    }
+}
+Value valModulo(Value one, Value two) {
+    if(one.type != two.type) {
+
+    }
+    if(one.type == value_num) {
+        double r = fmod(one.r, two.r);
+        double i = fmod(one.i, two.i);
+        if(isnan(r)) r = 0.0;
+        if(isnan(i)) i = 0.0;
+        return newValNum(r, i, unitInteract(one.u, two.u, '+', 0));
+    }
+}
+Value valLn(Value one) {
+    if(one.type == value_num) {
+        return newValNum(0.5 * log(one.r * one.r + one.i * one.i), atan2f(one.i, one.r), one.u);
+    }
 }
 #pragma endregion
 #pragma region Trees
@@ -536,7 +661,7 @@ Tree newOp(Tree* branches, int argCount, int opID) {
     out.op = opID;
     return out;
 }
-Tree newOpValue(Number value) {
+Tree newOpValue(Value value) {
     Tree out;
     out.op = op_val;
     out.value = value;
@@ -545,6 +670,7 @@ Tree newOpValue(Number value) {
 Tree newOpVal(double r, double i, unit_t u) {
     Tree out;
     out.op = op_val;
+    out.value.type = value_num;
     out.value.r = r;
     out.value.i = i;
     out.value.u = u;
@@ -579,11 +705,12 @@ void freeTree(Tree tree) {
             freeTree(tree.branch[i]);
         free(tree.branch);
     }
+    if(tree.op == op_val) freeValue(tree.value);
 }
 char* treeToString(Tree tree, bool bracket, char* argNames) {
     //Numbers
     if(tree.op == op_val)
-        return toStringNumber(tree.value, 10);
+        return valueToString(tree.value, 10);
     //Arguments
     if(tree.op < 0) {
         if(argNames == NULL) {
@@ -654,110 +781,123 @@ char* treeToString(Tree tree, bool bracket, char* argNames) {
     out[strLength - 2] = ')';
     return out;
 }
-Number computeTree(Tree tree, Number* args, int argLen) {
+Value computeTree(Tree tree, Value* args, int argLen) {
     //Returns a number from a tree and its arguments
     if(tree.op == op_val)
-        return tree.value;
+        return copyValue(tree.value);
     if(tree.op < op_val) {
         if(argLen < -tree.op) error("argument error", NULL);
-        return args[-tree.op - 1];
+        return copyValue(args[-tree.op - 1]);
     }
     if(tree.argCount != functions[tree.op].argCount) {
         error("Argument mismatch", NULL);
-        return NULLNUM;
+        return NULLVAL;
     }
     //Sum and product
     if(tree.op < 65 && tree.op > 62) {
-        Number sumArgs[argLen + 1];
-        memset(sumArgs, 0, (argLen + 1) * sizeof(Number));
-        if(args != NULL) memcpy(sumArgs, args, sizeof(Number) * argLen);
-        Number start = computeTree(tree.branch[1], args, argLen);
-        Number end = computeTree(tree.branch[2], args, argLen);
-        Number step = computeTree(tree.branch[3], args, argLen);
-        Number out;
+        Value tempArgs[argLen + 1];
+        memset(tempArgs, 0, (argLen + 1) * sizeof(Number));
+        if(args != NULL) memcpy(tempArgs, args, sizeof(Number) * argLen);
+        Value start = computeTree(tree.branch[1], args, argLen);
+        Value end = computeTree(tree.branch[2], args, argLen);
+        Value step = computeTree(tree.branch[3], args, argLen);
+        Value out;
         if((end.r - start.r) > step.r * 100 || end.r < start.r)
-            return NULLNUM;
+            return NULLVAL;
         if(tree.op == op_sum) {
-            out = newValue(0, 0, 0);
-            sumArgs[argLen] = newValue(0, 0, 0);
+            out = newValNum(0, 0, 0);
+            tempArgs[argLen] = newValNum(0, 0, 0);
             double i;
             for(i = start.r;i <= end.r;i += step.r) {
-                sumArgs[argLen].r = i;
-                Number current = computeTree(tree.branch[0], sumArgs, argLen + 1);
-                out.u = current.u;
-                out.r += current.r;
-                out.i += current.i;
+                tempArgs[argLen].r = i;
+                Value current = computeTree(tree.branch[0], tempArgs, argLen + 1);
+                out = valAdd(out, current);
             }
         }
         if(tree.op == op_product) {
-            out = newValue(1, 0, 0);
+            out = newValNum(1, 0, 0);
             double i;
             for(i = start.r;i <= end.r;i += step.r) {
-                sumArgs[argLen].r = i;
-                Number current = computeTree(tree.branch[0], sumArgs, argLen + 1);
-                double temp = out.r * current.r - out.i * current.i;
-                out.i = out.i * current.r + out.r * current.i;
-                out.r = temp;
-                out.u = current.u;
+                tempArgs[argLen].r = i;
+                Value current = computeTree(tree.branch[0], tempArgs, argLen + 1);
+                out = valMult(out, current);
             }
         }
         return out;
     }
-    Number one, two;
+    Value one, two;
     if(tree.argCount > 0)
         one = computeTree(tree.branch[0], args, argLen);
     if(tree.argCount > 1)
         two = computeTree(tree.branch[1], args, argLen);
     if(globalError)
-        return NULLNUM;
+        return NULLVAL;
     //Basic operators
     if(tree.op < 9) {
         if(tree.op == op_i)
-            return newValue(0, 1, 0);
+            return newValNum(0, 1, 0);
         if(tree.op == op_neg) {
             one.r = -one.r;
             one.i = -one.i;
             return one;
         }
         if(tree.op == op_pow)
-            return compPower(one, two);
+            return valPower(one, two);
         if(tree.op == op_mod)
-            return newValue(fmod(one.r, two.r), fmod(one.i, two.r), unitInteract(one.u, two.u, '+', 0));
+            return valModulo(one, two);
         if(tree.op == op_mult)
-            return compMultiply(one, two);
+            return valMult(one, two);
         if(tree.op == op_div)
-            return compDivide(one, two);
+            return valDivide(one, two);
         if(tree.op == op_add)
-            return newValue(one.r + two.r, one.i + two.i, unitInteract(one.u, two.u, '+', 0));
+            return valAdd(one, two);
         if(tree.op == op_sub)
-            return newValue(one.r - two.r, one.i - two.i, unitInteract(one.u, two.u, '+', 0));
+            return valAdd(one, valNegate(two));
     }
     //Trigonometric functions
     if(tree.op < 27) {
-        return compTrig(tree.op,one);
+        if(one.type == value_num) {
+            Value out;
+            out.type = value_num;
+            out.num = compTrig(tree.op, one.num);
+            return out;
+        }
     }
     //Log, rounding, arg, and abs
     if(tree.op < 38) {
-        if(tree.op == op_sqrt) return compPower(one, newValue(0.5, 0, 0));
-        if(tree.op == op_cbrt) return compPower(one, newValue(0.3333333333333333, 0, 0));
+        if(tree.op == op_sqrt) return valPower(one, newValNum(1.0 / 2.0, 0, 0));
+        if(tree.op == op_cbrt) return valPower(one, newValNum(1.0 / 3.0, 0, 0));
         if(tree.op == op_exp) {
             double epowr = exp(one.r);
-            return newValue(epowr * cos(one.i), epowr * sin(one.i), one.u);
+            return newValNum(epowr * cos(one.i), epowr * sin(one.i), one.u);
         }
         if(tree.op == op_ln)
-            return newValue(0.5 * log(one.r * one.r + one.i * one.i), atan2f(one.i, one.r), one.u);
+            return valLn(one);
         if(tree.op == op_logten) {
             double logten = 1 / log(10);
-            return newValue(0.5 * log(one.r * one.r + one.i * one.i) * logten, atan2f(one.i, one.r), one.u);
+            Value out = valLn(one);
+            if(one.type == value_num) {
+                out.r *= logten;
+                out.i *= logten;
+            }
+            return out;
         }
         if(tree.op == op_log) {
-            one = newValue(0.5 * log(one.r * one.r + one.i * one.i), atan2f(one.i, one.r), one.u);
-            two = newValue(0.5 * log(two.r * two.r + two.i * two.i), atan2f(two.i, two.r), two.u);
-            return compDivide(one, two);
+            Value LnOne = valLn(one);
+            Value LnTwo = valLn(two);
+            Value out = valDivide(LnOne, LnTwo);
+            freeValue(LnOne);
+            freeValue(LnTwo);
+            return out;
         }
         if(tree.op == op_fact) {
-            one.r += 1;
-            return compGamma(one);
+            if(one.type == value_num) {
+                one.r += 1;
+                Value out;
+                out.type = value_num;
+                out.num = compGamma(one.num);
+                return out;
+            }
         }
         if(tree.op == op_sgn) {
             if(one.r > 0)
@@ -771,10 +911,10 @@ Number computeTree(Tree tree, Number* args, int argLen) {
             return one;
         }
         if(tree.op == op_abs)
-            return newValue(sqrt(one.i * one.i + one.r * one.r), 0, one.u);
+            return newValNum(sqrt(one.i * one.i + one.r * one.r), 0, one.u);
         if(tree.op == op_arg)
-            return newValue(atan2(one.i, one.r), 0, one.u);
-        return NULLNUM;
+            return newValNum(atan2(one.i, one.r), 0, one.u);
+        return NULLVAL;
     }
     //Rounding and conditionals
     if(tree.op < 50) {
@@ -809,15 +949,15 @@ Number computeTree(Tree tree, Number* args, int argLen) {
         }
         if(tree.op == op_grthan) {
             if(one.r > two.r)
-                return newValue(1, 0, 0);
+                return newValNum(1, 0, 0);
             else
-                return newValue(0, 0, 0);
+                return newValNum(0, 0, 0);
         }
         if(tree.op == op_equal) {
             if(one.r == two.r && one.r == two.r)
-                return newValue(1, 0, 0);
+                return newValNum(1, 0, 0);
             else
-                return newValue(0, 0, 0);
+                return newValNum(0, 0, 0);
         }
         if(tree.op == op_min) {
             if(one.r > two.r)
@@ -833,31 +973,39 @@ Number computeTree(Tree tree, Number* args, int argLen) {
         }
         if(tree.op == op_lerp) {
             //(1 - c) * one + c * two;
-            Number c = computeTree(tree.branch[2], args, argLen);
-            Number p1 = newValue((1 - c.r) * one.r + one.i * c.i, (1 - c.r) * one.i - one.r * c.i, 0);
-            Number p2 = newValue(c.r * two.r - c.i * two.i, c.r * two.i + two.r * c.i, 0);
-            return newValue(p1.r + p2.r, p1.i + p2.i, unitInteract(one.u, two.u, '+', 0));
+            Value c = computeTree(tree.branch[2], args, argLen);
+            Value p1 = newValNum((1 - c.r) * one.r + one.i * c.i, (1 - c.r) * one.i - one.r * c.i, 0);
+            Value p2 = newValNum(c.r * two.r - c.i * two.i, c.r * two.i + two.r * c.i, 0);
+            return newValNum(p1.r + p2.r, p1.i + p2.i, unitInteract(one.u, two.u, '+', 0));
         }
         if(tree.op == op_dist) {
-            return newValue(sqrt(pow(fabs(one.r - two.r), 2) + pow(fabs(one.i - two.i), 2)), 0, 0);
+            return newValNum(sqrt(pow(fabs(one.r - two.r), 2) + pow(fabs(one.i - two.i), 2)), 0, 0);
         }
     }
     //Binary Operations
     if(tree.op < 56) {
-        return compBinOp(tree.op,one,two);
+        if(one.type != two.type && tree.op != op_not) {
+
+        }
+        if(one.type == value_num) {
+            Value out;
+            out.type = value_num;
+            out.num = compBinOp(tree.op, one.num, two.num);
+            return out;
+        }
     }
     //Constants
     if(tree.op < 63) {
         if(tree.op == op_pi)
-            return newValue(3.14159265358979, 0, 0);
+            return newValNum(3.14159265358979, 0, 0);
         if(tree.op == op_e)
-            return newValue(1.618033988749894, 0, 0);
+            return newValNum(1.618033988749894, 0, 0);
         if(tree.op == op_phi)
-            return newValue(2.718281828459045, 0, 0);
+            return newValNum(2.718281828459045, 0, 0);
         if(tree.op == op_ans) {
             if(historyCount == 0) {
                 error("no previous answer", NULL);
-                return NULLNUM;
+                return NULLVAL;
             }
             return history[historyCount - 1];
         }
@@ -865,27 +1013,27 @@ Number computeTree(Tree tree, Number* args, int argLen) {
             if(one.r < 0) {
                 if((int)floor(-one.r) > historyCount) {
                     error("history too short", NULL);
-                    return NULLNUM;
+                    return NULLVAL;
                 }
                 return history[historyCount - (int)floor(-one.r)];
             }
             if((int)floor(one.r) >= historyCount) {
                 error("history too short", NULL);
-                return NULLNUM;
+                return NULLVAL;
             }
             return history[(int)floor(one.r)];
         }
         if(tree.op == op_histnum)
-            return newValue(historyCount, 0, 0);
+            return newValNum(historyCount, 0, 0);
         if(tree.op == op_rand)
-            return newValue((double)rand() / RAND_MAX, 0, 0);
+            return newValNum((double)rand() / RAND_MAX, 0, 0);
     }
     //Custom functions
     if(functions[tree.op].tree == NULL) {
         error("this uses a nonexistent function", NULL);
-        return NULLNUM;
+        return NULLVAL;
     }
-    Number funcArgs[tree.argCount];
+    Value funcArgs[tree.argCount];
     int i;
     //Crunch args
     if(tree.argCount > 0)
@@ -894,13 +1042,14 @@ Number computeTree(Tree tree, Number* args, int argLen) {
         funcArgs[1] = two;
     for(i = 2; i < tree.argCount; i++)
         funcArgs[i] = computeTree(tree.branch[i], args, argLen);
-    Number out = computeTree(*functions[tree.op].tree, funcArgs, tree.argCount);
+    Value out = computeTree(*functions[tree.op].tree, funcArgs, tree.argCount);
     if(globalError)
-        return NULLNUM;
+        return NULLVAL;
     return out;
 }
 Tree treeCopy(Tree tree, Tree* args, bool unfold, bool replaceArgs, bool optimize) {
     Tree out = tree;
+    if(tree.op == op_val) out.value = copyValue(tree.value);
     //Example: if f(x)=x^2, copyTree(f(2x),NULL,true,false,false) will return (2x)^2
     //Replace arguments
     if(replaceArgs)
@@ -1121,7 +1270,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
                     }
                 //Set operation
                 if(opID == 0)
-                    ops[i] = newOpValue(num);
+                    ops[i] = newOpVal(num.r, num.i, num.u);
                 else
                     ops[i] = newOp(NULL, 0, opID);
             }
@@ -1181,11 +1330,11 @@ Tree generateTree(char* eq, char* argNames, double base) {
                     error("Base type must be a runtime constant", NULL);
                     return NULLOPERATION;
                 }
-                Number baseNum = computeTree(tree, NULL, 0);
+                Value baseNum = computeTree(tree, NULL, 0);
                 if(globalError)
                     return NULLOPERATION;
                 freeTree(tree);
-                base = baseNum.r;
+                if(baseNum.type == value_num) base = baseNum.r;
                 section[j - 1] = '\0';
             }
             else
@@ -1462,18 +1611,18 @@ Tree derivative(Tree tree) {
     error("not all functions are supported in dx currently", NULL);
     return NULLOPERATION;
 }
-Number calculate(char* eq, double base) {
+Value calculate(char* eq, double base) {
     //Clean input
     char* cleanInput = inputClean(eq);
-    if(globalError) return NULLNUM;
+    if(globalError) return NULLVAL;
     //Generate tree
     Tree tree = generateTree(base == 0 ? cleanInput : eq, NULL, base);
     free(cleanInput);
-    if(globalError) return NULLNUM;
+    if(globalError) return NULLVAL;
     //Compute tree
-    Number ans = computeTree(tree, NULL, 0);
+    Value ans = computeTree(tree, NULL, 0);
     freeTree(tree);
-    if(globalError) return NULLNUM;
+    if(globalError) return NULLVAL;
     return ans;
 }
 #pragma endregion
@@ -1630,16 +1779,21 @@ void cleanup() {
         free(functions[i].tree);
         free(functions[i].argNames);
     }
+    //Free history
+    for(i = 0;i < historyCount;i++) {
+        freeValue(history[i]);
+    }
     //Free global array
     free(functions);
     free(history);
 }
 void startup() {
     //Constants
-    NULLNUM = newValue(0, 0, 0);
+    NULLNUM = newNum(0, 0, 0);
     NULLOPERATION = newOpVal(0, 0, 0);
+    NULLVAL = newValNum(0, 0, 0);
     //Allocate history
-    history = calloc(10, sizeof(Number));
+    history = calloc(10, sizeof(Value));
     historySize = 10;
     //Set immutable function args
     functions = calloc(sizeof(Function), immutableFunctions + 10);
@@ -1821,20 +1975,30 @@ void runLine(char* input) {
                 input[i] = '\0';
                 break;
             }
-            Number base = calculate(input + 5, 0);
+            Value base = calculate(input + 5, 0);
+            Number baseNum;
+            if(base.type == value_num) baseNum = base.num;
             if(base.r > 36 || base.r < 1) {
                 error("base out of bounds", NULL);
                 globalError = false;
                 return;
             }
-            Number out = calculate(input + expStart, 0);
+            Value out = calculate(input + expStart, 0);
             appendToHistory(out, base.r, true);
         }
         else if(input[1] == 'd' && input[2] == 'e' && input[3] == 'g' && input[4] == 's' && input[5] == 'e' && input[6] == 't' && input[7] == ' ') {
             if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
             else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
             else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
-            else degrat = calculate(input + 7, 0).r;
+            else {
+                Value deg = calculate(input + 7, 0);
+                if(deg.type != value_num) {
+                    error("Degree ratio is not a numeral", NULL);
+                    freeValue(deg);
+                    return;
+                }
+                degrat = deg.r;
+            }
             printf("Degree ratio set to %g\n", degrat);
         }
         else if(input[1] == 'u' && input[2] == 'n' && input[3] == 'i' && input[4] == 't') {
@@ -1844,8 +2008,8 @@ void runLine(char* input) {
                 input[i] = '\0';
                 break;
             }
-            Number unit = calculate(input + 5, 10);
-            Number value = calculate(input + unitStart, 0);
+            Value unit = calculate(input + 5, 10);
+            Value value = calculate(input + unitStart, 0);
             if(unit.u != value.u) {
                 char* unitOne = toStringUnit(unit.u);
                 char* unitTwo = toStringUnit(value.u);
@@ -1854,8 +2018,11 @@ void runLine(char* input) {
                 free(unitTwo);
                 return;
             }
-            Number out = compDivide(value, unit);
-            char* numString = toStringNumber(out, 10);
+            Value out = valDivide(value, unit);
+            char* numString = valueToString(out, 10);
+            freeValue(unit);
+            freeValue(value);
+            freeValue(out);
             printf("= %s %s\n", numString, input + 5);
             free(numString);
         }
@@ -1869,7 +2036,12 @@ void runLine(char* input) {
     }
     //Else compute it as a value
     else {
-        Number out = calculate(input, 0);
+        if(input[0] == '\n') {
+            error("no input", NULL);
+            globalError = false;
+            return;
+        }
+        Value out = calculate(input, 0);
         if(!globalError) appendToHistory(out, 10, true);
     }
     globalError = false;

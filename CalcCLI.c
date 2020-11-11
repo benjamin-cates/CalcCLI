@@ -17,7 +17,7 @@ void graphEquation(char* equation, double left, double right, double top, double
     double rowHeight = (top - bottom) / rows;
     Tree tree = generateTree(equation, "x", 0);
     int i;
-    Number x = NULLNUM;
+    Value x = NULLVAL;
     //Compute columns number of values
     double yvalues[columns + 1];
     for(i = 0; i <= columns; i++) {
