@@ -1143,7 +1143,7 @@ Tree generateTree(char* eq, char* argNames, double base) {
             pType = 2;
             sections[sectionCount++] = i;
         }
-        else if(((eq[i] >= 'a' && eq[i] <= 'z') || (useUnits && ((eq[i] >= 'A' && eq[i] <= 'Z') || eq[i] == '$') && (pType != 1 || (eq[i] > 'A' + (int)base - 10)))) && pType != 3) {
+        else if(((eq[i] >= 'a' && eq[i] <= 'z') || eq[i]=='_' || (useUnits && ((eq[i] >= 'A' && eq[i] <= 'Z') || eq[i] == '$') && (pType != 1 || (eq[i] > 'A' + (int)base - 10)))) && pType != 3) {
             if(i != 0 && eq[i - 1] == '0' && (eq[i] == 'b' || eq[i] == 'x' || eq[i] == 'd' || eq[i] == 'o'))
                 continue;
             pType = 3;
