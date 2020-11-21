@@ -22,7 +22,7 @@ extern "C" {
     //Number of units#
     #define unitCount 59
     //Number of immutable functions
-    #define immutableFunctions 65
+    #define immutableFunctions 66
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -40,6 +40,7 @@ extern "C" {
     #define metricCount 17
 #endif
 #define value_num 0
+#define value_vec 1
 //Structs
 /**
  * Complex number with unit
@@ -52,6 +53,22 @@ typedef struct NumberStruct {
     double i;
     unit_t u;
 } Number;
+/**
+ * A vector (2D array of Number)
+ * total is the total number of elements
+ * width and height describe the shape of the vector
+ * val[0] is the top left corner
+ * val[mat.width-1] is the top right corner
+ */
+typedef struct VectorStruct {
+    Number *val;
+    //Width of the vector
+    short width;
+    //Height of the vector
+    short height;
+    //Total number of members = width * height
+    short total;
+} Vector;
 /**
  * Value that can contain a number or any other type
  * @param type type of value (0 for numbers)
@@ -69,6 +86,7 @@ typedef struct ValueStruct {
             double i;
             unit_t u;
         };
+        Vector vec;
     };
 } Value;
 /**
@@ -89,6 +107,7 @@ typedef struct UnitStandardStuct {
  * @param value Numeric value, if op==0
  * @param args Arguments, if op!=0
  * @param argCount Number of arguments, if op!=0
+ * @param argWidth Width of argument vector (internal, only for vector constructor)
  */
 typedef struct TreeStruct {
     int op;
@@ -96,7 +115,8 @@ typedef struct TreeStruct {
         Value value;
         struct {
             struct TreeStruct* branch;
-            char argCount;
+            short argCount;
+            short argWidth;
         };
     };
 } Tree;
@@ -218,23 +238,49 @@ Number compTrig(int type, Number num);
  * @param two Second input
  */
 Number compBinOp(int type, Number one, Number two);
+/**
+ * newVecScalar, but returns a Value
+ */
+Value newValMatScalar(int type, Number scalar);
+/**
+ * Creates a one-by-one vector and fills it with num
+ */
+Vector newVecScalar(Number num);
+/**
+ * Initializes an empty vector with width and height
+ */
+Vector newVec(short width,short height);
 //Values
 /**
  * Create a numeral value from r, i, and u
  */
 Value newValNum(double r, double i, unit_t u);
 /**
- * Frees any array buffers stored in a value (vectors or matrices only.
+ * Frees any array buffers stored in a value (vectors)
  */
 void freeValue(Value val);
 /**
- * Copies the value if it is a matrix of vector.
+ * Copies the value if it is a vector
  */
 Value copyValue(Value val);
 /**
  * Returns the string version of a value. Return char* must be freed.
  */
 char* valueToString(Value val, double base);
+/**
+ * Returns the real component of a value. (top left corner if val is a vector)
+ *
+ */
+double getR(Value val);
+/**
+ * Returns the Division, Modulus, or Exponent of the two values
+ *  This function was created to solve the repetition of num to num, vec to num, num to vec, vec to vec
+ * @param function can be &compDivide, &compModulo, or &compPower
+ * @param one First value
+ * @param two Second value
+ * @param type How to handle different sized vectors (0 to take the maximum width for power, 1 to take the minimum width for modulo and divide)
+ */
+Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int type);
 Value valMult(Value one, Value two);
 Value valAdd(Value one, Value two);
 Value valDivide(Value one, Value two);
@@ -486,4 +532,5 @@ char* inputClean(char* input);
 #define op_rand 62
 #define op_sum 63
 #define op_product 64
+#define op_vector 65
 #pragma endregion
