@@ -22,7 +22,7 @@ extern "C" {
     //Number of units#
     #define unitCount 59
     //Number of immutable functions
-    #define immutableFunctions 66
+    #define immutableFunctions 67
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -207,6 +207,10 @@ char* doubleToString(double num, double base);
  * @param base Base to output in
  */
 void appendToHistory(Value num, double base, bool print);
+//Returns one+two
+Number compAdd(Number one, Number two);
+//Returns one-two
+Number compSubtract(Number one, Number two);
 //Returns one*two
 Number compMultiply(Number one, Number two);
 //Returns pow(one,two) or one^two
@@ -238,6 +242,14 @@ Number compTrig(int type, Number num);
  * @param two Second input
  */
 Number compBinOp(int type, Number one, Number two);
+/**
+ * Return the determinant of a square matrix
+ */
+Number determinant(Vector vec);
+/**
+ * Returns the subsection of a vector with the row and column omitted.
+ */
+Vector subsection(Vector vec, int row, int column);
 /**
  * newVecScalar, but returns a Value
  */
@@ -533,4 +545,5 @@ char* inputClean(char* input);
 #define op_sum 63
 #define op_product 64
 #define op_vector 65
+#define op_det 66
 #pragma endregion

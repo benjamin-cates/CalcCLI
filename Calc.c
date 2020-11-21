@@ -332,6 +332,18 @@ void appendToHistory(Value num, double base, bool print) {
     history[historyCount] = num;
     historyCount++;
 }
+Number compAdd(Number one, Number two) {
+    one.r += two.r;
+    one.i += two.i;
+    one.u = unitInteract(one.u, two.u, '+', 0);
+    return one;
+}
+Number compSubtract(Number one, Number two) {
+    one.r -= two.r;
+    one.i -= two.i;
+    one.u = unitInteract(one.u, two.u, '+', 0);
+    return one;
+}
 Number compMultiply(Number one, Number two) {
     return newNum(one.r * two.r - one.i * two.i, one.r * two.i + one.i * two.r, unitInteract(one.u, two.u, '*', 0));
 }
@@ -527,6 +539,42 @@ Vector newVec(short width, short height) {
     out.height = height;
     out.total = width * height;
     out.val = calloc(out.total, sizeof(Number));
+    return out;
+}
+Number determinant(Vector vec) {
+    if(vec.width==1) {
+        return vec.val[0];
+    }
+    if(vec.width == 2) {
+        return compSubtract(compMultiply(vec.val[0], vec.val[3]), compMultiply(vec.val[1], vec.val[2]));
+    }
+    int i;
+    Number out = NULLNUM;
+    Number(*addOrSub[2])(Number, Number) = { &compAdd,&compSubtract };
+    for(i = 0;i < vec.width;i++) {
+        Vector subsec = subsection(vec, 0, i);
+        out = (*(addOrSub[i % 2]))(out, compMultiply(determinant(subsec), vec.val[i]));
+        free(subsec.val);
+    }
+    return out;
+}
+Vector subsection(Vector vec, int row, int column) {
+    int width = vec.width - 1;
+    if(row < 0 || row >= vec.height) width++;
+    int height = vec.height - 1;
+    if(column < 0 || column >= vec.width) height++;
+    int i, j, rowID = 0, columnID;
+    Vector out = newVec(width, height);
+    for(j = 0;j < vec.height;j++) {
+        if(j == row) continue;
+        columnID = 0;
+        for(i = 0;i < vec.width;i++) {
+            if(i == column) continue;
+            out.val[columnID + rowID * width] = vec.val[i + j * vec.width];
+            columnID++;
+        }
+        rowID++;
+    }
     return out;
 }
 #pragma endregion
@@ -1419,6 +1467,26 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             return newValNum(historyCount, 0, 0);
         if(tree.op == op_rand)
             return newValNum((double)rand() / RAND_MAX, 0, 0);
+    }
+    //Matrix functions
+    if(tree.op < 67) {
+        if(tree.op == op_det) {
+            if(one.type == value_num) {
+                one = newValMatScalar(value_vec, one.num);
+            }
+            if(one.type == value_vec) {
+                if(one.vec.width != one.vec.height) {
+                    freeValue(one);
+                    error("Cannot calculate determinant of non-square matrix", NULL);
+                    return NULLVAL;
+                }
+                Value out;
+                out.type = value_num;
+                out.num = determinant(one.vec);
+                freeValue(one);
+                return out;
+            }
+        }
     }
     //Custom functions
     if(functions[tree.op].tree == NULL) {
@@ -2324,6 +2392,7 @@ void startup() {
     functions[op_sum] = newFunction("sum", NULL, 4, NULL);
     functions[op_product] = newFunction("product", NULL, 4, NULL);
     functions[op_vector] = newFunction(" ", NULL, 0, NULL);
+    functions[op_det] = newFunction("det", NULL, 1, NULL);
 }
 void runLine(char* input) {
     int i;
