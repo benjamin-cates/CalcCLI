@@ -22,7 +22,7 @@ extern "C" {
     //Number of units#
     #define unitCount 59
     //Number of immutable functions
-    #define immutableFunctions 68
+    #define immutableFunctions 69
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -250,6 +250,14 @@ Number determinant(Vector vec);
  * Returns the subsection of a vector with the row and column omitted.
  */
 Vector subsection(Vector vec, int row, int column);
+/**
+ * Transpose the matrix (swap x and y coordinates)
+ */
+Vector transpose(Vector one);
+/**
+ * Multiply two matrices (order matters)
+ */
+Vector matMult(Vector one, Vector two);
 /**
  * newVecScalar, but returns a Value
  */
@@ -546,5 +554,6 @@ char* inputClean(char* input);
 #define op_product 64
 #define op_vector 65
 #define op_det 66
-#define op_mat_mult 67
+#define op_transpose 67
+#define op_mat_mult 68
 #pragma endregion

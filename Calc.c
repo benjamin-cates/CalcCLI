@@ -577,6 +577,14 @@ Vector subsection(Vector vec, int row, int column) {
     }
     return out;
 }
+Vector transpose(Vector one) {
+    Vector out = newVec(one.height, one.width);
+    int i, j;
+    for(i = 0;i < one.width;i++) for(j = 0;j < one.height;j++) {
+        out.val[j + i * one.width] = one.val[i + j * one.width];
+    }
+    return out;
+}
 Vector matMult(Vector one, Vector two) {
     Vector out = newVec(two.width, one.height);
     int i, j;
@@ -1502,18 +1510,26 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                 return out;
             }
         }
-        if(tree.op==op_mat_mult) {
-            if(one.type==value_num) one=newValMatScalar(value_vec,one.num);
-            if(two.type==value_num) two=newValMatScalar(value_vec,two.num);
-            if(one.vec.width!=two.vec.height) {
-                error("Matrix size error in mat_mult",NULL);
+        if(tree.op == op_transpose) {
+            if(one.type == value_num) one = newValMatScalar(value_vec, one.num);
+            Value out;
+            out.type = value_vec;
+            out.vec = transpose(one.vec);
+            freeValue(one);
+            return out;
+        }
+        if(tree.op == op_mat_mult) {
+            if(one.type == value_num) one = newValMatScalar(value_vec, one.num);
+            if(two.type == value_num) two = newValMatScalar(value_vec, two.num);
+            if(one.vec.width != two.vec.height) {
+                error("Matrix size error in mat_mult", NULL);
                 freeValue(one);
                 freeValue(two);
                 return NULLVAL;
             }
             Value out;
-            out.type=value_vec;
-            out.vec=matMult(one.vec,two.vec);
+            out.type = value_vec;
+            out.vec = matMult(one.vec, two.vec);
             freeValue(one);
             freeValue(two);
             return out;
@@ -2424,6 +2440,7 @@ void startup() {
     functions[op_product] = newFunction("product", NULL, 4, NULL);
     functions[op_vector] = newFunction(" ", NULL, 0, NULL);
     functions[op_det] = newFunction("det", NULL, 1, NULL);
+    functions[op_transpose] = newFunction("transpose", NULL, 1, NULL);
     functions[op_mat_mult] = newFunction("mat_mult", NULL, 2, NULL);
 }
 void runLine(char* input) {
