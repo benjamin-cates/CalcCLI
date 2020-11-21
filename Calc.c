@@ -542,7 +542,7 @@ Vector newVec(short width, short height) {
     return out;
 }
 Number determinant(Vector vec) {
-    if(vec.width==1) {
+    if(vec.width == 1) {
         return vec.val[0];
     }
     if(vec.width == 2) {
@@ -574,6 +574,21 @@ Vector subsection(Vector vec, int row, int column) {
             columnID++;
         }
         rowID++;
+    }
+    return out;
+}
+Vector matMult(Vector one, Vector two) {
+    Vector out = newVec(two.width, one.height);
+    int i, j;
+    for(i = 0;i < out.width;i++) {
+        for(j = 0;j < out.height;j++) {
+            Number cell = NULLNUM;
+            int x;
+            for(x = 0;x < one.width;x++) {
+                cell = compAdd(cell, compMultiply(one.val[x + j * one.width], two.val[i + x * two.width]));
+            }
+            out.val[i + j * out.width] = cell;
+        }
     }
     return out;
 }
@@ -1469,7 +1484,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             return newValNum((double)rand() / RAND_MAX, 0, 0);
     }
     //Matrix functions
-    if(tree.op < 67) {
+    if(tree.op < 68) {
         if(tree.op == op_det) {
             if(one.type == value_num) {
                 one = newValMatScalar(value_vec, one.num);
@@ -1486,6 +1501,22 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                 freeValue(one);
                 return out;
             }
+        }
+        if(tree.op==op_mat_mult) {
+            if(one.type==value_num) one=newValMatScalar(value_vec,one.num);
+            if(two.type==value_num) two=newValMatScalar(value_vec,two.num);
+            if(one.vec.width!=two.vec.height) {
+                error("Matrix size error in mat_mult",NULL);
+                freeValue(one);
+                freeValue(two);
+                return NULLVAL;
+            }
+            Value out;
+            out.type=value_vec;
+            out.vec=matMult(one.vec,two.vec);
+            freeValue(one);
+            freeValue(two);
+            return out;
         }
     }
     //Custom functions
@@ -2393,6 +2424,7 @@ void startup() {
     functions[op_product] = newFunction("product", NULL, 4, NULL);
     functions[op_vector] = newFunction(" ", NULL, 0, NULL);
     functions[op_det] = newFunction("det", NULL, 1, NULL);
+    functions[op_mat_mult] = newFunction("mat_mult", NULL, 2, NULL);
 }
 void runLine(char* input) {
     int i;

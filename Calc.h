@@ -22,7 +22,7 @@ extern "C" {
     //Number of units#
     #define unitCount 59
     //Number of immutable functions
-    #define immutableFunctions 67
+    #define immutableFunctions 68
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -546,4 +546,5 @@ char* inputClean(char* input);
 #define op_product 64
 #define op_vector 65
 #define op_det 66
+#define op_mat_mult 67
 #pragma endregion
