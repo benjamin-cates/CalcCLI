@@ -1,9 +1,6 @@
 /*
     This header file has comments on each function and allows for functions in CalcCLI.c to be in any order.
 */
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -15,7 +12,7 @@ extern "C" {
 #include <time.h>
 //Definitions
 #ifndef NULL
-    //NULL pointer with val
+    //NULL pointer
     #define NULL ((void *)0)
 #endif
 #ifndef unit_t
@@ -41,7 +38,10 @@ extern "C" {
 #endif
 #define value_num 0
 #define value_vec 1
-//Structs
+#ifdef __cplusplus
+extern "C" {
+#endif
+#pragma region Structs
 /**
  * Complex number with unit
  * @param r Real component
@@ -103,9 +103,10 @@ typedef struct UnitStandardStuct {
 } unitStandard;
 /**
  * Operation tree. Value and args are in a union, so changing one with change the other.
- * @param op Operation ID (0 means value)
- * @param value Numeric value, if op==0
- * @param args Arguments, if op!=0
+ * @param op Operation ID
+ * @param optype Type of operation ID, 0 for builtin, 1 for custom functions, 2 for function arguments
+ * @param value Numeric value, if op==op_val && optype==optype_builtin
+ * @param branch Branches of the operation tree (only for functions)
  * @param argCount Number of arguments, if op!=0
  * @param argWidth Width of argument vector (internal, only for vector constructor)
  */
@@ -123,8 +124,9 @@ typedef struct TreeStruct {
 } Tree;
 /**
  * Function
- * @param tree Operation tree with the first argument having opID=-1, NULL if it is a built-in function
+ * @param tree Operation tree
  * @param name Name of the function
+ * @param argNames List of argument names (ex. a(b,c) will have argNames="bc")
  * @param argCount Number of arguments
  * @param nameLen length of name (used to make searching faster)
  */
@@ -135,11 +137,19 @@ typedef struct FunctionStruct {
     char argCount;
     char nameLen;
 } Function;
+/**
+ * Holds information about a builtin function
+ * @param argCount Number of arguments
+ * @param nameLen Length of the name, useful for finding function IDs faster
+ * @param name Name of the function
+ */
 struct stdFunction {
     const int argCount;
     const int nameLen;
     const char* name;
 };
+#pragma endregion
+#pragma region External Variables
 //Degree ratio, 1 if radian, pi/180 if degrees
 extern double degrat;
 //Size of the history array
@@ -175,6 +185,7 @@ extern const double metricNumValues[];
 //Metric base units, used for toStringUnit
 extern const char* baseUnits[];
 extern const char numberChars[];
+#pragma endregion
 //Functions
 /**
  * Prints an error message as printf("Error: "+format,message), then sets globalError to true
@@ -182,7 +193,7 @@ extern const char numberChars[];
  * @param message char* that is passed to format
  */
 void error(const char* format, const char* message);
-//Numbers
+#pragma region Numbers
 /**
  * Returns a number made of the three components
  * @param r Real component
@@ -200,13 +211,14 @@ double parseNumber(char* num, double base);
  * Returns the string representation of num (ex. 3+4.5i[m])
  * @param num Number to be printed
  * @param base Base to output
+ * @return string that must be freed
  */
 char* toStringNumber(Number num, double base);
 /**
  * Returns the string form of num in base base
  * @param num Number to print
  * @param base base to print it in
- * @return string, maximum length of 24
+ * @return string, maximum length of 24, must be freed
  */
 char* doubleToString(double num, double base);
 /**
@@ -250,6 +262,8 @@ Number compTrig(int type, Number num);
  * @param two Second input
  */
 Number compBinOp(int type, Number one, Number two);
+#pragma endregion
+#pragma region Vectors
 /**
  * Return the determinant of a square matrix
  */
@@ -278,7 +292,8 @@ Vector newVecScalar(Number num);
  * Initializes an empty vector with width and height
  */
 Vector newVec(short width,short height);
-//Values
+#pragma endregion
+#pragma region Values
 /**
  * Create a numeral value from r, i, and u
  */
@@ -317,7 +332,8 @@ Value valModulo(Value one, Value two);
 Value valNegate(Value one);
 Value valLn(Value one);
 bool valIsEqual(Value one, Value two);
-//Units
+#pragma endregion
+#pragma region Units
 /**
  * Returns a new unit standard
  * @param name name of the unit (ex. ft)
@@ -345,7 +361,8 @@ char* toStringUnit(unit_t unit);
  * @param twor value of two.r, used when op=='^'
  */
 unit_t unitInteract(unit_t one, unit_t two, char op, double twor);
-//Tree Constructors
+#pragma endregion
+#pragma region Trees
 /**
  * Returns new operator from args and opID
  * @param args Arguments of the operation
@@ -390,26 +407,6 @@ bool treeIsOne(Tree in);
  * Returns true if both trees are equal
  */
 bool treeEqual(Tree one, Tree two);
-//Functions
-/**
- * Function constructor
- * @param name name of the function
- * @param tree function tree, NULL if predefined
- * @param argCount number of arguments the function recieves
- */
-Function newFunction(char* name, Tree* tree, char argCount, char* argNames);
-/**
- * Returns the function ID
- * @param name name of the function
- * @return function ID of name, returns 0 if not found
- */
-Tree findFunction(char* name);
-/**
- * Parses the equation eq and adds it to the function list
- * @param eq Equation (ex. "f(a)=a^2")
- */
-void generateFunction(char* eq);
-//Operation Tree
 /**
  * Frees the op.args and runs freeTree on all arguments. Does not need to be called if the operation has no arguments.
  * @param op Operation to free
@@ -453,6 +450,27 @@ Tree generateTree(char* eq, char* argNames, double base);
  * @return Tree, must be freed with freeTree()
  */
 Tree derivative(Tree op);
+#pragma endregion
+#pragma region Functions
+/**
+ * Function constructor
+ * @param name name of the function
+ * @param tree function tree, NULL if predefined
+ * @param argCount number of arguments the function recieves
+ */
+Function newFunction(char* name, Tree* tree, char argCount, char* argNames);
+/**
+ * Returns the function ID
+ * @param name name of the function
+ * @return function ID of name, returns 0 if not found
+ */
+Tree findFunction(char* name);
+/**
+ * Parses the equation eq and adds it to the function list
+ * @param eq Equation (ex. "f(a)=a^2")
+ */
+void generateFunction(char* eq);
+#pragma endregion
 /**
  * Prints graph of equation to stdout
  * @param equation Equation to print
