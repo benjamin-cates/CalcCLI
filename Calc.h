@@ -111,6 +111,7 @@ typedef struct UnitStandardStuct {
  */
 typedef struct TreeStruct {
     int op;
+    int optype;
     union {
         Value value;
         struct {
@@ -134,6 +135,11 @@ typedef struct FunctionStruct {
     char argCount;
     char nameLen;
 } Function;
+struct stdFunction {
+    const int argCount;
+    const int nameLen;
+    const char* name;
+};
 //Degree ratio, 1 if radian, pi/180 if degrees
 extern double degrat;
 //Size of the history array
@@ -154,12 +160,14 @@ extern Value* history;
 extern const unitStandard unitList[];
 //Tree with op=0 and value=0
 extern Tree NULLOPERATION;
-//Number of functions
+//Number of custom functions
 extern int numFunctions;
 //Array length of functions
 extern int functionArrayLength;
-//List of all functions (operation IDs)
-extern Function* functions;
+//List of all custom functions (optype_custom)
+extern Function* customfunctions;
+//List of all standard functions (optype_builtin)
+extern const struct stdFunction stdfunctions[immutableFunctions];
 //Metric prefixes
 extern const char metricNums[];
 //Metric prefix values
@@ -173,7 +181,7 @@ extern const char numberChars[];
  * @param format error format
  * @param message char* that is passed to format
  */
-void error(char* format, char* message);
+void error(const char* format, const char* message);
 //Numbers
 /**
  * Returns a number made of the three components
@@ -344,7 +352,7 @@ unit_t unitInteract(unit_t one, unit_t two, char op, double twor);
  * @param argCount Number of arguments
  * @param op OperatorID
  */
-Tree newOp(Tree* args, int argCount, int op);
+Tree newOp(Tree* args, int argCount, int op, int optype);
 /**
  * Returns a new operation with id 0 and value val
  */
@@ -395,7 +403,7 @@ Function newFunction(char* name, Tree* tree, char argCount, char* argNames);
  * @param name name of the function
  * @return function ID of name, returns 0 if not found
  */
-int findFunction(char* name);
+Tree findFunction(char* name);
 /**
  * Parses the equation eq and adds it to the function list
  * @param eq Equation (ex. "f(a)=a^2")
@@ -487,6 +495,9 @@ char* inputClean(char* input);
 #endif
 #pragma region Operation IDs
 //These definitons are to ease readability of the program and to allow flexibility
+#define optype_builtin 0
+#define optype_custom 1
+#define optype_argument 2
 #define op_val 0
 #define op_i 1
 #define op_neg 2

@@ -1,5 +1,5 @@
 #include "Calc.h"
-void error(char* format, char* message) {
+void error(const char* format, const char* message) {
     //Print error
     printf("Error: ");
     printf(format, message);
