@@ -1,4 +1,146 @@
 #include "Calc.h"
+#if defined(__linux__) || defined(unix) || defined(__unix__) || defined(__APPLE__)
+#define FANCY_INPUT
+#endif
+char* readLineRaw() {
+    char* out = calloc(10, 1);
+    int outLen = 10;
+    int charPos = 0;
+    while(true) {
+        int character = getchar();
+        if(character == -1) {
+            free(out);
+            return NULL;
+        }
+        if(character == '\n') return out;
+        if(charPos == outLen) {
+            out = realloc(out, (outLen += 10));
+        }
+        out[charPos] = character;
+    }
+    return out;
+}
+#ifdef FANCY_INPUT
+bool useFancyInput=true;
+#include <termios.h>
+#include <sys/ioctl.h>
+#include <unistd.h>
+int getTermWidth() {
+    struct winsize ws;
+    ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws);
+    return ws.ws_col;
+}
+struct termios orig_termios;
+void disableRawMode() {
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+}
+void enableRawMode() {
+    atexit(disableRawMode);
+    struct termios raw;
+    tcgetattr(STDIN_FILENO, &orig_termios);
+    raw = orig_termios;
+    raw.c_lflag &= ~(ECHO | ICANON);
+    tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
+}
+void initializeInput() {
+    enableRawMode();
+}
+char* readLine() {
+    char* input = calloc(11, 1);
+    int strLenAllocated = 10;
+    int strLen = 0;
+    int cursorPos = 0;
+    int character = 0;
+    int i;
+    printf("\0337");
+    while(1) {
+        int width=getTermWidth();
+        printf("\0338\033[J\r%s ", input);
+        printf("\0338");
+        if(cursorPos%width!=0) printf("\033[%dC",cursorPos%width);
+        if(cursorPos>width-1) printf("\033[%dB",cursorPos/width);
+        character = getchar();
+        if(character == 27) {
+            int next = getchar();
+            if(next == '[') {
+                int next2=getchar();
+                //Left Arrow
+                if(next2 == 'D') {
+                    cursorPos = cursorPos - 1;
+                    if(cursorPos == -1) cursorPos = 0;
+                    continue;
+                }
+                //Right Arrow
+                if(next2 == 'C') {
+                    cursorPos++;
+                    if(cursorPos > strLen) cursorPos--;
+                    continue;
+                }
+                //END
+                if(next2=='F') {
+                    cursorPos=strLen;
+                    continue;
+                }
+                //HOME
+                if(next2=='H') {
+                    cursorPos=0;
+                    continue;
+                }
+                //DELETE
+                if(next2=='3') {
+                    getchar();
+                    if(cursorPos==strLen) continue;
+                    int i;
+                    for(i=cursorPos;i<strLen;i++) {
+                        input[i]=input[i+1];
+                    }
+                    strLen--;
+                    continue;
+                }
+            }
+        }
+        if(character == 127 && cursorPos != 0) {
+            cursorPos--;
+            input[cursorPos] = '\0';
+            for(i = cursorPos;i < strLen;i++) {
+                input[i] = input[i + 1];
+            }
+            strLen--;
+            continue;
+        }
+        else if(character == 127) continue;
+        if(character == 10) break;
+        if(character<27) {
+            for(i=strLen;i>cursorPos-1;i--) {
+                input[i+1]=input[i];
+            }
+            input[cursorPos] = '^';
+            cursorPos++;
+            character+=64;
+        }
+        for(i=strLen;i>cursorPos-1;i--) {
+            input[i+1]=input[i];
+        }
+        input[cursorPos] = character;
+        strLen++;
+        if(strLen == strLenAllocated) {
+            strLenAllocated += 10;
+            input = realloc(input, strLenAllocated+1);
+        }
+        cursorPos++;
+    }
+    printf("\0338\033[J%s\n", input);
+    return input;
+}
+#else
+bool useFancyInput=false;
+void initializeInput() {
+
+}
+char* readLine() {
+    return readLineRaw();
+};
+#endif
 void error(const char* format, const char* message) {
     //Print error
     printf("Error: ");
@@ -99,12 +241,14 @@ int main(int argc, char** argv) {
     //Set cleanup on interupt
     signal(SIGINT, CLI_cleanup);
     startup();
+    bool rawInput = false;
     //Parse arguments
     int i;
     for(i = 0; i < argc; i++) {
         if(argv[i][0] == '-') {
             //Verbosity
             if(argv[i][1] == 'v') verbose = true;
+            if(argv[i][1] == 'r') rawInput = true;
             //Help
             if(argv[i][1] == 'h') {
                 if(argc == i + 1) {
@@ -129,13 +273,13 @@ int main(int argc, char** argv) {
             }
         }
     }
+    if(!rawInput) initializeInput();
     //Main loop
     while(true) {
-        char input[100];
-        memset(input, 0, 100);
-        if(fgets(input, 100, stdin) == NULL) {
-            break;
-        }
+        char* input;
+        if(rawInput) input=readLineRaw();
+        else input=readLine();
+        if(input == NULL) break;
         runLine(input);
     }
     cleanup();
