@@ -237,6 +237,182 @@ void graphEquation(char* equation, double left, double right, double top, double
     }
     freeTree(tree);
 }
+void runLine(char* input) {
+    int i;
+    //If command
+    if(input[0] == '-') {
+        if(input[1] == 'd' && input[2] == 'e' && input[3] == 'f' && input[4] == ' ') {
+            //Define function
+            generateFunction(input + 5);
+        }
+        else if(input[1] == 'd' && input[2] == 'e' && input[3] == 'l' && input[4] == ' ') {
+            int strLen = strlen(input);
+            //Delete function or variable
+            for(i = 0; i < numFunctions; i++) {
+                if(customfunctions[i].nameLen != strLen - 6) continue;
+                if(strcmp(input + 5, customfunctions[i].name) != 0) continue;
+                printf("Function '%s' has been deleted.\n", customfunctions[i].name);
+                customfunctions[i].nameLen = 0;
+                freeTree(*customfunctions[i].tree);
+                customfunctions[i].tree = NULL;
+                customfunctions[i].argCount = 0;
+                return;
+            }
+            error("Function '%s' not found\n", input + 5);
+            globalError = false;
+        }
+        else if(input[1] == 'g' && input[2] == ' ') {
+            //Graph
+            char* cleanInput = inputClean(input + 3);
+            if(globalError) {
+                globalError = false;
+                return;
+            }
+            graphEquation(cleanInput, -10, 10, 10, -10, 20, 50);
+            free(cleanInput);
+        }
+        else if(input[1] == 'f' && input[2] == ' ') {
+            int strLen = strlen(input);
+            if(input[strLen - 1] == '\n') input[strLen - 1] = 0;
+            //Read lines from a file
+            FILE* file = fopen(input + 3, "r");
+            unsigned long lineSize = 100;
+            char* line = malloc(100);
+            while(getline(&line, &lineSize, file) != -1) {
+                printf("%s", line);
+                runLine(line);
+            }
+            free(line);
+            fclose(file);
+        }
+        else if(input[1] == 'q' && input[2] == 'u' && input[3] == 'i' && input[4] == 't') {
+            //Exit the program
+            cleanup();
+            exit(0);
+        }
+        else if(input[1] == 'l' && input[2] == 's') {
+            //ls lists all user-defined functions
+            int num = 0;
+            for(i = 0; i < numFunctions; i++) {
+                if(customfunctions[i].nameLen == 0) continue;
+                num++;
+                char* equation = treeToString(*(customfunctions[i].tree), false, customfunctions[i].argNames);
+                //Print name
+                printf("%s", customfunctions[i].name);
+                //Print arguments (if it has them)
+                if(customfunctions[i].argNames != NULL) {
+                    printf("(");
+                    int j;
+                    for(j = 0;j < customfunctions[i].argCount;j++) {
+                        if(j != 0) printf(",");
+                        printf("%c", customfunctions[i].argNames[j]);
+                    }
+                    printf(")");
+                }
+                //Print equation
+                printf(" = %s\n", equation);
+                free(equation);
+            }
+            printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
+        }
+        else if(input[1] == 'd' && input[2] == 'x' && input[3] == ' ') {
+            char* cleanInput = inputClean(input + 4);
+            if(globalError) {
+                globalError = false;
+                return;
+            }
+            Tree ops = generateTree(cleanInput, "x", 0);
+            free(cleanInput);
+            Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
+            Tree dx = derivative(cleanedOps);
+            Tree dxClean = treeCopy(dx, NULL, false, false, true);
+            char* out = treeToString(dxClean, false, "x");
+            printf("=%s\n", out);
+            free(out);
+            freeTree(cleanedOps);
+            freeTree(ops);
+            freeTree(dxClean);
+            freeTree(dx);
+        }
+        else if(input[1] == 'b' && input[2] == 'a' && input[3] == 's' && input[4] == 'e') {
+            //format: -base(16) 46 will return 2E
+            int i, expStart = 0;
+            for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
+                expStart = i + 1;
+                input[i] = '\0';
+                break;
+            }
+            Value base = calculate(input + 5, 0);
+            Number baseNum;
+            if(base.type == value_num) baseNum = base.num;
+            if(base.r > 36 || base.r < 1) {
+                error("base out of bounds", NULL);
+                globalError = false;
+                return;
+            }
+            Value out = calculate(input + expStart, 0);
+            appendToHistory(out, base.r, true);
+        }
+        else if(input[1] == 'd' && input[2] == 'e' && input[3] == 'g' && input[4] == 's' && input[5] == 'e' && input[6] == 't' && input[7] == ' ') {
+            if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
+            else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
+            else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
+            else {
+                Value deg = calculate(input + 7, 0);
+                if(deg.type != value_num) {
+                    error("Degree ratio is not a numeral", NULL);
+                    freeValue(deg);
+                    return;
+                }
+                degrat = deg.r;
+            }
+            printf("Degree ratio set to %g\n", degrat);
+        }
+        else if(input[1] == 'u' && input[2] == 'n' && input[3] == 'i' && input[4] == 't') {
+            int i, unitStart = 0;
+            for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
+                unitStart = i + 1;
+                input[i] = '\0';
+                break;
+            }
+            Value unit = calculate(input + 5, 10);
+            Value value = calculate(input + unitStart, 0);
+            if(unit.u != value.u) {
+                char* unitOne = toStringUnit(unit.u);
+                char* unitTwo = toStringUnit(value.u);
+                printf("Error: units %s and %s are not compatible\n", unitOne, unitTwo);
+                free(unitOne);
+                free(unitTwo);
+                return;
+            }
+            Value out = valDivide(value, unit);
+            char* numString = valueToString(out, 10);
+            freeValue(unit);
+            freeValue(value);
+            freeValue(out);
+            printf("= %s %s\n", numString, input + 5);
+            free(numString);
+        }
+        else {
+            printf("Error: command '%s' not recognized.\n", input + 1);
+        }
+    }
+    else if(input[0] == '#' || (input[0] == '/' && input[0] == '/')) {
+        //If it is a comment, ignore
+        return;
+    }
+    //Else compute it as a value
+    else {
+        if(input[0] == '\0') {
+            error("no input", NULL);
+            globalError = false;
+            return;
+        }
+        Value out = calculate(input, 0);
+        if(!globalError) appendToHistory(out, 10, true);
+    }
+    globalError = false;
+}
 int main(int argc, char** argv) {
     //Set cleanup on interupt
     signal(SIGINT, CLI_cleanup);
