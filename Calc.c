@@ -2408,6 +2408,7 @@ void cleanup() {
     int i;
     //Free functions
     for(i = 0; i < numFunctions; i++) {
+        if(customfunctions[i].tree==NULL) continue;
         free(customfunctions[i].name);
         freeTree(*customfunctions[i].tree);
         free(customfunctions[i].tree);

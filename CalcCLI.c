@@ -278,7 +278,7 @@ void runLine(char* input) {
             int strLen = strlen(input);
             //Delete function or variable
             for(i = 0; i < numFunctions; i++) {
-                if(customfunctions[i].nameLen != strLen - 6) continue;
+                if(customfunctions[i].nameLen != strLen - 5) continue;
                 if(strcmp(input + 5, customfunctions[i].name) != 0) continue;
                 printf("Function '%s' has been deleted.\n", customfunctions[i].name);
                 customfunctions[i].nameLen = 0;
@@ -287,7 +287,7 @@ void runLine(char* input) {
                 customfunctions[i].argCount = 0;
                 return;
             }
-            error("Function '%s' not found\n", input + 5);
+            error("Function '%s' not found", input + 5);
             globalError = false;
         }
         else if(startsWith(input,"-g")) {
