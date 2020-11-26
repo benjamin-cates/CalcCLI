@@ -35,9 +35,9 @@ void printInput(char* string, int cursorPos) {
     bool isComment = false;
     //Print input
     if(useColors) {
-        if(string[0] == '-') {
+        if(string[0] == '-' || string[0]=='.') {
+            printf("\33[1;34m%c\33[0m",string[0]);
             string++;
-            printf("\33[1;34m-\33[0m");
         }
         if(string[0] == '#' || (string[0] == '/' && string[1] == '/')) {
             isComment = true;
@@ -53,16 +53,20 @@ void printInput(char* string, int cursorPos) {
     if(cursorPos % width != 0) printf("\033[%dC", cursorPos % width);
     if(cursorPos > width - 1) printf("\033[%dB", cursorPos / width);
 }
-char* readLine() {
+char* readLine(bool erasePrevious) {
     char* input = calloc(11, 1);
     int strLenAllocated = 10;
     int strLen = 0;
     int cursorPos = 0;
     int character = 0;
     int i;
-    printf("\0337");
+    if(!erasePrevious) printf("\0337");
     while(1) {
-        printInput(input, cursorPos);
+        if(!erasePrevious) printInput(input, cursorPos);
+        else {
+            printf("\338");
+            erasePrevious = false;
+        }
         character = getchar();
         if(character == 27) {
             int next = getchar();
@@ -152,7 +156,7 @@ char* readLineRaw() {
         if(charPos == outLen) {
             out = realloc(out, (outLen += 10));
         }
-        out[charPos] = character;
+        out[charPos++] = character;
     }
     return out;
 }
@@ -161,7 +165,7 @@ bool useFancyInput = false;
 void initializeInput() {
 
 }
-char* readLine() {
+char* readLine(bool erasePrevious) {
     return readLineRaw();
 };
 #endif
@@ -428,6 +432,24 @@ void runLine(char* input) {
         //If it is a comment, ignore
         return;
     }
+    else if(input[0] == '.') {
+        if(!useFancyInput) {
+            error("dot command is not supported in raw mode");
+            return;
+        }
+        printf("\0338\033[J\r");
+        Value out = calculate(input + 1, 0);
+        char* outString = valueToString(out, 10);
+        freeValue(out);
+        if(!globalError) {
+            if(useColors) printf("\33[1;34m= \033[0m%s", outString);
+            else printf("= %s", outString);
+        }
+        free(outString);
+        getchar();
+        printf("\0338");
+        return;
+    }
     //Else compute it as a value
     else {
         if(input[0] == '\0') {
@@ -442,14 +464,13 @@ int main(int argc, char** argv) {
     //Set cleanup on interupt
     signal(SIGINT, CLI_cleanup);
     startup();
-    bool rawInput = false;
     //Parse arguments
     int i;
     for(i = 0; i < argc; i++) {
         if(argv[i][0] == '-') {
             //Verbosity
             if(argv[i][1] == 'v') verbose = true;
-            if(argv[i][1] == 'r') rawInput = true;
+            if(argv[i][1] == 'r') useFancyInput = false;
             //Help
             if(argv[i][1] == 'h') {
                 if(argc == i + 1) {
@@ -474,14 +495,14 @@ int main(int argc, char** argv) {
             }
         }
     }
-    if(!rawInput) initializeInput();
+    if(useFancyInput) initializeInput();
     //Main loop
     while(true) {
-        globalError = false;
         char* input;
-        if(rawInput) input = readLineRaw();
-        else input = readLine();
+        if(useFancyInput) input = readLine(globalError);
+        else input = readLineRaw();
         if(input == NULL) break;
+        globalError = false;
         runLine(input);
     }
     cleanup();
