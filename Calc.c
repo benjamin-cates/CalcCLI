@@ -2385,9 +2385,8 @@ char* inputClean(char* input) {
         }
         //Check for invalid character
         if((in > '9' && in < 'A' && in != '>' && in != '<' && in != ';') || (in < '$' && in > ' ') || in == '&' || in == '\'' || in == '\\' || in == '`' || in > 'z' || (in == '$' && insideSquare == false)) {
-            printf("Error: invalid character '%c'\n", in);//TODO
+            error("invalid character '%c'", in);
             free(out);
-            globalError = true;
             break;
         }
         //Else add it to the output

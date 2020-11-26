@@ -1,16 +1,17 @@
 #include "Calc.h"
+#include <stdarg.h>
 #if defined __linux__ || defined unix || defined __unix__ || defined __APPLE__
-    #define FANCY_INPUT
+#define FANCY_INPUT
 #endif
-bool useColors=true;
+bool useColors = true;
 #ifdef FANCY_INPUT
-bool useFancyInput=true;
+bool useFancyInput = true;
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
 int getTermWidth() {
     struct winsize ws;
-    ioctl(STDOUT_FILENO,TIOCGWINSZ,&ws);
+    ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws);
     return ws.ws_col;
 }
 struct termios orig_termios;
@@ -28,29 +29,29 @@ void enableRawMode() {
 void initializeInput() {
     enableRawMode();
 }
-void printInput(char* string,int cursorPos) {
+void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
-    bool isComment=false;
+    bool isComment = false;
     //Print input
     if(useColors) {
-        if(string[0]=='-') {
+        if(string[0] == '-') {
             string++;
             printf("\33[1;34m-\33[0m");
         }
-        if(string[0]=='#'||(string[0]=='/'&&string[1]=='/')) {
-            isComment=true;
+        if(string[0] == '#' || (string[0] == '/' && string[1] == '/')) {
+            isComment = true;
             printf("\33[1;32m");
         }
     }
     printf("%s ", string);
     if(isComment) printf("\33[0m");
     //Set cursor position
-    if(cursorPos==-1) return;
+    if(cursorPos == -1) return;
     printf("\0338");
-    int width=getTermWidth();
-    if(cursorPos%width!=0) printf("\033[%dC",cursorPos%width);
-    if(cursorPos>width-1) printf("\033[%dB",cursorPos/width);
+    int width = getTermWidth();
+    if(cursorPos % width != 0) printf("\033[%dC", cursorPos % width);
+    if(cursorPos > width - 1) printf("\033[%dB", cursorPos / width);
 }
 char* readLine() {
     char* input = calloc(11, 1);
@@ -61,12 +62,12 @@ char* readLine() {
     int i;
     printf("\0337");
     while(1) {
-        printInput(input,cursorPos);
+        printInput(input, cursorPos);
         character = getchar();
         if(character == 27) {
             int next = getchar();
             if(next == '[') {
-                int next2=getchar();
+                int next2 = getchar();
                 //Left Arrow
                 if(next2 == 'D') {
                     cursorPos = cursorPos - 1;
@@ -80,22 +81,22 @@ char* readLine() {
                     continue;
                 }
                 //END
-                if(next2=='F') {
-                    cursorPos=strLen;
+                if(next2 == 'F') {
+                    cursorPos = strLen;
                     continue;
                 }
                 //HOME
-                if(next2=='H') {
-                    cursorPos=0;
+                if(next2 == 'H') {
+                    cursorPos = 0;
                     continue;
                 }
                 //DELETE
-                if(next2=='3') {
+                if(next2 == '3') {
                     getchar();
-                    if(cursorPos==strLen) continue;
+                    if(cursorPos == strLen) continue;
                     int i;
-                    for(i=cursorPos;i<strLen;i++) {
-                        input[i]=input[i+1];
+                    for(i = cursorPos;i < strLen;i++) {
+                        input[i] = input[i + 1];
                     }
                     strLen--;
                     continue;
@@ -113,26 +114,26 @@ char* readLine() {
         }
         else if(character == 127) continue;
         if(character == 10) break;
-        if(character<27) {
-            for(i=strLen;i>cursorPos-1;i--) {
-                input[i+1]=input[i];
+        if(character < 27) {
+            for(i = strLen;i > cursorPos - 1;i--) {
+                input[i + 1] = input[i];
             }
             input[cursorPos] = '^';
             cursorPos++;
-            character+=64;
+            character += 64;
         }
-        for(i=strLen;i>cursorPos-1;i--) {
-            input[i+1]=input[i];
+        for(i = strLen;i > cursorPos - 1;i--) {
+            input[i + 1] = input[i];
         }
         input[cursorPos] = character;
         strLen++;
         if(strLen == strLenAllocated) {
             strLenAllocated += 10;
-            input = realloc(input, strLenAllocated+1);
+            input = realloc(input, strLenAllocated + 1);
         }
         cursorPos++;
     }
-    printInput(input,-1);
+    printInput(input, -1);
     printf("\n");
     return input;
 }
@@ -156,7 +157,7 @@ char* readLineRaw() {
     return out;
 }
 #ifndef FANCY_INPUT
-bool useFancyInput=false;
+bool useFancyInput = false;
 void initializeInput() {
 
 }
@@ -164,12 +165,16 @@ char* readLine() {
     return readLineRaw();
 };
 #endif
-void error(const char* format, const char* message) {
+void error(const char* format, ...) {
     //Print error
     if(useColors) printf("\033[1;31m");
     printf("Error: ");
     if(useColors) printf("\033[0m");
-    printf(format, message);
+    char* dest[256];
+    va_list argptr;
+    va_start(argptr, format);
+    vprintf(format, argptr);
+    va_end(argptr);
     printf("\n");
     //Set error to true
     globalError = true;
@@ -262,19 +267,19 @@ void graphEquation(char* equation, double left, double right, double top, double
     }
     freeTree(tree);
 }
-bool startsWith(char* string,char* sw) {
-    int compareLength=strlen(sw);
-    return memcmp(string,sw,compareLength)==0?true:false;
+bool startsWith(char* string, char* sw) {
+    int compareLength = strlen(sw);
+    return memcmp(string, sw, compareLength) == 0 ? true : false;
 }
 void runLine(char* input) {
     int i;
     //If command
     if(input[0] == '-') {
-        if(startsWith(input,"-def ")) {
+        if(startsWith(input, "-def ")) {
             //Define function
             generateFunction(input + 5);
         }
-        else if(startsWith(input,"-del ")) {
+        else if(startsWith(input, "-del ")) {
             int strLen = strlen(input);
             //Delete function or variable
             for(i = 0; i < numFunctions; i++) {
@@ -288,19 +293,15 @@ void runLine(char* input) {
                 return;
             }
             error("Function '%s' not found", input + 5);
-            globalError = false;
         }
-        else if(startsWith(input,"-g")) {
+        else if(startsWith(input, "-g")) {
             //Graph
             char* cleanInput = inputClean(input + 3);
-            if(globalError) {
-                globalError = false;
-                return;
-            }
+            if(globalError) return;
             graphEquation(cleanInput, -10, 10, 10, -10, 20, 50);
             free(cleanInput);
         }
-        else if(startsWith(input,"-f")) {
+        else if(startsWith(input, "-f")) {
             int strLen = strlen(input);
             //Read lines from a file
             FILE* file = fopen(input + 3, "r");
@@ -313,12 +314,12 @@ void runLine(char* input) {
             free(line);
             fclose(file);
         }
-        else if(startsWith(input,"-quit")) {
+        else if(startsWith(input, "-quit")) {
             //Exit the program
             cleanup();
             exit(0);
         }
-        else if(startsWith(input,"-ls")) {
+        else if(startsWith(input, "-ls")) {
             //ls lists all user-defined functions
             int num = 0;
             for(i = 0; i < numFunctions; i++) {
@@ -343,12 +344,9 @@ void runLine(char* input) {
             }
             printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
         }
-        else if(startsWith(input,"-dx")) {
+        else if(startsWith(input, "-dx")) {
             char* cleanInput = inputClean(input + 4);
-            if(globalError) {
-                globalError = false;
-                return;
-            }
+            if(globalError) return;
             Tree ops = generateTree(cleanInput, "x", 0);
             free(cleanInput);
             Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
@@ -362,7 +360,7 @@ void runLine(char* input) {
             freeTree(dxClean);
             freeTree(dx);
         }
-        else if(startsWith(input,"-base")) {
+        else if(startsWith(input, "-base")) {
             //format: -base(16) 46 will return 2E
             int i, expStart = 0;
             for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
@@ -375,13 +373,12 @@ void runLine(char* input) {
             if(base.type == value_num) baseNum = base.num;
             if(base.r > 36 || base.r < 1) {
                 error("base out of bounds", NULL);
-                globalError = false;
                 return;
             }
             Value out = calculate(input + expStart, 0);
             appendToHistory(out, base.r, true);
         }
-        else if(startsWith(input,"-degset")) {
+        else if(startsWith(input, "-degset")) {
             if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
             else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
             else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
@@ -396,7 +393,7 @@ void runLine(char* input) {
             }
             printf("Degree ratio set to %g\n", degrat);
         }
-        else if(startsWith(input,"-unit")) {
+        else if(startsWith(input, "-unit")) {
             int i, unitStart = 0;
             for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
                 unitStart = i + 1;
@@ -408,7 +405,7 @@ void runLine(char* input) {
             if(unit.u != value.u) {
                 char* unitOne = toStringUnit(unit.u);
                 char* unitTwo = toStringUnit(value.u);
-                printf("Error: units %s and %s are not compatible\n", unitOne, unitTwo);
+                error("units %s and %s are not compatible", unitOne, unitTwo);
                 free(unitOne);
                 free(unitTwo);
                 return;
@@ -422,7 +419,8 @@ void runLine(char* input) {
             free(numString);
         }
         else {
-            printf("Error: command '%s' not recognized.\n", input + 1);
+            error("command '%s' not recognized.", input + 1);
+            return;
         }
     }
     else if(input[0] == '#' || (input[0] == '/' && input[0] == '/')) {
@@ -433,13 +431,11 @@ void runLine(char* input) {
     else {
         if(input[0] == '\0') {
             error("no input", NULL);
-            globalError = false;
             return;
         }
         Value out = calculate(input, 0);
         if(!globalError) appendToHistory(out, 10, true);
     }
-    globalError = false;
 }
 int main(int argc, char** argv) {
     //Set cleanup on interupt
@@ -480,9 +476,10 @@ int main(int argc, char** argv) {
     if(!rawInput) initializeInput();
     //Main loop
     while(true) {
+        globalError = false;
         char* input;
-        if(rawInput) input=readLineRaw();
-        else input=readLine();
+        if(rawInput) input = readLineRaw();
+        else input = readLine();
         if(input == NULL) break;
         runLine(input);
     }

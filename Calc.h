@@ -192,7 +192,7 @@ extern const char numberChars[];
  * @param format error format
  * @param message char* that is passed to format
  */
-void error(const char* format, const char* message);
+void error(const char* format, ...);
 #pragma region Numbers
 /**
  * Returns a number made of the three components
