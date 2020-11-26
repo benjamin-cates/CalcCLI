@@ -262,15 +262,19 @@ void graphEquation(char* equation, double left, double right, double top, double
     }
     freeTree(tree);
 }
+bool startsWith(char* string,char* sw) {
+    int compareLength=strlen(sw);
+    return memcmp(string,sw,compareLength)==0?true:false;
+}
 void runLine(char* input) {
     int i;
     //If command
     if(input[0] == '-') {
-        if(input[1] == 'd' && input[2] == 'e' && input[3] == 'f' && input[4] == ' ') {
+        if(startsWith(input,"-def ")) {
             //Define function
             generateFunction(input + 5);
         }
-        else if(input[1] == 'd' && input[2] == 'e' && input[3] == 'l' && input[4] == ' ') {
+        else if(startsWith(input,"-del ")) {
             int strLen = strlen(input);
             //Delete function or variable
             for(i = 0; i < numFunctions; i++) {
@@ -286,7 +290,7 @@ void runLine(char* input) {
             error("Function '%s' not found\n", input + 5);
             globalError = false;
         }
-        else if(input[1] == 'g' && input[2] == ' ') {
+        else if(startsWith(input,"-g")) {
             //Graph
             char* cleanInput = inputClean(input + 3);
             if(globalError) {
@@ -296,9 +300,8 @@ void runLine(char* input) {
             graphEquation(cleanInput, -10, 10, 10, -10, 20, 50);
             free(cleanInput);
         }
-        else if(input[1] == 'f' && input[2] == ' ') {
+        else if(startsWith(input,"-f")) {
             int strLen = strlen(input);
-            if(input[strLen - 1] == '\n') input[strLen - 1] = 0;
             //Read lines from a file
             FILE* file = fopen(input + 3, "r");
             unsigned long lineSize = 100;
@@ -310,12 +313,12 @@ void runLine(char* input) {
             free(line);
             fclose(file);
         }
-        else if(input[1] == 'q' && input[2] == 'u' && input[3] == 'i' && input[4] == 't') {
+        else if(startsWith(input,"-quit")) {
             //Exit the program
             cleanup();
             exit(0);
         }
-        else if(input[1] == 'l' && input[2] == 's') {
+        else if(startsWith(input,"-ls")) {
             //ls lists all user-defined functions
             int num = 0;
             for(i = 0; i < numFunctions; i++) {
@@ -340,7 +343,7 @@ void runLine(char* input) {
             }
             printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
         }
-        else if(input[1] == 'd' && input[2] == 'x' && input[3] == ' ') {
+        else if(startsWith(input,"-dx")) {
             char* cleanInput = inputClean(input + 4);
             if(globalError) {
                 globalError = false;
@@ -359,7 +362,7 @@ void runLine(char* input) {
             freeTree(dxClean);
             freeTree(dx);
         }
-        else if(input[1] == 'b' && input[2] == 'a' && input[3] == 's' && input[4] == 'e') {
+        else if(startsWith(input,"-base")) {
             //format: -base(16) 46 will return 2E
             int i, expStart = 0;
             for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
@@ -378,7 +381,7 @@ void runLine(char* input) {
             Value out = calculate(input + expStart, 0);
             appendToHistory(out, base.r, true);
         }
-        else if(input[1] == 'd' && input[2] == 'e' && input[3] == 'g' && input[4] == 's' && input[5] == 'e' && input[6] == 't' && input[7] == ' ') {
+        else if(startsWith(input,"-degset")) {
             if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
             else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
             else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
@@ -393,7 +396,7 @@ void runLine(char* input) {
             }
             printf("Degree ratio set to %g\n", degrat);
         }
-        else if(input[1] == 'u' && input[2] == 'n' && input[3] == 'i' && input[4] == 't') {
+        else if(startsWith(input,"-unit")) {
             int i, unitStart = 0;
             for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
                 unitStart = i + 1;
