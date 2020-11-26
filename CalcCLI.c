@@ -1,25 +1,8 @@
 #include "Calc.h"
-#if defined(__linux__) || defined(unix) || defined(__unix__) || defined(__APPLE__)
-#define FANCY_INPUT
+#if defined __linux__ || defined unix || defined __unix__ || defined __APPLE__
+    #define FANCY_INPUT
 #endif
-char* readLineRaw() {
-    char* out = calloc(10, 1);
-    int outLen = 10;
-    int charPos = 0;
-    while(true) {
-        int character = getchar();
-        if(character == -1) {
-            free(out);
-            return NULL;
-        }
-        if(character == '\n') return out;
-        if(charPos == outLen) {
-            out = realloc(out, (outLen += 10));
-        }
-        out[charPos] = character;
-    }
-    return out;
-}
+bool useColors=true;
 #ifdef FANCY_INPUT
 bool useFancyInput=true;
 #include <termios.h>
@@ -45,6 +28,30 @@ void enableRawMode() {
 void initializeInput() {
     enableRawMode();
 }
+void printInput(char* string,int cursorPos) {
+    //Clear old input
+    printf("\0338\033[J\r");
+    bool isComment=false;
+    //Print input
+    if(useColors) {
+        if(string[0]=='-') {
+            string++;
+            printf("\33[1;34m-\33[0m");
+        }
+        if(string[0]=='#'||(string[0]=='/'&&string[1]=='/')) {
+            isComment=true;
+            printf("\33[1;32m");
+        }
+    }
+    printf("%s ", string);
+    if(isComment) printf("\33[0m");
+    //Set cursor position
+    if(cursorPos==-1) return;
+    printf("\0338");
+    int width=getTermWidth();
+    if(cursorPos%width!=0) printf("\033[%dC",cursorPos%width);
+    if(cursorPos>width-1) printf("\033[%dB",cursorPos/width);
+}
 char* readLine() {
     char* input = calloc(11, 1);
     int strLenAllocated = 10;
@@ -54,11 +61,7 @@ char* readLine() {
     int i;
     printf("\0337");
     while(1) {
-        int width=getTermWidth();
-        printf("\0338\033[J\r%s ", input);
-        printf("\0338");
-        if(cursorPos%width!=0) printf("\033[%dC",cursorPos%width);
-        if(cursorPos>width-1) printf("\033[%dB",cursorPos/width);
+        printInput(input,cursorPos);
         character = getchar();
         if(character == 27) {
             int next = getchar();
@@ -129,10 +132,30 @@ char* readLine() {
         }
         cursorPos++;
     }
-    printf("\0338\033[J%s\n", input);
+    printInput(input,-1);
+    printf("\n");
     return input;
 }
-#else
+#endif
+char* readLineRaw() {
+    char* out = calloc(10, 1);
+    int outLen = 10;
+    int charPos = 0;
+    while(true) {
+        int character = getchar();
+        if(character == -1) {
+            free(out);
+            return NULL;
+        }
+        if(character == '\n') return out;
+        if(charPos == outLen) {
+            out = realloc(out, (outLen += 10));
+        }
+        out[charPos] = character;
+    }
+    return out;
+}
+#ifndef FANCY_INPUT
 bool useFancyInput=false;
 void initializeInput() {
 
@@ -143,7 +166,9 @@ char* readLine() {
 #endif
 void error(const char* format, const char* message) {
     //Print error
+    if(useColors) printf("\033[1;31m");
     printf("Error: ");
+    if(useColors) printf("\033[0m");
     printf(format, message);
     printf("\n");
     //Set error to true
