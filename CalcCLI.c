@@ -181,7 +181,8 @@ void error(const char* format, ...) {
 };
 void CLI_cleanup() {
     cleanup();
-    printf("\b\b-quit\n");
+    if(useColors) printf("\b\b\33[1;34m-\33[0mquit\n");
+    else printf("\b\b-quit\n");
     exit(0);
 }
 void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
