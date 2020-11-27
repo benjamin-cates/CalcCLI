@@ -1066,7 +1066,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         int i = 0;
         if(argNames != NULL) while(argNames[++i] != NULL);
         argNamesTemp = calloc(i + 2, 1);
-        if(argNames != NULL) memcpy(argNamesTemp, argNames, i*sizeof(char*));
+        if(argNames != NULL) memcpy(argNamesTemp, argNames, i * sizeof(char*));
         //Append "n" to argNamesTemp
         argNamesTemp[i] = calloc(2, 1);
         argNamesTemp[i][0] = 'n';
@@ -1662,7 +1662,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
                 }
         }
         if(brackets != 0) continue;
-        if(((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') && pType != 1) {
+        if(((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') && pType != 1 && pType != 3) {
             pType = 1;
             sections[sectionCount++] = i;
         }
@@ -1761,7 +1761,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
                         int i = 0;
                         if(argNames != NULL) while(argNames[++i] != NULL);
                         argNamesTemp = calloc(i + 2, sizeof(char*));
-                        if(argNames != NULL) memcpy(argNamesTemp, argNames, i*sizeof(char*));
+                        if(argNames != NULL) memcpy(argNamesTemp, argNames, i * sizeof(char*));
                         //Append "n" to argNamesTemp
                         argNamesTemp[i] = calloc(2, 1);
                         argNamesTemp[i][0] = 'n';
@@ -2258,6 +2258,7 @@ char** parseArgumentList(char* list) {
         out[i] = calloc(commaPos[i + 1] - commaPos[i], 1);
         for(j = commaPos[i] + 1;j < commaPos[i + 1];j++) {
             if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9')) out[i][stringPos++] = list[j];
+            else if(list[j]>='A'&&list[j]<='Z') out[i][stringPos++]=list[j]+32;
             else if(list[j] == '(' || list[j] == ')' || list[j] == ' ' || list[j] == '=' || list[j] == '\0') continue;
             else error("invalid '%c' in argument list", list[j]);
         }
@@ -2307,8 +2308,10 @@ void generateFunction(char* eq) {
     }
     //Get function name
     char* name = calloc(openBracket + 1, 1);
-    eq[openBracket] = '\0';
-    strcpy(name, eq);
+    for(i=0;i<openBracket;i++) {
+        if(eq[i]>='A'&&eq[i]<='Z') name[i]=eq[i]+32;
+        else name[i]=eq[i];
+    }
     int nameLen = strlen(name);
     //Verify name is not already used
     for(i = 0; i < immutableFunctions; i++) {
