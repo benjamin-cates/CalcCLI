@@ -35,8 +35,8 @@ void printInput(char* string, int cursorPos) {
     bool isComment = false;
     //Print input
     if(useColors) {
-        if(string[0] == '-' || string[0]=='.') {
-            printf("\33[1;34m%c\33[0m",string[0]);
+        if(string[0] == '-' || string[0] == '.') {
+            printf("\33[1;34m%c\33[0m", string[0]);
             string++;
         }
         if(string[0] == '#' || (string[0] == '/' && string[1] == '/')) {
@@ -118,11 +118,16 @@ char* readLine(bool erasePrevious) {
         }
         else if(character == 127) continue;
         if(character == 10) break;
+        if(character == 12) {
+            printf("\33[2J\033[f\0337");
+            continue;
+        }
         if(character < 27) {
             for(i = strLen;i > cursorPos - 1;i--) {
                 input[i + 1] = input[i];
             }
             input[cursorPos] = '^';
+            strLen++;
             cursorPos++;
             character += 64;
         }
@@ -192,9 +197,9 @@ void CLI_cleanup() {
 void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
-    char** xArgName=calloc(2,sizeof(char*));
-    xArgName[0]=calloc(2,1);
-    xArgName[0][0]='x';
+    char** xArgName = calloc(2, sizeof(char*));
+    xArgName[0] = calloc(2, 1);
+    xArgName[0][0] = 'x';
     Tree tree = generateTree(equation, xArgName, 0);
     int i;
     Value x = NULLVAL;
@@ -298,9 +303,9 @@ void runLine(char* input) {
                 freeTree(*customfunctions[i].tree);
                 free(customfunctions[i].tree);
                 free(customfunctions[i].name);
-                int j=-1;
-                char** argNames=customfunctions[i].argNames;
-                while(argNames[++j]!=NULL) free(argNames[j]);
+                int j = -1;
+                char** argNames = customfunctions[i].argNames;
+                while(argNames[++j] != NULL) free(argNames[j]);
                 free(argNames);
                 customfunctions[i].tree = NULL;
                 customfunctions[i].argCount = 0;
@@ -361,9 +366,9 @@ void runLine(char* input) {
         else if(startsWith(input, "-dx")) {
             char* cleanInput = inputClean(input + 4);
             if(globalError) return;
-            char** x= calloc(2,sizeof(char*));
-            x[0]=calloc(2,1);
-            x[0][0]='x';
+            char** x = calloc(2, sizeof(char*));
+            x[0] = calloc(2, 1);
+            x[0][0] = 'x';
             Tree ops = generateTree(cleanInput, x, 0);
             free(cleanInput);
             Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
