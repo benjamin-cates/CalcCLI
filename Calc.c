@@ -1499,7 +1499,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                     error("history too short", NULL);
                     return NULLVAL;
                 }
-                return history[i];
+                return copyValue(history[i]);
             }
             if(tree.op == op_histnum)
                 return newValNum(historyCount, 0, 0);
