@@ -516,6 +516,7 @@ int main(int argc, char** argv) {
         if(input == NULL) break;
         globalError = false;
         runLine(input);
+        free(input);
     }
     cleanup();
     return 0;
