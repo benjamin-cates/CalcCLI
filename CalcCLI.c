@@ -192,7 +192,10 @@ void CLI_cleanup() {
 void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
-    Tree tree = generateTree(equation, "x", 0);
+    char** xArgName=calloc(2,sizeof(char*));
+    xArgName[0]=calloc(2,1);
+    xArgName[0][0]='x';
+    Tree tree = generateTree(equation, xArgName, 0);
     int i;
     Value x = NULLVAL;
     //Compute columns number of values
@@ -293,6 +296,12 @@ void runLine(char* input) {
                 printf("Function '%s' has been deleted.\n", customfunctions[i].name);
                 customfunctions[i].nameLen = 0;
                 freeTree(*customfunctions[i].tree);
+                free(customfunctions[i].tree);
+                free(customfunctions[i].name);
+                int j=-1;
+                char** argNames=customfunctions[i].argNames;
+                while(argNames[++j]!=NULL) free(argNames[j]);
+                free(argNames);
                 customfunctions[i].tree = NULL;
                 customfunctions[i].argCount = 0;
                 return;
@@ -339,7 +348,7 @@ void runLine(char* input) {
                     int j;
                     for(j = 0;j < customfunctions[i].argCount;j++) {
                         if(j != 0) printf(",");
-                        printf("%c", customfunctions[i].argNames[j]);
+                        printf("%s", customfunctions[i].argNames[j]);
                     }
                     printf(")");
                 }
@@ -352,12 +361,15 @@ void runLine(char* input) {
         else if(startsWith(input, "-dx")) {
             char* cleanInput = inputClean(input + 4);
             if(globalError) return;
-            Tree ops = generateTree(cleanInput, "x", 0);
+            char** x= calloc(2,sizeof(char*));
+            x[0]=calloc(2,1);
+            x[0][0]='x';
+            Tree ops = generateTree(cleanInput, x, 0);
             free(cleanInput);
             Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
             Tree dx = derivative(cleanedOps);
             Tree dxClean = treeCopy(dx, NULL, false, false, true);
-            char* out = treeToString(dxClean, false, "x");
+            char* out = treeToString(dxClean, false, x);
             printf("=%s\n", out);
             free(out);
             freeTree(cleanedOps);

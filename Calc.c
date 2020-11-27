@@ -978,7 +978,7 @@ void freeTree(Tree tree) {
     }
     if(tree.op == op_val) freeValue(tree.value);
 }
-char* treeToString(Tree tree, bool bracket, char* argNames) {
+char* treeToString(Tree tree, bool bracket, char** argNames) {
     //Arguments
     if(tree.optype == optype_argument) {
         if(argNames == NULL) {
@@ -987,9 +987,10 @@ char* treeToString(Tree tree, bool bracket, char* argNames) {
             return num;
         }
         else {
-            char* num = calloc(2, 1);
-            num[0] = argNames[tree.op];
-            return num;
+            int len = strlen(argNames[tree.op]);
+            char* out = calloc(len + 1, 1);
+            memcpy(out, argNames[tree.op], len);
+            return out;
         }
     }
     //Numbers
@@ -1058,14 +1059,17 @@ char* treeToString(Tree tree, bool bracket, char* argNames) {
         strLength = customfunctions[tree.op].nameLen + 2;
         functionName = customfunctions[tree.op].name;
     }
-    char* argNamesTemp = argNames;
-    //N argument name for sum and product
+    char** argNamesTemp = argNames;
+    //"n" argument name for sum and product
     if(tree.op == op_sum || tree.op == op_product) {
-        int len = 0;
-        if(argNames != NULL) len += strlen(argNames);
-        argNamesTemp = calloc(len + 2, 1);
-        if(argNames != NULL) memcpy(argNamesTemp, argNames, len);
-        argNamesTemp[len] = 'n';
+        //Copy over argNames (or allocate new array)
+        int i = 0;
+        if(argNames != NULL) while(argNames[++i] != NULL);
+        argNamesTemp = calloc(i + 2, 1);
+        if(argNames != NULL) memcpy(argNamesTemp, argNames, i*sizeof(char*));
+        //Append "n" to argNamesTemp
+        argNamesTemp[i] = calloc(2, 1);
+        argNamesTemp[i][0] = 'n';
     }
     //Generate the treeToString of the branches while counting the string length
     for(i = 0; i < tree.argCount; i++) {
@@ -1607,7 +1611,7 @@ Tree treeCopy(Tree tree, Tree* args, bool unfold, bool replaceArgs, bool optimiz
     //Return
     return out;
 }
-Tree generateTree(char* eq, char* argNames, double base) {
+Tree generateTree(char* eq, char** argNames, double base) {
     bool useUnits = base != 0;
     if(base == 0) base = 10;
     if(verbose) {
@@ -1750,17 +1754,25 @@ Tree generateTree(char* eq, char* argNames, double base) {
                     char argText[commas[j + 1] - commas[j] + 1];
                     memset(argText, 0, sizeof(argText));
                     memcpy(argText, section + commas[j] + 1, commas[j + 1] - commas[j] - 1);
-                    char* argNameTemp = argNames;
+                    char** argNamesTemp = argNames;
                     //N variable in sum and product
                     if(j == 0 && funcID.optype == optype_builtin) if(funcID.op == op_sum || funcID.op == op_product) {
-                        int len = 0;
-                        if(argNames != NULL) len = strlen(argNames);
-                        argNameTemp = calloc(len + 2, 1);
-                        memcpy(argNameTemp, argNames, len);
-                        argNameTemp[len] = 'n';
+                        //Copy over argNames (or allocate new array)
+                        int i = 0;
+                        if(argNames != NULL) while(argNames[++i] != NULL);
+                        argNamesTemp = calloc(i + 2, sizeof(char*));
+                        if(argNames != NULL) memcpy(argNamesTemp, argNames, i*sizeof(char*));
+                        //Append "n" to argNamesTemp
+                        argNamesTemp[i] = calloc(2, 1);
+                        argNamesTemp[i][0] = 'n';
                     }
-                    args[j] = generateTree(argText, argNameTemp, 0);
-                    if(argNameTemp != argNames) free(argNameTemp);
+                    args[j] = generateTree(argText, argNamesTemp, 0);
+                    if(argNamesTemp != argNames) {
+                        int i = 0;
+                        while(argNamesTemp[i++] != NULL);
+                        free(argNamesTemp[i - 1]);
+                        free(argNamesTemp);
+                    }
                     if(globalError) {
                         free(args);
                         return NULLOPERATION;
@@ -1772,13 +1784,14 @@ Tree generateTree(char* eq, char* argNames, double base) {
                 //Variables or units
                 Tree op = findFunction(section);
                 Number num = NULLNUM;
-                if(sectionLength == 1 && argNames != NULL) {
-                    int j;
-                    for(j = 0; j < strlen(argNames); j++)
-                        if(argNames[j] == section[0]) {
+                if(argNames != NULL) {
+                    int j = 0;
+                    while(argNames[j++] != NULL) {
+                        if(strcmp(argNames[j - 1], section) == 0) {
                             op.optype = optype_argument;
-                            op.op = j;
+                            op.op = j - 1;
                         }
+                    }
                 }
                 if(op.op == op_val && op.optype == optype_builtin && useUnits) {
                     num = getUnitName(section);
@@ -2222,7 +2235,42 @@ Value calculate(char* eq, double base) {
 }
 #pragma endregion
 #pragma region Functions
-Function newFunction(char* name, Tree* tree, char argCount, char* argNames) {
+char** parseArgumentList(char* list) {
+    int listLen = strlen(list);
+    int i;
+    int argCount = 1;
+    int commaPos[(listLen + 3) / 2];
+    commaPos[0] = -1;
+    for(i = 0;i < listLen;i++) {
+        if(list[i] == ',') {
+            commaPos[argCount++] = i;
+        }
+        if(list[i] == '=' || list[i] == '\0') {
+            commaPos[argCount] = i;
+            break;
+        }
+    }
+    //Null terminated
+    char** out = calloc(argCount + 1, sizeof(char*));
+    int j;
+    for(i = 0;i < argCount;i++) {
+        int stringPos = 0;
+        out[i] = calloc(commaPos[i + 1] - commaPos[i], 1);
+        for(j = commaPos[i] + 1;j < commaPos[i + 1];j++) {
+            if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9')) out[i][stringPos++] = list[j];
+            else if(list[j] == '(' || list[j] == ')' || list[j] == ' ' || list[j] == '=' || list[j] == '\0') continue;
+            else error("invalid '%c' in argument list", list[j]);
+        }
+        if(out[i][0] < 'a') error("argument name '%s' starts with a numeral", out[i]);
+        if(globalError) {
+            for(;i >= 0;i--) free(out[i]);
+            free(out);
+            return NULL;
+        }
+    }
+    return out;
+}
+Function newFunction(char* name, Tree* tree, char argCount, char** argNames) {
     Function out;
     out.name = name;
     if(name == NULL) out.nameLen = 0;
@@ -2253,7 +2301,7 @@ void generateFunction(char* eq) {
         openBracket = equalPos;
         argCount = 0;
     }
-    if(openBracket > 15) {
+    if(openBracket > 25) {
         error("function name too long", NULL);
         return;
     }
@@ -2280,20 +2328,23 @@ void generateFunction(char* eq) {
         return;
     }
     //Get argument names
-    char* argNames = NULL;
-    if(argCount > 0) {
-        argNames = calloc(((equalPos - openBracket - 1) / 2) + 1, 1);
-        for(i = openBracket + 1; i < equalPos; i += 2)
-            argNames[(i - openBracket - 1) / 2] = eq[i];
+    char** argNames = parseArgumentList(eq + openBracket + 1);
+    if(argNames == NULL) {
+        free(name);
+        return;
     }
     //Compute tree
     Tree* tree = malloc(sizeof(Tree));
     char* cleaninput = inputClean(eq + equalPos + 1);
-    Tree generateTree(char* eq, char* argNames, double base);
     *tree = generateTree(cleaninput, argNames, 0);
     free(cleaninput);
-    if(globalError)
+    if(globalError) {
+        free(name);
+        int i = 0;
+        while(argNames[i] != NULL) free(argNames[i++]);
+        free(argNames);
         return;
+    }
     //Append to functions
     if(functionArrayLength == numFunctions) {
         customfunctions = realloc(customfunctions, functionArrayLength + 10);
@@ -2407,11 +2458,14 @@ void cleanup() {
     int i;
     //Free functions
     for(i = 0; i < numFunctions; i++) {
-        if(customfunctions[i].tree==NULL) continue;
+        if(customfunctions[i].tree == NULL) continue;
         free(customfunctions[i].name);
         freeTree(*customfunctions[i].tree);
         free(customfunctions[i].tree);
-        free(customfunctions[i].argNames);
+        char** argNames = customfunctions[i].argNames;
+        int j = -1;
+        while(argNames[++j] != NULL) free(argNames[j]);
+        free(argNames);
     }
     //Free history
     for(i = 0;i < historyCount;i++) {

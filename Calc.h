@@ -133,7 +133,7 @@ typedef struct TreeStruct {
 typedef struct FunctionStruct {
     Tree* tree;
     char* name;
-    char* argNames;
+    char** argNames;
     char argCount;
     char nameLen;
 } Function;
@@ -429,7 +429,7 @@ Tree treeCopy(Tree op, Tree* args, bool unfold, bool replaceArgs, bool optimize)
  * @param args names of the arguments
  * @return string form of op, must be free()d
  */
-char* treeToString(Tree op, bool bracket, char* args);
+char* treeToString(Tree op, bool bracket, char** argNames);
 /**
  * Computes the operation tree
  * @param op Tree to compute
@@ -443,7 +443,7 @@ Value computeTree(Tree op, Value* args, int argLen);
  * @param base base to compute in, defaults to 10, if base is not 0, eq will be treated as inside square brackets
  * @return Tree, must be freeTree()ed
  */
-Tree generateTree(char* eq, char* argNames, double base);
+Tree generateTree(char* eq, char** argNames, double base);
 /**
  * Returns the derivative of operation
  * @param op Tree to take the derivative of must be copied before passing
@@ -457,8 +457,9 @@ Tree derivative(Tree op);
  * @param name name of the function
  * @param tree function tree, NULL if predefined
  * @param argCount number of arguments the function recieves
+ * @param argNames list of argument names (null terminated char* array)
  */
-Function newFunction(char* name, Tree* tree, char argCount, char* argNames);
+Function newFunction(char* name, Tree* tree, char argCount, char** argNames);
 /**
  * Returns the function ID
  * @param name name of the function
