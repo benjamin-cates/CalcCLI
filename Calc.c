@@ -1507,7 +1507,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                 return newValNum((double)rand() / RAND_MAX, 0, 0);
         }
         //Matrix functions
-        if(tree.op < 68) {
+        if(tree.op < 69) {
             if(tree.op == op_det) {
                 if(one.type == value_num) {
                     one = newValMatScalar(value_vec, one.num);
