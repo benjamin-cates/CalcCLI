@@ -72,13 +72,13 @@ void initializeInput() {
 
 }
 int readCharacter() {
-    int out=getch();
-    if(out==3) CLI_cleanup();
+    int out = getch();
+    if(out == 3) CLI_cleanup();
     return out;
 }
 #endif
 #ifdef USE_FANCY_INPUT
-bool useFancyInput=true;
+bool useFancyInput = true;
 void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
@@ -162,44 +162,44 @@ char* readLine(bool erasePrevious) {
         if(character == 0) {
             int next = readCharacter();
             //Left arrow
-            if(next=='K') {
-                if(cursorPos!=0)
+            if(next == 'K') {
+                if(cursorPos != 0)
                     cursorPos--;
                 continue;
             }
             //Right arrow
-            if(next=='M') {
+            if(next == 'M') {
                 cursorPos++;
-                if(cursorPos> strLen)
+                if(cursorPos > strLen)
                     cursorPos--;
                 continue;
             }
             //Up arrow is 'H'
             //Down arrow is 'P'
             //HOME
-            if(next=='G') {
+            if(next == 'G') {
                 cursorPos = 0;
                 continue;
             }
             //END
-            if(next=='O') {
+            if(next == 'O') {
                 cursorPos = strLen;
                 continue;
             }
             //DELETE
-            if(next=='S') {
+            if(next == 'S') {
                 if(cursorPos == strLen) continue;
-                    int i;
-                    for(i = cursorPos;i < strLen;i++) {
-                        input[i] = input[i + 1];
-                    }
-                    strLen--;
-                    continue;
+                int i;
+                for(i = cursorPos;i < strLen;i++) {
+                    input[i] = input[i + 1];
+                }
+                strLen--;
+                continue;
             }
             continue;
         }
         if(character == 127 || character == 8) {
-            if(cursorPos==0)
+            if(cursorPos == 0)
                 continue;
             cursorPos--;
             input[cursorPos] = '\0';
@@ -210,10 +210,9 @@ char* readLine(bool erasePrevious) {
             continue;
         }
         else if(character == 127) continue;
-        if(character == 10||character==13) break;
+        if(character == 10 || character == 13) break;
         if(character == 3) CLI_cleanup();
-        if (character == 12)
-        {
+        if(character == 12)         {
             printf("\33[2J\033[f\0337");
             continue;
         }
@@ -242,7 +241,7 @@ char* readLine(bool erasePrevious) {
     return input;
 }
 #else
-bool useFancyInput=false;
+bool useFancyInput = false;
 char* readLine(bool erasePrevious) {
     return readLineRaw();
 };
@@ -395,11 +394,11 @@ void runLine(char* input) {
             char* line = malloc(300);
             while(fgets(line, lineSize, file)) {
                 int i;
-                while(line[i++]!='\0') if(line[i]=='\n')
-                        line[i] = '\0';
+                while(line[i++] != '\0') if(line[i] == '\n')
+                    line[i] = '\0';
                 printf("%s", line);
                 runLine(line);
-                globalError=false;
+                globalError = false;
             }
             free(line);
             fclose(file);
@@ -512,13 +511,13 @@ void runLine(char* input) {
             free(numString);
         }
         else if(startsWith(input, "-parse")) {
-            char* clean=inputClean(input+7);
-            Tree tree=generateTree(clean,NULL,0);
+            char* clean = inputClean(input + 7);
+            Tree tree = generateTree(clean, NULL, 0);
             free(clean);
             if(globalError) return;
-            char* out=treeToString(tree,false,NULL);
+            char* out = treeToString(tree, false, NULL);
             freeTree(tree);
-            printf("Parsed as: %s\n",out);
+            printf("Parsed as: %s\n", out);
             free(out);
         }
         else {
@@ -527,6 +526,41 @@ void runLine(char* input) {
         }
     }
     else if(input[0] == '#' || (input[0] == '/' && input[0] == '/')) {
+        if(useFancyInput) {
+            printf("\0338\33[J\r");
+            if(useColors) printf("\33[1;32m");
+            int i = -1;
+            while(input[++i] != '\0') {
+                if(input[i] == '$' && input[i + 1] == '(') {
+                    int j=i,endBracket=0,bracketCount=0;
+                    while(input[++j]) {
+                        if(input[j]=='(') bracketCount++;
+                        else if(input[j]==')') if(--bracketCount==0) {
+                            endBracket=j;
+                            break;
+                        }
+                    }
+                    if(endBracket==0) {
+                        error("no ending bracket");
+                        return;
+                    }
+                    char stringToParse[endBracket-i-1];
+                    memcpy(stringToParse,input+i+2,endBracket-i-2);
+                    stringToParse[endBracket-i-2]='\0';
+                    Value out=calculate(stringToParse,0);
+                    char* outString=valueToString(out,10);
+                    freeValue(out);
+                    printf("%s",outString);
+                    free(outString);
+                    i=endBracket+1;
+                }
+                putchar(input[i]);
+
+            }
+            putchar('\n');
+            printf("\33[0m");
+
+        }
         //If it is a comment, ignore
         return;
     }
