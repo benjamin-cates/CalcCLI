@@ -399,6 +399,7 @@ void runLine(char* input) {
                         line[i] = '\0';
                 printf("%s", line);
                 runLine(line);
+                globalError=false;
             }
             free(line);
             fclose(file);
