@@ -1,11 +1,38 @@
 #include "Calc.h"
 #include <stdarg.h>
 #if defined __linux__ || defined unix || defined __unix__ || defined __APPLE__
-#define FANCY_INPUT
+#define USE_TERMIOS_H
+#endif
+#if defined __WIN32 || defined _WIN64 || defined _WIN32
+#define USE_CONIO_H
 #endif
 bool useColors = true;
-#ifdef FANCY_INPUT
-bool useFancyInput = true;
+void CLI_cleanup() {
+    cleanup();
+    if(useColors) printf("\b\b\33[1;34m-\33[0mquit\n");
+    else printf("\b\b-quit\n");
+    exit(0);
+}
+char* readLineRaw() {
+    char* out = calloc(10, 1);
+    int outLen = 10;
+    int charPos = 0;
+    while(true) {
+        int character = getchar();
+        if(character == -1) {
+            free(out);
+            return NULL;
+        }
+        if(character == '\n') return out;
+        if(charPos == outLen) {
+            out = realloc(out, (outLen += 10));
+        }
+        out[charPos++] = character;
+    }
+    return out;
+}
+#ifdef USE_TERMIOS_H
+#define USE_FANCY_INPUT
 #include <termios.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
@@ -29,6 +56,29 @@ void enableRawMode() {
 void initializeInput() {
     enableRawMode();
 }
+int readCharacter() {
+    return getchar();
+}
+#elif defined USE_CONIO_H
+#define USE_FANCY_INPUT
+#include <conio.h>
+#include <windows.h>
+int getTermWidth() {
+    CONSOLE_SCREEN_BUFFER_INFO csbi;
+    GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+    return csbi.srWindow.Right - csbi.srWindow.Left + 1;
+}
+void initializeInput() {
+
+}
+int readCharacter() {
+    int out=getch();
+    if(out==3) CLI_cleanup();
+    return out;
+}
+#endif
+#ifdef USE_FANCY_INPUT
+bool useFancyInput=true;
 void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
@@ -67,11 +117,12 @@ char* readLine(bool erasePrevious) {
             printf("\338");
             erasePrevious = false;
         }
-        character = getchar();
+        character = readCharacter();
+        //Unix escape sequences
         if(character == 27) {
-            int next = getchar();
+            int next = readCharacter();
             if(next == '[') {
-                int next2 = getchar();
+                int next2 = readCharacter();
                 //Left Arrow
                 if(next2 == 'D') {
                     cursorPos = cursorPos - 1;
@@ -96,7 +147,7 @@ char* readLine(bool erasePrevious) {
                 }
                 //DELETE
                 if(next2 == '3') {
-                    getchar();
+                    readCharacter();
                     if(cursorPos == strLen) continue;
                     int i;
                     for(i = cursorPos;i < strLen;i++) {
@@ -107,7 +158,49 @@ char* readLine(bool erasePrevious) {
                 }
             }
         }
-        if(character == 127 && cursorPos != 0) {
+        //Windows escape sequences
+        if(character == 0) {
+            int next = readCharacter();
+            //Left arrow
+            if(next=='K') {
+                if(cursorPos!=0)
+                    cursorPos--;
+                continue;
+            }
+            //Right arrow
+            if(next=='M') {
+                cursorPos++;
+                if(cursorPos> strLen)
+                    cursorPos--;
+                continue;
+            }
+            //Up arrow is 'H'
+            //Down arrow is 'P'
+            //HOME
+            if(next=='G') {
+                cursorPos = 0;
+                continue;
+            }
+            //END
+            if(next=='O') {
+                cursorPos = strLen;
+                continue;
+            }
+            //DELETE
+            if(next=='S') {
+                if(cursorPos == strLen) continue;
+                    int i;
+                    for(i = cursorPos;i < strLen;i++) {
+                        input[i] = input[i + 1];
+                    }
+                    strLen--;
+                    continue;
+            }
+            continue;
+        }
+        if(character == 127 || character == 8) {
+            if(cursorPos==0)
+                continue;
             cursorPos--;
             input[cursorPos] = '\0';
             for(i = cursorPos;i < strLen;i++) {
@@ -117,8 +210,10 @@ char* readLine(bool erasePrevious) {
             continue;
         }
         else if(character == 127) continue;
-        if(character == 10) break;
-        if(character == 12) {
+        if(character == 10||character==13) break;
+        if(character == 3) CLI_cleanup();
+        if (character == 12)
+        {
             printf("\33[2J\033[f\0337");
             continue;
         }
@@ -146,30 +241,8 @@ char* readLine(bool erasePrevious) {
     printf("\n");
     return input;
 }
-#endif
-char* readLineRaw() {
-    char* out = calloc(10, 1);
-    int outLen = 10;
-    int charPos = 0;
-    while(true) {
-        int character = getchar();
-        if(character == -1) {
-            free(out);
-            return NULL;
-        }
-        if(character == '\n') return out;
-        if(charPos == outLen) {
-            out = realloc(out, (outLen += 10));
-        }
-        out[charPos++] = character;
-    }
-    return out;
-}
-#ifndef FANCY_INPUT
-bool useFancyInput = false;
-void initializeInput() {
-
-}
+#else
+bool useFancyInput=false;
 char* readLine(bool erasePrevious) {
     return readLineRaw();
 };
@@ -188,12 +261,6 @@ void error(const char* format, ...) {
     //Set error to true
     globalError = true;
 };
-void CLI_cleanup() {
-    cleanup();
-    if(useColors) printf("\b\b\33[1;34m-\33[0mquit\n");
-    else printf("\b\b-quit\n");
-    exit(0);
-}
 void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
@@ -324,9 +391,12 @@ void runLine(char* input) {
             int strLen = strlen(input);
             //Read lines from a file
             FILE* file = fopen(input + 3, "r");
-            unsigned long lineSize = 100;
-            char* line = malloc(100);
-            while(getline(&line, &lineSize, file) != -1) {
+            unsigned long lineSize = 300;
+            char* line = malloc(300);
+            while(fgets(line, lineSize, file)) {
+                int i;
+                while(line[i++]!='\0') if(line[i]=='\n')
+                        line[i] = '\0';
                 printf("%s", line);
                 runLine(line);
             }
@@ -440,6 +510,16 @@ void runLine(char* input) {
             printf("= %s %s\n", numString, input + 5);
             free(numString);
         }
+        else if(startsWith(input, "-parse")) {
+            char* clean=inputClean(input+7);
+            Tree tree=generateTree(clean,NULL,0);
+            free(clean);
+            if(globalError) return;
+            char* out=treeToString(tree,false,NULL);
+            freeTree(tree);
+            printf("Parsed as: %s\n",out);
+            free(out);
+        }
         else {
             error("command '%s' not recognized.", input + 1);
             return;
@@ -463,7 +543,7 @@ void runLine(char* input) {
             else printf("= %s", outString);
         }
         free(outString);
-        getchar();
+        readCharacter();
         printf("\0338");
         return;
     }
