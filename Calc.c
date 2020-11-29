@@ -600,6 +600,35 @@ Vector matMult(Vector one, Vector two) {
     }
     return out;
 }
+Vector matInv(Vector one) {
+    if(one.width==1) {
+        return newVecScalar(compDivide(newNum(1,0,0),one.val[0]));
+    }
+    Vector minors = newVec(one.width, one.height);
+    int i, j;
+    for(i = 0;i < one.width;i++) for(j = 0;j < one.height;j++) {
+        Vector sub = subsection(one, j,i);
+        minors.val[i + j * one.width] = determinant(sub);
+        free(sub.val);
+    }
+    Number det = NULLNUM;
+    Number (*addOrSub[2])(Number,Number) = {&compAdd,&compSubtract};
+    for(i = 0;i < one.width;i++) {
+        det = addOrSub[i%2](det, compMultiply(minors.val[i], one.val[i]));
+    }
+    Vector cofactors = transpose(minors);
+    free(minors.val);
+    for(i = 0;i < cofactors.width;i++) for(j = 0;j < cofactors.height;j++) {
+        Number cell = cofactors.val[i + j * cofactors.width];
+        if((i + j) % 2 == 1) {
+            cell.r = -cell.r;
+            cell.i = -cell.i;
+        }
+        cell = compDivide(cell, det);
+        cofactors.val[i + j * cofactors.width] = cell;
+    }
+    return cofactors;
+}
 #pragma endregion
 #pragma region Values
 void valueConvert(int type, Value* one, Value* two) {
@@ -1507,7 +1536,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                 return newValNum((double)rand() / RAND_MAX, 0, 0);
         }
         //Matrix functions
-        if(tree.op < 69) {
+        if(tree.op < 70) {
             if(tree.op == op_det) {
                 if(one.type == value_num) {
                     one = newValMatScalar(value_vec, one.num);
@@ -1547,6 +1576,19 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                 out.vec = matMult(one.vec, two.vec);
                 freeValue(one);
                 freeValue(two);
+                return out;
+            }
+            if(tree.op == op_mat_inv) {
+                if(one.type == value_num) one = newValMatScalar(value_vec, one.num);
+                if(one.vec.width != one.vec.height) {
+                    freeValue(one);
+                    error("cannot take inverse of non-square matrix");
+                    return NULLVAL;
+                }
+                Value out;
+                out.type = value_vec;
+                out.vec = matInv(one.vec);
+                freeValue(one);
                 return out;
             }
         }
@@ -2236,6 +2278,9 @@ Value calculate(char* eq, double base) {
 #pragma endregion
 #pragma region Functions
 char** parseArgumentList(char* list) {
+    if(list[0] == '=') {
+        return calloc(1, sizeof(char*));
+    }
     int listLen = strlen(list);
     int i;
     int argCount = 1;
@@ -2258,7 +2303,7 @@ char** parseArgumentList(char* list) {
         out[i] = calloc(commaPos[i + 1] - commaPos[i], 1);
         for(j = commaPos[i] + 1;j < commaPos[i + 1];j++) {
             if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9')) out[i][stringPos++] = list[j];
-            else if(list[j]>='A'&&list[j]<='Z') out[i][stringPos++]=list[j]+32;
+            else if(list[j] >= 'A' && list[j] <= 'Z') out[i][stringPos++] = list[j] + 32;
             else if(list[j] == '(' || list[j] == ')' || list[j] == ' ' || list[j] == '=' || list[j] == '\0') continue;
             else error("invalid '%c' in argument list", list[j]);
         }
@@ -2283,7 +2328,7 @@ Function newFunction(char* name, Tree* tree, char argCount, char** argNames) {
 }
 void generateFunction(char* eq) {
     //Parse first half a(x)
-    int i, equalPos, openBracket, argCount = 1;
+    int i, equalPos, openBracket = 0, argCount = 1;
     for(i = 0; i < strlen(eq); i++) {
         if(eq[i] == '(')
             openBracket = i;
@@ -2308,9 +2353,9 @@ void generateFunction(char* eq) {
     }
     //Get function name
     char* name = calloc(openBracket + 1, 1);
-    for(i=0;i<openBracket;i++) {
-        if(eq[i]>='A'&&eq[i]<='Z') name[i]=eq[i]+32;
-        else name[i]=eq[i];
+    for(i = 0;i < openBracket;i++) {
+        if(eq[i] >= 'A' && eq[i] <= 'Z') name[i] = eq[i] + 32;
+        else name[i] = eq[i];
     }
     int nameLen = strlen(name);
     //Verify name is not already used
@@ -2331,7 +2376,7 @@ void generateFunction(char* eq) {
         return;
     }
     //Get argument names
-    char** argNames = parseArgumentList(eq + openBracket + 1);
+    char** argNames = parseArgumentList(eq + openBracket);
     if(argNames == NULL) {
         free(name);
         return;
@@ -2350,7 +2395,7 @@ void generateFunction(char* eq) {
     }
     //Append to functions
     if(functionArrayLength == numFunctions) {
-        customfunctions = realloc(customfunctions, functionArrayLength + 10);
+        customfunctions = realloc(customfunctions, (functionArrayLength + 10) * sizeof(Function));
         functionArrayLength += 10;
     }
     customfunctions[numFunctions++] = newFunction(name, tree, argCount, argNames);
@@ -2396,7 +2441,7 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     {1, 3, "not"}, {2, 3, "and"}, {2, 2, "or"}, {2, 3, "xor"}, {2, 2, "ls"}, {2, 2, "rs"},
     {0, 2, "pi"}, {0, 3, "phi"}, {0, 1, "e"}, {0, 3, "ans"}, {1, 4, "hist"}, {0, 6, "histnum"}, {0, 4, "rand"},
     {4, 3, "sum"}, {4, 7, "product"},
-    {0, 0, " "}, {1, 3, "det"}, {1, 9, "transpose"}, {2, 8, "mat_mult"},
+    {0, 0, " "}, {1, 3, "det"}, {1, 9, "transpose"}, {2, 8, "mat_mult"}, {1, 7, "mat_inv"}
 };
 #pragma endregion
 #pragma region Main Program
