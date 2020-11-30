@@ -601,20 +601,20 @@ Vector matMult(Vector one, Vector two) {
     return out;
 }
 Vector matInv(Vector one) {
-    if(one.width==1) {
-        return newVecScalar(compDivide(newNum(1,0,0),one.val[0]));
+    if(one.width == 1) {
+        return newVecScalar(compDivide(newNum(1, 0, 0), one.val[0]));
     }
     Vector minors = newVec(one.width, one.height);
     int i, j;
     for(i = 0;i < one.width;i++) for(j = 0;j < one.height;j++) {
-        Vector sub = subsection(one, j,i);
+        Vector sub = subsection(one, j, i);
         minors.val[i + j * one.width] = determinant(sub);
         free(sub.val);
     }
     Number det = NULLNUM;
-    Number (*addOrSub[2])(Number,Number) = {&compAdd,&compSubtract};
+    Number(*addOrSub[2])(Number, Number) = { &compAdd,&compSubtract };
     for(i = 0;i < one.width;i++) {
-        det = addOrSub[i%2](det, compMultiply(minors.val[i], one.val[i]));
+        det = addOrSub[i % 2](det, compMultiply(minors.val[i], one.val[i]));
     }
     Vector cofactors = transpose(minors);
     free(minors.val);
@@ -1663,63 +1663,80 @@ Tree generateTree(char* eq, char** argNames, double base) {
         printf("\nInput: %s\n", eq);
     }
     //Divide into sections
-    int i, brackets = 0, sectionCount = 0, pType = 0, eqLength = strlen(eq);
+    int i, brackets = 0, sectionCount = 0, curType = -1, eqLength = strlen(eq);
     int sections[eqLength + 1];
+    /*
+        Section Types:
+        0 - Number
+        1 - Variable or function
+        2 - Function
+        3 - Bracket
+        4 - Square Bracket
+        5 - Square Bracket with Base
+        6 - Operator
+        7 - Vector
+    */
+    int sectionTypes[eqLength + 1];
     memset(sections, 0, sizeof(sections));
+    memset(sectionTypes, 0, sizeof(sectionTypes));
     for(i = 0; i < eqLength; i++) {
-        //pTypes: 1: numbers, 2: operators (+-*/), 3: variable or function
-        if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
-            if(brackets++ == 0 && pType != 3)
-                sections[sectionCount++] = i;
-            pType = 0;
+        char ch = eq[i];
+        if(ch == '(' && curType == 1) {
+            curType = 2;
+            brackets++;
+            sectionTypes[sectionCount - 1] = 2;
+            continue;
         }
-        if(eq[i] == ')' || eq[i] == '>')
+        if(ch == '(' || ch == '[' || ch == '<') {
+            int type = ch == '(' ? 3 : (ch == '[' ? 4 : 7);
+            if(brackets++ != 0) continue;
+            curType = type;
+            sectionTypes[sectionCount] = type;
+            sections[sectionCount++] = i;
+        }
+        if(ch == ')' || ch == '>' || ch == ']')
             if(--brackets < 0) {
                 error("bracket mismatch 1", NULL);
                 return NULLOPERATION;
             }
-        if(eq[i] == ']') {
-            if(--brackets < 0) {
-                error("bracket mismatch 2", NULL);
-                return NULLOPERATION;
+        if(ch == ']' && eq[i + 1] == '_') {
+            sectionTypes[sectionCount - 1] = 5;
+            if(eq[i + 2] >= '0' && eq[i + 2] <= '9') curType = 0;
+            else if(eq[i + 2] >= 'a' && eq[i + 2] <= 'z')
+                curType = 1;
+            else if(eq[i + 2] == '(' || eq[i + 2] == '[') {
+                brackets++;
+                i++;
             }
-            if(i != eqLength - 1)
-                if(eq[i + 1] == '_') {
-                    if(i == eqLength - 2) {
-                        error("floating underscore", NULL);
-                        return NULLOPERATION;
-                    }
-                    if(eq[i + 2] >= '0' && eq[i + 2] <= '9')
-                        pType = 1;
-                    else if(eq[i + 2] >= 'a' && eq[i + 2] <= 'z')
-                        pType = 3;
-                    else if(eq[i + 2] == '(') {
-                        brackets++;
-                        i++;
-                    }
-                    else
-                        pType = 2;
-                    i++;
-                    continue;
-                }
+            else curType = 6;
+            i++;
+            continue;
         }
         if(brackets != 0) continue;
-        if(((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') && pType != 1 && pType != 3) {
-            pType = 1;
+        //Get character type
+        int chType = -1;
+
+        if((ch >= '0' && ch <= '9') || ch == '.') chType = 0;
+        else if(ch >= 'a' && ch <= 'z') chType = 1;
+        else if(ch == '_') chType = 1;
+        else if(useUnits && ((ch >= 'A' && ch <= 'Z') || ch == '$') && (curType != 0 || (ch > 'A' + (int)base - 10))) chType = 1;
+        else if((ch >= '*' && ch <= '/' && ch != '.') || ch == '%' || ch == '^') chType = 6;
+        //To start a new section
+        bool createSection = false;
+        if(chType == 0 && curType != 0 && curType != 1) createSection = true;
+        if(chType == 6 && curType != 6) createSection = true;
+        if(chType == 1 && curType != 1) {
+            if(i != 0 && eq[i - 1] == '0')
+                if(ch == 'b' || ch == 'x' || ch == 'd' || ch == 'o')
+                    continue;
+            createSection = true;
+        }
+        if(createSection) {
+            curType = chType;
+            sectionTypes[sectionCount] = chType;
             sections[sectionCount++] = i;
         }
-        else if(((eq[i] >= '*' && eq[i] <= '/' && eq[i] != '.') || eq[i] == '%' || eq[i] == '^') && pType != 2) {
-            pType = 2;
-            sections[sectionCount++] = i;
-        }
-        else if(((eq[i] >= 'a' && eq[i] <= 'z') || eq[i] == '_' || (useUnits && ((eq[i] >= 'A' && eq[i] <= 'Z') || eq[i] == '$') && (pType != 1 || (eq[i] > 'A' + (int)base - 10)))) && pType != 3) {
-            if(i != 0 && eq[i - 1] == '0' && (eq[i] == 'b' || eq[i] == 'x' || eq[i] == 'd' || eq[i] == 'o'))
-                continue;
-            pType = 3;
-            sections[sectionCount++] = i;
-        }
-        if(i == 0 && sectionCount == 0)
-            sectionCount++;
+        if(i == 0 && sectionCount == 0) sectionCount++;
     }
     sections[sectionCount] = eqLength;
     if(brackets != 0) {
@@ -1741,7 +1758,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             printf("%s, ", section);
         //Parse section
         char first = eq[sections[i]];
-        if(first >= '0' && first <= '9' || first == '.') {
+        if(sectionTypes[i] == 0) {
             //Number
             double numBase = base;
             bool useBase = false;
@@ -1756,110 +1773,108 @@ Tree generateTree(char* eq, char** argNames, double base) {
             double numr = parseNumber(section + (useBase ? 2 : 0), numBase);
             ops[i] = newOpVal(numr, 0, 0);
         }
-        else if(first >= 'a' && first <= 'z' || (useUnits && ((first >= 'A' && first <= 'Z') || first == '$'))) {
-            if(eq[sections[i + 1] - 1] == ')') {
-                //Function
-                int j;
-                int commas[sectionLength];
-                int commaCount = 1;
-                int openBracket = 0;
-                int brackets = 0;
-                //Iterate through all characters to find ','
-                for(j = 0; j < sectionLength; j++) {
-                    if(openBracket == 0 && section[j] == '(')
-                        openBracket = j;
-                    if(section[j] == '(' || section[j] == '<')
-                        brackets++;
-                    else if(section[j] == ')' || section[j] == '>')
-                        brackets--;
-                    if(section[j] == ',' && brackets == 1)
-                        commas[commaCount++] = j;
-                }
-                commas[0] = openBracket;
-                commas[commaCount] = sectionLength - 1;
-                section[openBracket] = '\0';
-                Tree funcID = findFunction(section);
-                if(funcID.optype == 0 && funcID.op == 0) {
-                    error("function '%s' does not exist", section);
-                    return NULLOPERATION;
-                }
-                if(funcID.optype == optype_builtin && stdfunctions[funcID.op].argCount != commaCount) {
-                    error("Wrong number of arguments for '%s'", stdfunctions[funcID.op].name);
-                    return NULLOPERATION;
-                }
-                if(funcID.optype == optype_custom && customfunctions[funcID.op].argCount != commaCount) {
-                    error("Wrong number of arguments for '%s'", section);
-                    return NULLOPERATION;
-                }
-                Tree* args = calloc(commaCount, sizeof(Tree));
-                for(j = 0; j < commaCount; j++) {
-                    char argText[commas[j + 1] - commas[j] + 1];
-                    memset(argText, 0, sizeof(argText));
-                    memcpy(argText, section + commas[j] + 1, commas[j + 1] - commas[j] - 1);
-                    char** argNamesTemp = argNames;
-                    //N variable in sum and product
-                    if(j == 0 && funcID.optype == optype_builtin) if(funcID.op == op_sum || funcID.op == op_product) {
-                        //Copy over argNames (or allocate new array)
-                        int i = 0;
-                        if(argNames != NULL) while(argNames[++i] != NULL);
-                        argNamesTemp = calloc(i + 2, sizeof(char*));
-                        if(argNames != NULL) memcpy(argNamesTemp, argNames, i * sizeof(char*));
-                        //Append "n" to argNamesTemp
-                        argNamesTemp[i] = calloc(2, 1);
-                        argNamesTemp[i][0] = 'n';
-                    }
-                    args[j] = generateTree(argText, argNamesTemp, 0);
-                    if(argNamesTemp != argNames) {
-                        int i = 0;
-                        while(argNamesTemp[i++] != NULL);
-                        free(argNamesTemp[i - 1]);
-                        free(argNamesTemp);
-                    }
-                    if(globalError) {
-                        free(args);
-                        return NULLOPERATION;
-                    }
-                }
-                ops[i] = newOp(args, commaCount, funcID.op, funcID.optype);
+        else if(sectionTypes[i] == 2) {
+            //Function
+            int j;
+            int commas[sectionLength];
+            int commaCount = 1;
+            int openBracket = 0;
+            int brackets = 0;
+            //Iterate through all characters to find ','
+            for(j = 0; j < sectionLength; j++) {
+                if(openBracket == 0 && section[j] == '(')
+                    openBracket = j;
+                if(section[j] == '(' || section[j] == '<')
+                    brackets++;
+                else if(section[j] == ')' || section[j] == '>')
+                    brackets--;
+                if(section[j] == ',' && brackets == 1)
+                    commas[commaCount++] = j;
             }
-            else {
-                //Variables or units
-                Tree op = findFunction(section);
-                Number num = NULLNUM;
-                if(argNames != NULL) {
-                    int j = 0;
-                    while(argNames[j++] != NULL) {
-                        if(strcmp(argNames[j - 1], section) == 0) {
-                            op.optype = optype_argument;
-                            op.op = j - 1;
-                        }
-                    }
+            commas[0] = openBracket;
+            commas[commaCount] = sectionLength - 1;
+            section[openBracket] = '\0';
+            Tree funcID = findFunction(section);
+            if(funcID.optype == 0 && funcID.op == 0) {
+                error("function '%s' does not exist", section);
+                return NULLOPERATION;
+            }
+            if(funcID.optype == optype_builtin && stdfunctions[funcID.op].argCount != commaCount) {
+                error("Wrong number of arguments for '%s'", stdfunctions[funcID.op].name);
+                return NULLOPERATION;
+            }
+            if(funcID.optype == optype_custom && customfunctions[funcID.op].argCount != commaCount) {
+                error("Wrong number of arguments for '%s'", section);
+                return NULLOPERATION;
+            }
+            Tree* args = calloc(commaCount, sizeof(Tree));
+            for(j = 0; j < commaCount; j++) {
+                char argText[commas[j + 1] - commas[j] + 1];
+                memset(argText, 0, sizeof(argText));
+                memcpy(argText, section + commas[j] + 1, commas[j + 1] - commas[j] - 1);
+                char** argNamesTemp = argNames;
+                //N variable in sum and product
+                if(j == 0 && funcID.optype == optype_builtin) if(funcID.op == op_sum || funcID.op == op_product) {
+                    //Copy over argNames (or allocate new array)
+                    int i = 0;
+                    if(argNames != NULL) while(argNames[++i] != NULL);
+                    argNamesTemp = calloc(i + 2, sizeof(char*));
+                    if(argNames != NULL) memcpy(argNamesTemp, argNames, i * sizeof(char*));
+                    //Append "n" to argNamesTemp
+                    argNamesTemp[i] = calloc(2, 1);
+                    argNamesTemp[i][0] = 'n';
                 }
-                if(op.op == op_val && op.optype == optype_builtin && useUnits) {
-                    num = getUnitName(section);
-                    if(num.u == 0) {
-                        error("Variable or unit '%s' not found", section);
-                        return NULLOPERATION;
-                    }
+                args[j] = generateTree(argText, argNamesTemp, 0);
+                if(argNamesTemp != argNames) {
+                    int i = 0;
+                    while(argNamesTemp[i++] != NULL);
+                    free(argNamesTemp[i - 1]);
+                    free(argNamesTemp);
                 }
-                //Check for errors
-                else if(op.optype == 0 && op.op == 0) {
-                    error("Variable '%s' not found", section);
+                if(globalError) {
+                    free(args);
                     return NULLOPERATION;
                 }
-                if(op.optype == optype_builtin)
-                    if(stdfunctions[op.op].argCount != 0) {
-                        error("no arguments for function '%s'", section);
-                        return NULLOPERATION;
-                    }
-                //Set operation
-                if(op.optype == 0 && op.op == op_val)
-                    ops[i] = newOpVal(num.r, num.i, num.u);
-                else
-                    ops[i] = newOp(NULL, 0, op.op, op.optype);
             }
+            ops[i] = newOp(args, commaCount, funcID.op, funcID.optype);
         }
-        else if((first >= '*' && first <= '/') || first == '^' || first == '%') {
+        else if(sectionTypes[i] == 1) {
+            //Variables or units
+            Tree op = findFunction(section);
+            Number num = NULLNUM;
+            if(argNames != NULL) {
+                int j = 0;
+                while(argNames[j++] != NULL) {
+                    if(strcmp(argNames[j - 1], section) == 0) {
+                        op.optype = optype_argument;
+                        op.op = j - 1;
+                    }
+                }
+            }
+            if(op.op == op_val && op.optype == optype_builtin && useUnits) {
+                num = getUnitName(section);
+                if(num.u == 0) {
+                    error("Variable or unit '%s' not found", section);
+                    return NULLOPERATION;
+                }
+            }
+            //Check for errors
+            else if(op.optype == 0 && op.op == 0) {
+                error("Variable '%s' not found", section);
+                return NULLOPERATION;
+            }
+            if(op.optype == optype_builtin)
+                if(stdfunctions[op.op].argCount != 0) {
+                    error("no arguments for function '%s'", section);
+                    return NULLOPERATION;
+                }
+            //Set operation
+            if(op.optype == 0 && op.op == op_val)
+                ops[i] = newOpVal(num.r, num.i, num.u);
+            else
+                ops[i] = newOp(NULL, 0, op.op, op.optype);
+        }
+        else if(sectionTypes[i] == 6) {
             int opID = 0;
             //For negative operations eg. *-
             if(first == '*' && section[1] == '*')
@@ -1896,7 +1911,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
         else if(first == '[') {
             //Unit bracket
             double base = 10;
-            if(section[sectionLength - 1] != ']') {
+            if(sectionTypes[i] == 5) {
                 //use alternate base
                 int j, brackets = 0;
                 for(j = sectionLength - 1; j >= 0; j--) {
