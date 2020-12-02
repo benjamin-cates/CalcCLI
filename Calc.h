@@ -19,7 +19,7 @@
     //Number of units#
     #define unitCount 59
     //Number of immutable functions
-    #define immutableFunctions 70
+    #define immutableFunctions 71
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -38,6 +38,7 @@
 #endif
 #define value_num 0
 #define value_vec 1
+#define value_func 2
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -69,6 +70,7 @@ typedef struct VectorStruct {
     //Total number of members = width * height
     short total;
 } Vector;
+struct TreeStruct;
 /**
  * Value that can contain a number or any other type
  * @param type type of value (0 for numbers)
@@ -87,6 +89,10 @@ typedef struct ValueStruct {
             unit_t u;
         };
         Vector vec;
+        struct {
+            struct TreeStruct* tree;
+            char** argNames;
+        };
     };
 } Value;
 /**
@@ -118,7 +124,10 @@ typedef struct TreeStruct {
         struct {
             struct TreeStruct* branch;
             short argCount;
+            //Only for op_vector
             short argWidth;
+            //Only for optype_anon
+            char** argNames;
         };
     };
 } Tree;
@@ -421,7 +430,7 @@ void freeTree(Tree op);
  * @param optimize whether to precalculate non-variable branches
  * @return return value must be freeTree()ed
  */
-Tree treeCopy(Tree op, Tree* args, bool unfold, bool replaceArgs, bool optimize);
+Tree treeCopy(Tree op, Tree* args, bool unfold, int replaceArgs, bool optimize);
 /**
  * Returns the string form of operation op, output must be free()d
  * @param op operation to print
@@ -436,6 +445,20 @@ char* treeToString(Tree op, bool bracket, char** argNames);
  * @param args Arguments (only used for functions)
  */
 Value computeTree(Tree op, Value* args, int argLen);
+/**
+ * Returns the type of character in is.
+ * @param in The character to determine the type of
+ * @param curType The type of the previous character
+ * @param base Base it is being parsed in
+ * @param useUnits whether to include capital letters in names
+ * @return Returns: {
+        -1: Character not recognized
+        0: Numeral
+        1: Variable
+        6: Operator
+     }
+ */
+int getCharType(char in, int curType, int base, bool useUnits);
 /**
  * Generates an operation tree from an equation
  * @param eq Equation
@@ -452,6 +475,33 @@ Tree generateTree(char* eq, char** argNames, double base);
 Tree derivative(Tree op);
 #pragma endregion
 #pragma region Functions
+/**
+ * Frees an argument list
+ */
+void freeArgList(char** argList);
+/**
+ * Get the length of an argument list (number of arguments)
+ */
+int argListLen(char** argList);
+/**
+ * Returns of a copy of the argList. Return must be freeArgList()ed.
+ */
+char** argListCopy(char** argList);
+/**
+ * Merges two argument lists
+ * Warning: only run free on the output, do not run freeArgList on it
+*/
+char** mergeArgList(char** one, char** two);
+/**
+ * Returns the string form of an argument list
+ *
+ *
+ */
+char* argListToString(char** argList);
+/**
+ * Returns an argument list from a string
+ */
+char** parseArgumentList(char* list);
 /**
  * Function constructor
  * @param name name of the function
@@ -517,6 +567,7 @@ char* inputClean(char* input);
 #define optype_builtin 0
 #define optype_custom 1
 #define optype_argument 2
+#define optype_anon 3
 #define op_val 0
 #define op_i 1
 #define op_neg 2
@@ -580,11 +631,12 @@ char* inputClean(char* input);
 #define op_hist 60
 #define op_histnum 61
 #define op_rand 62
-#define op_sum 63
-#define op_product 64
-#define op_vector 65
-#define op_det 66
-#define op_transpose 67
-#define op_mat_mult 68
-#define op_mat_inv 69
+#define op_run 63
+#define op_sum 64
+#define op_product 65
+#define op_vector 66
+#define op_det 67
+#define op_transpose 68
+#define op_mat_mult 69
+#define op_mat_inv 70
 #pragma endregion
