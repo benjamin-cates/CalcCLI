@@ -212,7 +212,7 @@ char* readLine(bool erasePrevious) {
         else if(character == 127) continue;
         if(character == 10 || character == 13) break;
         if(character == 3) CLI_cleanup();
-        if(character == 12)         {
+        if(character == 12) {
             printf("\33[2J\033[f\0337");
             continue;
         }
@@ -350,6 +350,26 @@ bool startsWith(char* string, char* sw) {
     int compareLength = strlen(sw);
     return memcmp(string, sw, compareLength) == 0 ? true : false;
 }
+void printRatio(double out, bool forceSign) {
+    char sign = out < 0 ? '-' : '+';
+    //Get ratio
+    int numer = 0;
+    int denom = 0;
+    getRatio(out, &numer, &denom);
+    //Print number if no ratio exists
+    if(numer == 0 && denom == 0) {
+        char* string = doubleToString(sign == '-' ? -out : out, 10);
+        printf("%s", string);
+        free(string);
+    }
+    else {
+        if(sign == '-' || forceSign) printf("%c", sign);
+        if(forceSign) printf(" ");
+        if(floor(fabs(out)) == 0) printf("%d/%d", numer, denom);
+        else printf("%d%c%d/%d", (int)floor(fabs(out)), sign, numer, denom);
+    }
+
+}
 void runLine(char* input) {
     int i;
     //If command
@@ -386,7 +406,7 @@ void runLine(char* input) {
             graphEquation(cleanInput, -10, 10, 10, -10, 20, 50);
             free(cleanInput);
         }
-        else if(startsWith(input, "-f")) {
+        else if(startsWith(input, "-f ")) {
             int strLen = strlen(input);
             //Read lines from a file
             FILE* file = fopen(input + 3, "r");
@@ -520,6 +540,71 @@ void runLine(char* input) {
             printf("Parsed as: %s\n", out);
             free(out);
         }
+        else if(startsWith(input, "-factors")) {
+            int num = parseNumber(input + 9, 10);
+            int* factors = primeFactors(num);
+            if(factors[0] == 0) {
+                printf("%d is prime\n", num);
+            }
+            else {
+                printf("Factors of %d:", num);
+                int i = -1;
+                int prev = factors[0];
+                int count = 0;
+                while(factors[++i] != 0) {
+                    if(factors[i] != prev) {
+                        if(count != 1) printf(" %d^%d *", prev, count);
+                        else printf(" %d *", prev);
+                        count = 1;
+                    }
+                    else count++;
+                    prev = factors[i];
+                }
+                if(count == 1)printf(" %d\n", prev);
+                else printf(" %d^%d\n", prev, count);
+            }
+            free(factors);
+        }
+        else if(startsWith(input, "-ratio")) {
+            Value out = calculate(input + 7, 0);
+            if(out.type == value_num) {
+                if(out.r != 0) printRatio(out.r, false);
+                if(out.i != 0) {
+                    if(out.r != 0) printf(" ");
+                    printRatio(out.i, out.r != 0);
+                    printf(" i");
+                }
+                if(out.u != 0) {
+                    char* string = toStringUnit(out.u);
+                    printf(" [%s]", string);
+                    free(string);
+                }
+                printf("\n");
+            }
+            if(out.type == value_vec) {
+                int i, j;
+                printf("<");
+                int width = out.vec.width;
+                for(j = 0;j < out.vec.height;j++) for(i = 0;i < width;i++) {
+                    Number num = out.vec.val[i + j * width];
+                    if(i == 0 && j != 0) printf(";");
+                    if(i != 0) printf(",");
+                    if(num.r != 0) printRatio(num.r, false);
+                    if(num.i != 0) {
+                        if(num.r != 0) printf(" ");
+                        printRatio(num.i, num.r != 0);
+                        printf(" i");
+                    }
+                    if(num.u != 0) {
+                        char* string = toStringUnit(num.u);
+                        printf(" [%s]", string);
+                        free(string);
+                    }
+                }
+                printf(">\n");
+            }
+            freeValue(out);
+        }
         else {
             error("command '%s' not recognized.", input + 1);
             return;
@@ -532,27 +617,27 @@ void runLine(char* input) {
             int i = -1;
             while(input[++i] != '\0') {
                 if(input[i] == '$' && input[i + 1] == '(') {
-                    int j=i,endBracket=0,bracketCount=0;
+                    int j = i, endBracket = 0, bracketCount = 0;
                     while(input[++j]) {
-                        if(input[j]=='(') bracketCount++;
-                        else if(input[j]==')') if(--bracketCount==0) {
-                            endBracket=j;
+                        if(input[j] == '(') bracketCount++;
+                        else if(input[j] == ')') if(--bracketCount == 0) {
+                            endBracket = j;
                             break;
                         }
                     }
-                    if(endBracket==0) {
+                    if(endBracket == 0) {
                         error("no ending bracket");
                         return;
                     }
-                    char stringToParse[endBracket-i-1];
-                    memcpy(stringToParse,input+i+2,endBracket-i-2);
-                    stringToParse[endBracket-i-2]='\0';
-                    Value out=calculate(stringToParse,0);
-                    char* outString=valueToString(out,10);
+                    char stringToParse[endBracket - i - 1];
+                    memcpy(stringToParse, input + i + 2, endBracket - i - 2);
+                    stringToParse[endBracket - i - 2] = '\0';
+                    Value out = calculate(stringToParse, 0);
+                    char* outString = valueToString(out, 10);
                     freeValue(out);
-                    printf("%s",outString);
+                    printf("%s", outString);
                     free(outString);
-                    i=endBracket+1;
+                    i = endBracket + 1;
                 }
                 putchar(input[i]);
 

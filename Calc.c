@@ -2737,3 +2737,83 @@ void startup() {
     customfunctions = calloc(functionArrayLength, sizeof(Function));
 }
 #pragma endregion
+#pragma region Misc
+int* primeFactors(int num) {
+    int* out = calloc(11, sizeof(int));
+    int outSize = 10;
+    int outPos = 0;
+    int max = num / 2;
+    //Remove factors of 2
+    while(num % 2 == 0) {
+        out[outPos++] = 2;
+        num = num / 2;
+        if(outPos == outSize) {
+            out = realloc(out, (outSize + 11) * sizeof(int));
+            memset(out + outSize, 0, 11 * sizeof(int));
+            outSize += 10;
+        }
+    }
+    int i;
+    for(i = 3;i <= max;i += 2) {
+        while(num % i == 0) {
+            out[outPos++] = i;
+            num = num / i;
+            if(outPos == outSize) {
+                out = realloc(out, (outSize + 11) * sizeof(int));
+                memset(out + outSize, 0, 11 * sizeof(int));
+                outSize += 10;
+            }
+        }
+    }
+    return out;
+}
+bool isPrime(int num) {
+    if(num < 0) num = -num;
+    //If i is a multiple of 6i, 6i+2, 6i+4
+    if(num % 2 == 0) return false;
+    //If i is a multiple of 6i+3
+    if(num % 3 == 0) return false;
+    //If i is a multiple of 5
+    if(num % 5 == 0) return false;
+    int i;
+    int sqrtN = sqrt(num) + 1;
+    for(i = 7;i < sqrtN;i += 6) {
+        //If num is a multiple of 6i+1
+        if(num % i == 0) return false;
+        //If num is a multiple of 6i+5
+        if(num % (i + 4) == 0) return false;
+    }
+    return true;
+}
+void getRatio(double num, int* numerOut, int* denomOut) {
+    if(num == floor(num)) return;
+    if(num < 0) num = -num;
+    if(num > 1) num = fmod(num, 1);
+    double origNum = num;
+    int contFraction[40];
+    memset(contFraction, 0, 40 * sizeof(int));
+    num = 1 / num;
+    int i;
+    for(i = 0;i < 20;i++) {
+        if((int)num <= 0) {
+            i--;
+            break;
+        }
+        contFraction[i] = (int)num;
+        num -= (int)num;
+        if(num < 1e-6) break;
+        num = 1 / num;
+    }
+    if(i==20) return;
+    int numer = contFraction[i--];
+    int denom = 1;
+    while(i >= 0) {
+        int newNumer = contFraction[i] * numer + denom;
+        denom = numer;
+        numer = newNumer;
+        i--;
+    }
+    *numerOut = denom;
+    *denomOut = numer;
+}
+#pragma endregion

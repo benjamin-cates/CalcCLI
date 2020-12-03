@@ -559,6 +559,11 @@ void runLine(char* input);
  * @return output, must be free()d
  */
 char* inputClean(char* input);
+#pragma region Misc
+int* primeFactors(int num);
+bool isPrime(int num);
+void getRatio(double num, int* numerOut, int* denomOut);
+#pragma endregion
 #ifdef __cplusplus
 }
 #endif
