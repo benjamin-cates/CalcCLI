@@ -674,6 +674,7 @@ double getR(Value val) {
         return val.vec.val[0].r;
     }
     if(val.type == value_func) return 0;
+    return 0;
 }
 void freeValue(Value val) {
     if(val.type == value_vec) free(val.vec.val);
@@ -790,6 +791,7 @@ Value valMult(Value one, Value two) {
             return out;
         }
     }
+    return NULLVAL;
 }
 Value valAdd(Value one, Value two) {
     if(one.type != two.type) valueConvert(op_add, &one, &two);
@@ -827,6 +829,7 @@ Value valAdd(Value one, Value two) {
         }
         return out;
     }
+    return NULLVAL;
 }
 Value valNegate(Value one) {
     if(one.type == value_num) {
@@ -853,6 +856,7 @@ Value valNegate(Value one) {
         error("cannot negate functions");
         return NULLVAL;
     }
+    return NULLVAL;
 }
 Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int type) {
     if(one.type != two.type) valueConvert(op_div, &one, &two);
@@ -899,6 +903,7 @@ Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int typ
         }
         return out;
     }
+    return NULLVAL;
 }
 Value valDivide(Value one, Value two) {
     return DivPowMod(&compDivide, one, two, 1);
@@ -917,6 +922,7 @@ Value valLn(Value one) {
         error("cannot ln functions");
         return NULLVAL;
     }
+    return NULLVAL;
 }
 Value valAbs(Value one) {
     if(one.type == value_num) {
@@ -935,6 +941,7 @@ Value valAbs(Value one) {
         error("cannot abs functions");
         return NULLVAL;
     }
+    return NULLVAL;
 }
 #pragma endregion
 #pragma region Trees
@@ -1710,6 +1717,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
         free(replaceArgs);
         return out;
     }
+    return NULLVAL;
 }
 Tree treeCopy(Tree tree, Tree* args, bool unfold, int replaceArgs, bool optimize) {
     Tree out = tree;
@@ -2628,7 +2636,7 @@ Tree findFunction(char* name) {
     return out;
 }
 const char* getFunctionName(int optype, int op) {
-
+    return NULL;
 }
 const struct stdFunction stdfunctions[immutableFunctions] = {
     {0, 0, " "},{0, 1, "i"},
