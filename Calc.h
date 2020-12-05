@@ -19,7 +19,7 @@
     //Number of units#
     #define unitCount 59
     //Number of immutable functions
-    #define immutableFunctions 71
+    #define immutableFunctions 77
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -640,8 +640,14 @@ void getRatio(double num, int* numerOut, int* denomOut);
 #define op_sum 64
 #define op_product 65
 #define op_vector 66
-#define op_det 67
-#define op_transpose 68
-#define op_mat_mult 69
-#define op_mat_inv 70
+#define op_width 67
+#define op_height 68
+#define op_length 69
+#define op_ge 70
+#define op_fill 71
+#define op_map 72
+#define op_det 73
+#define op_transpose 74
+#define op_mat_mult 75
+#define op_mat_inv 76
 #pragma endregion
