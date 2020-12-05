@@ -1173,7 +1173,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
         if(tree.op == op_val)
             return copyValue(tree.value);
         //Vector Functions
-        if(tree.op > 65 && tree.op < 71) {
+        if(tree.op > 95 && tree.op < 101) {
             if(tree.op == op_vector) {
                 int width = tree.argWidth;
                 int height = tree.argCount / tree.argWidth;
@@ -1339,7 +1339,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             return out;
         }
         //Trigonometric functions
-        if(tree.op < 27) {
+        if(tree.op < 30) {
             if(one.type == value_num) {
                 Value out;
                 out.type = one.type;
@@ -1355,7 +1355,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             }
         }
         //Log, arg, and abs
-        if(tree.op < 38) {
+        if(tree.op < 46) {
             if(tree.op == op_sqrt || tree.op == op_cbrt) {
                 double pow = (tree.op == op_sqrt) ? 1.0 / 2.0 : 1.0 / 3.0;
                 Value out = valPower(one, newValNum(pow, 0, 0));
@@ -1454,7 +1454,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             return NULLVAL;
         }
         //Rounding and conditionals
-        if(tree.op < 50) {
+        if(tree.op < 59) {
             if(tree.op >= op_round && tree.op <= op_ceil) {
                 double (*roundType)(double);
                 if(tree.op == op_round) roundType = &round;
@@ -1615,7 +1615,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             }
         }
         //Binary Operations
-        if(tree.op < 56) {
+        if(tree.op < 72) {
             if(one.type != two.type && tree.op != op_not) valueConvert(op_add, &one, &two);
             if(one.type == value_num) {
                 Value out;
@@ -1627,13 +1627,13 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             }
         }
         //Constants
-        if(tree.op < 63) {
+        if(tree.op < 88) {
             if(tree.op == op_pi)
                 return newValNum(3.1415926535897932, 0, 0);
             if(tree.op == op_e)
-                return newValNum(1.618033988749894, 0, 0);
-            if(tree.op == op_phi)
                 return newValNum(2.718281828459045, 0, 0);
+            if(tree.op == op_phi)
+                return newValNum(1.618033988749894, 0, 0);
             if(tree.op == op_ans) {
                 if(historyCount == 0) {
                     error("no previous answer", NULL);
@@ -1663,7 +1663,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                 return newValNum((double)rand() / RAND_MAX, 0, 0);
         }
         //Run, Sum, and Product
-        if(tree.op < 66) {
+        if(tree.op < 93) {
             if(one.type != value_func) {
                 error("first argument of %s is not a function", stdfunctions[tree.op].name);
                 freeValue(one);
@@ -1733,7 +1733,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             return out;
         }
         //Matrix functions
-        if(tree.op < 77) {
+        if(tree.op < 107) {
             if(tree.op == op_fill) {
                 int width = getR(two);
                 freeValue(two);
@@ -2820,16 +2820,25 @@ const char* getFunctionName(int optype, int op) {
 const struct stdFunction stdfunctions[immutableFunctions] = {
     {0, 0, " "},{0, 1, "i"},
     {1, 3, "neg"},{2, 3, "pow"},{2, 3, "mod"},{2, 4, "mult"},{2, 3, "div"},{2, 3, "add"},{2, 3, "sub"},
+    {0, 0, " "},{0, 0, " "}, {0, 0, " "},
     {1, 3, "sin"},{1,3, "cos"}, {1, 3, "tan"}, {1, 3, "csc"}, {1, 3, "sec"}, {1, 3, "cot"},
     {1, 4, "sinh"}, {1, 4, "cosh"}, {1, 4, "tanh"},
     {1, 4, "asin"}, {1, 4, "acos"}, {1, 4, "atan"}, {1, 4, "acsc"}, {1, 4, "asec"}, {1, 4, "acot"},
     {1, 5, "asinh"}, {1, 5, "acosh"}, {1, 5, "atanh"},
+{0, 0, " "}, {0, 0, " "},
     {1, 4, "sqrt"}, {1, 4, "cbrt"}, {1, 3, "exp"}, {1, 2, "ln"}, {1, 6, "logten"}, {2, 3, "log"}, {1, 4, "fact"},
+    {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
     {1, 3, "sgn"}, {1, 3, "abs"}, {1, 3, "arg"}, {1, 4, "norm"},
     {1, 5, "round"}, {1, 5, "floor"}, {1, 4, "ceil"}, {1, 4, "getr"}, {1, 4, "geti"}, {1, 4, "getu"}, {2, 6, "grthan"}, {2, 5, "equal"}, {2, 3, "min"}, {2, 3, "max"}, {3, 4, "lerp"}, {2, 4, "dist"},
-    {1, 3, "not"}, {2, 3, "and"}, {2, 2, "or"}, {2, 3, "xor"}, {2, 2, "ls"}, {2, 2, "rs"},
-    {0, 2, "pi"}, {0, 3, "phi"}, {0, 1, "e"}, {0, 3, "ans"}, {1, 4, "hist"}, {0, 6, "histnum"}, {0, 4, "rand"},
+    {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
+    {1, 3, "not"}, {0, 0, " "}, {2, 3, "and"}, {2, 2, "or"}, {2, 3, "xor"}, {2, 2, "ls"}, {2, 2, "rs"},
+    {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
+    {0, 2, "pi"}, {0, 3, "phi"}, {0, 1, "e"},
+{0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
+    {0, 3, "ans"}, {1, 4, "hist"}, {0, 6, "histnum"}, {0, 4, "rand"},
+    {0, 0, " "}, {0, 0, " "},
     {1, 3, "run"}, {4, 3, "sum"}, {4, 7, "product"},
+    {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
     {0, 0, " "}, {1, 5, "width"}, {1, 6, "height"}, {1, 6, "length"}, {3, 2, "ge"}, {2, 4, "fill"}, {2, 3, "map"}, {1, 3, "det"}, {1, 9, "transpose"}, {2, 8, "mat_mult"}, {1, 7, "mat_inv"}
 };
 #pragma endregion
