@@ -31,6 +31,7 @@ char* readLineRaw() {
     }
     return out;
 }
+int readCharacter();
 #ifdef USE_TERMIOS_H
 #define USE_FANCY_INPUT
 #include <termios.h>
@@ -53,9 +54,6 @@ void enableRawMode() {
     raw.c_lflag &= ~(ECHO | ICANON);
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 }
-void initializeInput() {
-    enableRawMode();
-}
 int readCharacter() {
     return getchar();
 }
@@ -68,13 +66,25 @@ int getTermWidth() {
     GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
     return csbi.srWindow.Right - csbi.srWindow.Left + 1;
 }
-void initializeInput() {
+void enableRawMode() {
 
+}
+void disableRawMode() {
 }
 int readCharacter() {
     int out = getch();
     if(out == 3) CLI_cleanup();
     return out;
+}
+#else
+int readCharacter() {
+    return getchar();
+}
+void enableRawMode() {
+
+}
+void disableRawMode() {
+
 }
 #endif
 #ifdef USE_FANCY_INPUT
@@ -712,7 +722,26 @@ int main(int argc, char** argv) {
             }
         }
     }
-    if(useFancyInput) initializeInput();
+    if(useFancyInput) enableRawMode();
+    //Test VT-100 compatability
+    printf("\033[c");
+    int firstChar=readCharacter();
+    if(firstChar!=27) {
+        useFancyInput=false;
+        printf("\r    \r");
+        printf("Reverting to raw mode\n");
+        disableRawMode();
+        printf("%c",firstChar);
+        #ifdef USE_CONIO_H
+        ungetch(firstChar);
+        #else
+        ungetc(firstChar,stdin);
+        #endif
+    }
+    else {
+        while(readCharacter()!='c');
+        printf("\r           \r");
+    }
     //Main loop
     while(true) {
         char* input;
