@@ -39,6 +39,7 @@
 #define value_num 0
 #define value_vec 1
 #define value_func 2
+#define value_arb 3
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -70,6 +71,29 @@ typedef struct VectorStruct {
     //Total number of members = width * height
     short total;
 } Vector;
+/**
+ * Arbitrary Precision Number
+ * @param mantissa Stores the base-256 digits of the number
+ * @param accu Maximum of length
+ * @param len Length of the mantissa
+ * @param exp Exponent, 0 for integers, 1 for the value 256, -1 for 1/10 ...
+ * @param sign 0 for positive numbers, 1 for negative
+ */
+typedef struct ArbStruct {
+    unsigned char* mantissa;
+    short accu;
+    short len;
+    short exp;
+    char sign;
+} Arb;
+/**
+ * Number, but with arbitrary precision instead of doubles
+ */
+typedef struct ArbNumber {
+    Arb r;
+    Arb i;
+    unit_t u;
+} ArbNum;
 struct TreeStruct;
 /**
  * Value that can contain a number or any other type
@@ -93,6 +117,7 @@ typedef struct ValueStruct {
             struct TreeStruct* tree;
             char** argNames;
         };
+        ArbNum* numArb;
     };
 } Value;
 /**
@@ -169,6 +194,10 @@ extern int historyCount;
 extern bool verbose;
 //Error has occured
 extern bool globalError;
+//Global arbitrary precision accuracy
+extern int globalAccuracy;
+//Global use arbitrary precision
+extern bool useArb;
 //Number with r=0, i=0, and u=0
 extern Number NULLNUM;
 //Value with number 0
@@ -194,14 +223,49 @@ extern const double metricNumValues[];
 //Metric base units, used for toStringUnit
 extern const char* baseUnits[];
 extern const char numberChars[];
-#pragma endregion
-//Functions
 /**
  * Prints an error message as printf("Error: "+format,message), then sets globalError to true
  * @param format error format
  * @param message char* that is passed to format
  */
 void error(const char* format, ...);
+#pragma endregion
+#pragma region Arbitrary Precision
+///General Functions
+Arb arbCTR(unsigned char* mant, short len, short exp, char sign, short accu);
+Arb nullArb(int accu);
+Arb copyArb(Arb arb);
+void freeArb(Arb arb);
+/*
+    Returns 1 if one>two, -1 if two>one, or 0 if they are equal
+*/
+int arbCmp(Arb one, Arb two);
+//Trim the zeroes and round up if len is greater than accu
+void trimZeroes(Arb* arb);
+Arb multByInt(Arb one, int two);
+//Arb conversions
+Arb parseArb(char* string, int base, int accu);
+double arbToDouble(Arb arb);
+char* arbToString(Arb arb, int base);
+Arb doubleToArb(double val, int accu);
+//Math functions
+Arb arb_floor(Arb one);
+Arb arb_add(Arb one, Arb two);
+Arb arb_subtract(Arb one, Arb two);
+Arb arb_mult(Arb one, Arb two);
+//Calculate the reciprocal of one
+Arb arb_recip(Arb one);
+//Calculate pi to accu digits
+Arb arb_pi(int accu);
+//Calculate e to accu digits
+Arb arb_e(int accu);
+//Calculate the integer factorial of one
+Arb arb_intFact(Arb one);
+Arb arb_exp(Arb one);
+Arb arb_ln(Arb one);
+Arb arb_pow(Arb one, Arb two);
+Arb arb_sinh(Arb one);
+#pragma endregion
 #pragma region Numbers
 /**
  * Returns a number made of the three components
