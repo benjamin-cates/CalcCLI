@@ -350,6 +350,8 @@ Number compMultiply(Number one, Number two) {
 Number compPower(Number one, Number two) {
     double logabs = log(one.r * one.r + one.i * one.i);
     double arg = atan2(one.i, one.r);
+    //the builtin atan2 is wrong for this edge case
+    if(one.i == 0 && one.r < 0) arg = M_PI;
     if(one.r == 0 && one.i == 0)
         arg = 0;
     double p1 = exp(two.r * 0.5 * logabs - two.i * arg);
@@ -1458,9 +1460,14 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             }
             if(tree.op == op_arg) {
                 if(one.type == value_num) {
-                    one.r = atan2(one.i, one.r);
-                    one.i = 0;
-                    return one;
+                    Value out;
+                    out.type = value_num;
+                    out.r = atan2(one.i, one.r);
+                    //The builtin atan2 is wrong for this edge case
+                    if(one.i == 0 && one.r < 0) out.r = M_PI;
+                    out.i = 0;
+                    out.u = one.u;
+                    return out;
                 }
                 if(one.type == value_vec) {
                     int i;
