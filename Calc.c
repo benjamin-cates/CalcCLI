@@ -2173,20 +2173,27 @@ Tree generateTree(char* eq, char** argNames, double base) {
         else if(sectionTypes[i] == 6) {
             int opID = 0;
             //For negative operations eg. *-
-            if(first == '*' && section[1] == '*')
-                opID = op_pow;
-            else if(sectionLength > 1) {
+            if(sectionLength > 1) {
                 if(section[1] == '-')
                     nextNegative = true;
+                // ** as pow
+                else if(first == '*' && section[1] == '*') {
+                    if(section[2] == '-') nextNegative = true;
+                    ops[i] = newOp(NULL, 0, op_pow, 0);
+                    continue;
+                }
+                //Else invalid
                 else
                     error("'%s' not a valid operator", section);
             }
-            else if(first == '-' && i == 0) {
+            //If - is the first character and first section
+            if(first == '-' && i == 0) {
                 //This operation is multplied by the next value, it is a place holder
                 ops[i] = newOpVal(1, 0, 0);
                 nextNegative = true;
                 continue;
             }
+            //Standard operation IDs
             else if(first == '^') opID = op_pow;
             else if(first == '%') opID = op_mod;
             else if(first == '*') opID = op_mult;
@@ -2194,6 +2201,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             else if(first == '+') opID = op_add;
             else if(first == '-') opID = op_sub;
             else error("'%s' is not a valid operator", section);
+            // Insert operation with the correct id
             ops[i] = newOp(NULL, 0, opID, 0);
             continue;
         }
@@ -2313,7 +2321,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             error("unable to parse '%s'", section);
             return NULLOPERATION;
         }
-        if(nextNegative && !(first > '*' && first < '/' && first!='.') && first != '^' && first != '%') {
+        if(nextNegative && !(first > '*' && first < '/' && first != '.') && first != '^' && first != '%') {
             nextNegative = false;
             ops[i] = newOp(allocArg(ops[i], false), 1, op_neg, 0);
         }
