@@ -2379,17 +2379,25 @@ Tree generateTree(char* eq, char** argNames, double base) {
     }
     ops[i] = ops[i + offset];
     //Condense operations: ^%*/+-
-    for(i = 3; i < 9; i++) {
+    for(i = 0; i < 3; i++) {
         offset = 0;
         int j;
         for(j = 0; j < sectionCount + offset; j++) {
             ops[j] = ops[j + offset];
-            if(ops[j].op != i || ops[j].optype != optype_builtin || ops[j].argCount != 0) continue;
+            //Configure order of operations
+            int op = ops[j].op;
+            if(i == 0) if(op != op_pow) continue;
+            if(i == 1) if(op != op_mod && op != op_mult && op != op_div) continue;
+            if(i == 2) if(op != op_add && op != op_sub) continue;
+            //Confirm that current item is a builtin operation
+            if(ops[j].optype != optype_builtin || ops[j].argCount != 0) continue;
+            //Check for missing argument
             if(j == 0 || j == sectionCount - 1) {
                 error("missing argument in operation", NULL);
                 return NULLOPERATION;
             }
-            ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, i, 0);
+            //Combine previous and next, set offset
+            ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, op, 0);
             ops[j - 1] = ops[j];
             j--;
             sectionCount -= 2;
