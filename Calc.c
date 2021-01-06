@@ -2313,7 +2313,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             error("unable to parse '%s'", section);
             return NULLOPERATION;
         }
-        if(nextNegative && !(first > '*' && first < '/') && first != '^' && first != '%') {
+        if(nextNegative && !(first > '*' && first < '/' && first!='.') && first != '^' && first != '%') {
             nextNegative = false;
             ops[i] = newOp(allocArg(ops[i], false), 1, op_neg, 0);
         }
