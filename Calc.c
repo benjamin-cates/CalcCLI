@@ -418,7 +418,8 @@ Number compGamma(Number one) {
 }
 Number compTrig(int type, Number num) {
     //Trigonometric functions
-    if(type < 18) {
+    if(type < 21) {
+        //Apply degree ratio
         num.r *= degrat;
         num.i *= degrat;
         if(type == op_sin)
@@ -427,18 +428,35 @@ Number compTrig(int type, Number num) {
             return newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
         if(type == op_tan)
             return compDivide(compSine(num), newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
+        if(type == op_sinh) {
+            //sinh(x+y) = sinh(x)*cosh(y)+cosh(x)*sinh(y)
+            //sinh(i*x) = i * sin(x)
+            //sinh(a+bi) = sinh(a)*cos(b) + cosh(a) * i * sin(b)
+            return newNum(sinh(num.r) * cos(num.i), cosh(num.r) * sin(num.i), num.u);
+        }
+        if(type == op_cosh) {
+            //cosh(x+y) =cosh(x)*cosh(y)+sinh(x)*sinh(y)
+            //cosh(x*i) = cos(x)
+            //cosh(a+bi) = cosh(a)*cos(b)+sinh(a)*i*sin(b)
+            return newNum(cosh(num.r) * cos(num.i), sinh(num.r) * sin(num.i), num.u);
+        }
+        if(type == op_tanh) {
+            //tanh(x+y) = (tanh(x)+tanh(y))/(1+tanh(x)*tanh(y))
+            //tanh(y*i) = i * tan(y)
+            //tanh(a+bi) = (tanh(a)+i*tan(b))/(1+tanh(a)*i*tan(b))
+            Number numer = newNum(tanh(num.r), tan(num.i), num.u);
+            Number denom = newNum(1, tanh(num.r) * tan(num.i), 0);
+            return compDivide(numer, denom);
+        }
         Number out;
         bool reciprocal = false;
         // csc, sec, tan
-        if(type > 11) {
-            reciprocal = true;
-            type -= 3;
-        }
-        if(type == op_sin)
+        if(type == op_csc || type == op_sec || type == op_cot) reciprocal = true;
+        if(type == op_csc)
             out = compSine(num);
-        if(type == op_cos)
+        if(type == op_sec)
             out = newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
-        if(type == op_tan)
+        if(type == op_cot)
             out = compDivide(compSine(num), newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
         if(reciprocal) {
             double denom = out.r * out.r + (out.i * out.i);
@@ -452,7 +470,8 @@ Number compTrig(int type, Number num) {
         //https://proofwiki.org/wiki/Definition:Inverse_Sine/Arcsine
         int opID = type;
         Number out;
-        if(type > 20 && type < 24) {
+        //acsc, asec, acot: invert and change opID
+        if(type == op_acsc || type == op_asec || type == op_acot) {
             unit_t unit = num.u;
             num = compDivide(newNum(1, 0, 0), num);
             num.u = unit;
@@ -489,6 +508,7 @@ Number compTrig(int type, Number num) {
             Number div = compDivide(p1, p2);
             out = newNum(0.25 * log(div.r * div.r + div.i * div.i), 0.5 * atan2(div.i, div.r), num.u);
         }
+        //Apply degree ratio
         out.r /= degrat;
         out.i /= degrat;
         return out;
