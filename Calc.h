@@ -610,7 +610,6 @@ void getRatio(double num, int* numerOut, int* denomOut);
 #define op_sgn 43
 #define op_abs 44
 #define op_arg 45
-#define op_norm 46
 #define op_round 47
 #define op_floor 48
 #define op_ceil 49
