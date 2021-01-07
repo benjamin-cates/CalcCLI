@@ -2023,23 +2023,12 @@ Tree generateTree(char* eq, char** argNames, double base) {
             sectionTypes[sectionCount] = type;
             sections[sectionCount++] = i;
         }
-        //Closed square brackets with _
+        //Closed square brackets with underscore
         if(ch == ']' && eq[i + 1] == '_' && brackets == 1) {
             sectionTypes[sectionCount - 1] = 5;
             curType = getCharType(eq[i + 2], curType, base, useUnits);
             brackets--;
             i++;
-            continue;
-        }
-        // (x,y)=> arrow notation
-        if(ch == ')' && brackets == 1 && eq[i + 1] == '=' && eq[i + 2] == '>') {
-            sectionTypes[sectionCount - 1] = 8;
-            i += 3;
-            curType = getCharType(eq[i], curType, base, useUnits);
-            brackets--;
-            if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
-                brackets++;
-            }
             continue;
         }
         //Close brackets
@@ -2051,15 +2040,14 @@ Tree generateTree(char* eq, char** argNames, double base) {
             continue;
         }
         if(brackets != 0) continue;
-        //Arrow notation with a single variable
-        if(ch == '=' && curType == 1 && eq[i + 1] == '>') {
+        //Arrow notation
+        if(ch == '=' && (curType == 1 || curType == 3) && eq[i + 1] == '>') {
+            //Set current type to 8 and fill the section with the rest of the string
             sectionTypes[sectionCount - 1] = 8;
-            i += 2;
-            curType = getCharType(eq[i], curType, base, useUnits);
-            if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
-                brackets++;
-            }
-            continue;
+            i++;
+            curType = 8;
+            while(eq[++i] != '\0');
+            break;
         }
         //Get character type
         int chType = getCharType(ch, curType, base, useUnits);
@@ -2234,16 +2222,16 @@ Tree generateTree(char* eq, char** argNames, double base) {
             continue;
         }
         else if(sectionTypes[i] == 8) {
+            //Get arglist
             char** argList = parseArgumentList(section);
             char** appendedArgList = mergeArgList(argNames, argList);
+            //Find '=' position
             int eqPos = 0;
             while(section[++eqPos] != '=');
-            if(section[eqPos + 2] == '(') {
-                eqPos++;
-                section[sectionLength - 1] = '\0';
-            }
+            //Generate tree
             Tree tree = generateTree(section + eqPos + 2, appendedArgList, base);
             free(appendedArgList);
+            //Return tree
             Tree out;
             out.branch = malloc(sizeof(Tree));
             *(out.branch) = tree;
