@@ -827,7 +827,8 @@ Value valAdd(Value one, Value two) {
         out.type = value_num;
         out.r = one.r + two.r;
         out.i = one.i + two.i;
-        if(one.u == 0) out.u = two.u;
+        if(one.u == two.u) out.u = one.u;
+        else if(one.u == 0) out.u = two.u;
         else if(two.u == 0) out.u = one.u;
         else error("cannot add two different units", NULL);
         return out;
