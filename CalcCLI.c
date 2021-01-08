@@ -15,6 +15,7 @@ void CLI_cleanup() {
 }
 char* readLineRaw() {
     char* out = calloc(10, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     int outLen = 10;
     int charPos = 0;
     while(true) {
@@ -26,6 +27,7 @@ char* readLineRaw() {
         if(character == '\n') return out;
         if(charPos == outLen) {
             out = realloc(out, (outLen += 10));
+            if(out == NULL) { error(mallocError);return NULL; }
         }
         out[charPos++] = character;
     }
@@ -115,6 +117,7 @@ void printInput(char* string, int cursorPos) {
 }
 char* readLine(bool erasePrevious) {
     char* input = calloc(11, 1);
+    if(input == NULL) { error(mallocError);return NULL; }
     int strLenAllocated = 10;
     int strLen = 0;
     int cursorPos = 0;
@@ -243,6 +246,7 @@ char* readLine(bool erasePrevious) {
         if(strLen == strLenAllocated) {
             strLenAllocated += 10;
             input = realloc(input, strLenAllocated + 1);
+            if(input == NULL) { error(mallocError);return NULL; }
         }
         cursorPos++;
     }
@@ -274,7 +278,9 @@ void graphEquation(char* equation, double left, double right, double top, double
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
     char** xArgName = calloc(2, sizeof(char*));
+    if(xArgName == NULL) { error(mallocError);return; }
     xArgName[0] = calloc(2, 1);
+    if(xArgName[0] == NULL) { error(mallocError);return; }
     xArgName[0][0] = 'x';
     Tree tree = generateTree(equation, xArgName, 0);
     int i;
@@ -370,7 +376,7 @@ void printRatio(double out, bool forceSign) {
     if(numer == 0 && denom == 0) {
         char* string = doubleToString(sign == '-' ? -out : out, 10);
         printf("%s", string);
-        free(string);
+        if(string != NULL) free(string);
     }
     else {
         if(sign == '-' || forceSign) printf("%c", sign);
@@ -422,6 +428,7 @@ void runLine(char* input) {
             FILE* file = fopen(input + 3, "r");
             unsigned long lineSize = 300;
             char* line = malloc(300);
+            if(line == NULL) { error("malloc error");return; }
             while(fgets(line, lineSize, file)) {
                 int i;
                 while(line[i++] != '\0') if(line[i] == '\n')
@@ -467,7 +474,9 @@ void runLine(char* input) {
             char* cleanInput = inputClean(input + 4);
             if(globalError) return;
             char** x = calloc(2, sizeof(char*));
+            if(x == NULL) { error(mallocError);return; }
             x[0] = calloc(2, 1);
+            if(x[0] == NULL) { error(mallocError);return; }
             x[0][0] = 'x';
             Tree ops = generateTree(cleanInput, x, 0);
             free(cleanInput);
@@ -725,21 +734,21 @@ int main(int argc, char** argv) {
     if(useFancyInput) enableRawMode();
     //Test VT-100 compatability
     printf("\033[c");
-    int firstChar=readCharacter();
-    if(firstChar!=27) {
-        useFancyInput=false;
+    int firstChar = readCharacter();
+    if(firstChar != 27) {
+        useFancyInput = false;
         printf("\r    \r");
         printf("Reverting to raw mode\n");
         disableRawMode();
-        printf("%c",firstChar);
-        #ifdef USE_CONIO_H
+        printf("%c", firstChar);
+#ifdef USE_CONIO_H
         ungetch(firstChar);
-        #else
-        ungetc(firstChar,stdin);
-        #endif
+#else
+        ungetc(firstChar, stdin);
+#endif
     }
     else {
-        while(readCharacter()!='c');
+        while(readCharacter() != 'c');
         printf("\r           \r");
     }
     //Main loop

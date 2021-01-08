@@ -87,6 +87,7 @@ const char metricNums[] = "yzafpnumchkMGTPEZY";
 const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 100, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
 const char* baseUnits[] = { "m", "kg", "s", "A", "K", "mol", "$", "bit" };
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char* mallocError="malloc returned null";
 #pragma endregion
 #pragma region Units
 unitStandard newUnit(char* name, double mult, unit_t units) {
@@ -124,12 +125,14 @@ char* toStringUnit(unit_t unit) {
         if(unitList[i].multiplier == -1 && unit == unitList[i].baseUnits) {
             //Copy its name into a dynamic memory address
             char* out = calloc(strlen(unitList[i].name), 1);
+            if(out == NULL) { error(mallocError);return NULL; }
             strcat(out, unitList[i].name);
             return out;
         }
     }
     //Else generate a custom string
     char* out = calloc(54, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     bool mult = false;
     for(i = 0; i < 8; i++) {
         char val = (unit >> (i * 8)) & 255;
@@ -227,10 +230,14 @@ double parseNumber(char* num, double base) {
 }
 char* toStringNumber(Number num, double base) {
     char* real = doubleToString(num.r, base);
+    if(real == NULL) real = "NULL";
     char* imag = doubleToString(num.i, base);
+    if(imag == NULL) imag = "NULL";
     char* unit = toStringUnit(num.u);
+    if(unit == NULL) unit = "NULL";
     int outLength = (num.u != 0 ? strlen(unit) + 2 : 0) + (num.i == 0 ? 0 : strlen(imag)) + strlen(real) + 3;
     char* out = calloc(outLength, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     memset(out, 0, outLength);
     if(num.r != 0 || num.i == 0) strcat(out, real);
     if(num.r != 0 && num.i > 0) strcat(out, "+");
@@ -251,12 +258,14 @@ char* toStringNumber(Number num, double base) {
 char* doubleToString(double num, double base) {
     if(num == 0 || base <= 1 || base > 36) {
         char* out = calloc(2, 1);
+        if(out == NULL) error(mallocError);
         out[0] = '0';
         return out;
     }
     if(isnan(num)) {
         int pos = 0;
         char* out = malloc(5);
+        if(out == NULL) { error(mallocError);return NULL; }
         if(num < 0) out[pos++] = '-';
         out[pos] = 'N';
         out[pos + 1] = 'a';
@@ -267,6 +276,7 @@ char* doubleToString(double num, double base) {
     if(isinf(num)) {
         int pos = 0;
         char* out = malloc(5);
+        if(out == NULL) { error(mallocError);return NULL; }
         if(num < 0) out[pos++] = '-';
         out[pos] = 'I';
         out[pos + 1] = 'n';
@@ -276,6 +286,7 @@ char* doubleToString(double num, double base) {
     }
     //Allocate string
     char* out = calloc(24, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     int outPos = 0;
     //Negative numbers
     if(num < 0) {
@@ -322,6 +333,7 @@ char* doubleToString(double num, double base) {
 void appendToHistory(Value num, double base, bool print) {
     if(historySize - 1 == historyCount) {
         history = realloc(history, (historySize + 25) * sizeof(Value));
+        if(history == NULL) { error(mallocError);return; }
         historySize += 25;
     }
     if(print) {
@@ -552,6 +564,7 @@ Vector newVecScalar(Number num) {
     Vector out;
     out.width = out.height = out.total = 1;
     out.val = malloc(sizeof(Number));
+    if(out.val == NULL) error(mallocError);
     out.val[0] = num;
     return out;
 }
@@ -561,6 +574,7 @@ Vector newVec(short width, short height) {
     out.height = height;
     out.total = width * height;
     out.val = calloc(out.total, sizeof(Number));
+    if(out.val == NULL) error(mallocError);
     return out;
 }
 Number determinant(Vector vec) {
@@ -725,6 +739,7 @@ char* valueToString(Value val, double base) {
             len += 1 + strlen(values[i + j * vec.width]);
         }
         char* out = calloc(len, sizeof(char));
+        if(out == NULL) { error(mallocError);return NULL; }
         strcat(out, "<");
         for(j = 0;j < vec.height;j++) for(i = 0;i < vec.width;i++) {
             if(i != 0) strcat(out, ",");
@@ -757,6 +772,7 @@ Value copyValue(Value val) {
     }
     if(val.type == value_func) {
         out.tree = malloc(sizeof(Tree));
+        if(out.tree == NULL) error(mallocError);
         *out.tree = treeCopy(*val.tree, NULL, false, false, false);
         out.argNames = argListCopy(val.argNames);
     }
@@ -1042,6 +1058,7 @@ Tree newOpVal(double r, double i, unit_t u) {
 }
 Tree* allocArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
     Tree* out = malloc(2 * sizeof(Tree));
+    if(out == NULL) { error(mallocError);return NULL; }
     if(copyOne)
         out[0] = treeCopy(one, NULL, 0, 0, 0);
     else
@@ -1054,6 +1071,7 @@ Tree* allocArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
 }
 Tree* allocArg(Tree one, bool copy) {
     Tree* out = malloc(sizeof(Tree));
+    if(out == NULL) { error(mallocError);return NULL; }
     if(copy)
         out[0] = treeCopy(one, NULL, 0, 0, 0);
     else
@@ -1085,6 +1103,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         char* treeString = treeToString(tree.branch[0], true, newArgNames);
         int argListLen = strlen(argListString);
         char* out = calloc(argListLen + 2 + strlen(treeString) + 1, 1);
+        if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argListString);
         strcpy(out + argListLen, "=>");
         strcpy(out + argListLen + 2, treeString);
@@ -1097,12 +1116,14 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     if(tree.optype == optype_argument) {
         if(argNames == NULL) {
             char* num = calloc(10, 1);
+            if(num == NULL) { error(mallocError);return NULL; }
             sprintf(num, "{%d}", tree.op);
             return num;
         }
         else {
             int len = strlen(argNames[tree.op]);
             char* out = calloc(len + 1, 1);
+            if(out == NULL) { error(mallocError);return NULL; }
             memcpy(out, argNames[tree.op], len);
             return out;
         }
@@ -1121,6 +1142,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         if(tree.op == op_add) op = "+";
         if(tree.branch == NULL) {
             char* out = calloc(10, 1);
+            if(out == NULL) { error(mallocError);return NULL; }
             snprintf(out, 10, "NULL%sNULL", op);
             return out;
         }
@@ -1131,6 +1153,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         //Allocate string
         int len = strlen(one) + strlen(two) + 2 + bracket * 2;
         char* out = calloc(len, 1);
+        if(out == NULL) { error(mallocError);return NULL; }
         //Print -(one) if tree.op==op_neg, or (one op two) otherwise
         snprintf(out, len, "%s%s%s%s%s%s", tree.op == op_neg ? "-" : "", bracket ? "(" : "", one, tree.op == op_neg ? "" : op, two, bracket ? ")" : "");
         //Free one and two, return
@@ -1148,6 +1171,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
             len += 1 + strlen(values[i]);
         }
         char* out = calloc(len, sizeof(char));
+        if(out == NULL) { error(mallocError);return NULL; }
         strcat(out, "<");
         int height = tree.argCount / tree.argWidth;
         for(j = 0;j < height;j++) for(i = 0;i < tree.argWidth;i++) {
@@ -1164,7 +1188,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     int i;
     //Get function name and name length
     int strLength;
-    const char* functionName;
+    const char* functionName="ERROR";
     if(tree.optype == optype_builtin) {
         strLength = stdfunctions[tree.op].nameLen + 2;
         functionName = stdfunctions[tree.op].name;
@@ -1180,6 +1204,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     }
     //Compile together the strings of the branches
     char* out = calloc(strLength, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     strcat(out, functionName);
     if(tree.argCount == 0) return out;
     strcat(out, "(");
@@ -1272,7 +1297,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                         error("argument error");
                         return NULLVAL;
                     }
-                    Value vec = args[tree.branch[0].op];
+                    vec = args[tree.branch[0].op];
                 }
                 else if(tree.branch[0].optype == optype_builtin && tree.branch[0].op == op_val) {
                     vec = tree.branch[0].value;
@@ -1706,6 +1731,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                     if(tree.argCount > 1) freeValue(two);
                 }
                 Value* inputs = calloc(tree.argCount, sizeof(Value));
+                if(inputs == NULL) { error(mallocError);return NULLVAL; }
                 inputs[0] = two;
                 int i;
                 for(i = 1;i < argCount;i++) {
@@ -1915,6 +1941,8 @@ Value computeTree(Tree tree, Value* args, int argLen) {
         out.type = value_func;
         out.tree = malloc(sizeof(Tree));
         Tree* replaceArgs = calloc(argLen, sizeof(Tree));
+        if(replaceArgs == NULL) { error(mallocError);return NULLVAL; }
+        if(out.tree == NULL || replaceArgs == NULL) { error(mallocError);return NULLVAL; }
         int i;
         for(i = 0;i < argLen;i++) {
             replaceArgs[i] = newOpValue(args[i]);
@@ -1930,6 +1958,7 @@ Tree treeCopy(Tree tree, Tree* args, bool unfold, int replaceArgs, bool optimize
     if(tree.optype == optype_anon) {
         out.argNames = argListCopy(tree.argNames);
         out.branch = malloc(sizeof(Tree));
+        if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
         *out.branch = treeCopy(tree.branch[0], args, unfold, replaceArgs, optimize);
         out.argWidth -= replaceArgs;
         return out;
@@ -1946,7 +1975,10 @@ Tree treeCopy(Tree tree, Tree* args, bool unfold, int replaceArgs, bool optimize
         else out.op -= replaceArgs;
     }
     //Copy tree branches
-    if(tree.argCount != 0) out.branch = malloc(tree.argCount * sizeof(Tree));
+    if(tree.argCount != 0) {
+        out.branch = malloc(tree.argCount * sizeof(Tree));
+        if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
+    }
     int i;
     bool crunch = true;
     for(i = 0; i < tree.argCount; i++) {
@@ -2080,7 +2112,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
     bool nextNegative = false;
     for(i = 0; i < sectionCount; i++) {
         //Get section substring
-        int j, sectionLength = sections[i + 1] - sections[i];
+        int sectionLength = sections[i + 1] - sections[i];
         char section[sectionLength + 1];
         memcpy(section, eq + sections[i], sectionLength);
         section[sectionLength] = '\0';
@@ -2138,6 +2170,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
                 return NULLOPERATION;
             }
             Tree* args = calloc(commaCount, sizeof(Tree));
+            if(args == NULL) { error(mallocError);return NULLOPERATION; }
             for(j = 0; j < commaCount; j++) {
                 char argText[commas[j + 1] - commas[j] + 1];
                 memset(argText, 0, sizeof(argText));
@@ -2234,6 +2267,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             //Return tree
             Tree out;
             out.branch = malloc(sizeof(Tree));
+            if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
             *(out.branch) = tree;
             out.optype = optype_anon;
             out.argNames = argList;
@@ -2323,6 +2357,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             }
             section[sectionLength - 1] = '\0';
             Tree* args = calloc(width * height, sizeof(Tree));
+            if(args == NULL) { error(mallocError);return NULLOPERATION; }
             for(y = 0;y < height;y++) for(x = 0;x < width;x++) {
                 if(pos[y][x] == 0 && x != 0) {
                     args[x + y * width] = NULLOPERATION;
@@ -2618,6 +2653,7 @@ Tree derivative(Tree tree) {
             out.argCount = tree.argCount;
             out.argWidth = tree.argWidth;
             out.branch = malloc(tree.argCount * sizeof(Tree));
+            if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
             int i;
             for(i = 0;i < tree.argCount;i++) {
                 out.branch[i] = derivative(tree.branch[i]);
@@ -2660,10 +2696,12 @@ char** argListCopy(char** argList) {
     if(argList == NULL) return NULL;
     int len = argListLen(argList);
     char** out = calloc(len + 1, sizeof(char*));
+    if(out == NULL) { error(mallocError);return NULL; }
     int i;
     for(i = 0;i < len;i++) {
         int strLen = strlen(argList[i]);
         out[i] = calloc(strLen + 1, 1);
+        if(out[i] == NULL) { error(mallocError);return NULL; }
         strcpy(out[i], argList[i]);
     }
     return out;
@@ -2673,6 +2711,7 @@ char** mergeArgList(char** one, char** two) {
     if(one != NULL) oneLen = argListLen(one);
     if(two != NULL) twoLen = argListLen(two);
     char** out = calloc(oneLen + twoLen + 1, sizeof(char*));
+    if(out == NULL) { error(mallocError);return NULL; }
     memcpy(out, one, oneLen * sizeof(char*));
     memcpy(out + oneLen, two, twoLen * sizeof(char*));
     return out;
@@ -2685,10 +2724,12 @@ char* argListToString(char** argList) {
     }
     if(i == 1) {
         char* out = calloc(strlen(argList[0]), 1);
+        if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argList[0]);
         return out;
     }
     char* out = calloc(totalLen + 3, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     out[0] = '(';
     i = -1;
     while(argList[++i]) {
@@ -2719,10 +2760,12 @@ char** parseArgumentList(char* list) {
     }
     //Null terminated
     char** out = calloc(argCount + 1, sizeof(char*));
+    if(out == NULL) { error(mallocError);return NULL; }
     int j;
     for(i = 0;i < argCount;i++) {
         int stringPos = 0;
         out[i] = calloc(commaPos[i + 1] - commaPos[i], 1);
+        if(out[i] == NULL) { error(mallocError);return NULL; }
         for(j = commaPos[i] + 1;j < commaPos[i + 1];j++) {
             if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9')) out[i][stringPos++] = list[j];
             else if(list[j] >= 'A' && list[j] <= 'Z') out[i][stringPos++] = list[j] + 32;
@@ -2775,6 +2818,7 @@ void generateFunction(char* eq) {
     }
     //Get function name
     char* name = calloc(openBracket + 1, 1);
+    if(name == NULL) { error(mallocError);return; }
     for(i = 0;i < openBracket;i++) {
         if(eq[i] >= 'A' && eq[i] <= 'Z') name[i] = eq[i] + 32;
         else name[i] = eq[i];
@@ -2799,12 +2843,12 @@ void generateFunction(char* eq) {
     }
     //Get argument names
     char** argNames = parseArgumentList(eq + openBracket);
-    if(argNames == NULL) {
+    //Compute tree
+    Tree* tree = malloc(sizeof(Tree));
+    if(argNames == NULL || tree == NULL) {
         free(name);
         return;
     }
-    //Compute tree
-    Tree* tree = malloc(sizeof(Tree));
     char* cleaninput = inputClean(eq + equalPos + 1);
     *tree = generateTree(cleaninput, argNames, 0);
     free(cleaninput);
@@ -2818,6 +2862,7 @@ void generateFunction(char* eq) {
     //Append to functions
     if(functionArrayLength == numFunctions) {
         customfunctions = realloc(customfunctions, (functionArrayLength + 10) * sizeof(Function));
+        if(customfunctions == NULL) { error(mallocError);return; }
         functionArrayLength += 10;
     }
     customfunctions[numFunctions++] = newFunction(name, tree, argCount, argNames);
@@ -2883,6 +2928,7 @@ char* inputClean(char* input) {
     }
     //Allocate out
     char* out = calloc(strlen(input) + 1, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     int outPos = 0, i = 0;
     char prev = 0;
     bool allowHex = false, insideSquare = false;
@@ -2964,11 +3010,13 @@ void startup() {
     historySize = 10;
     //Allocate functions
     customfunctions = calloc(functionArrayLength, sizeof(Function));
+    if(history == NULL || customfunctions == NULL) error(mallocError);
 }
 #pragma endregion
 #pragma region Misc
 int* primeFactors(int num) {
     int* out = calloc(11, sizeof(int));
+    if(out == NULL) { error(mallocError);return NULL; }
     int outSize = 10;
     int outPos = 0;
     int max = num / 2;
@@ -2978,6 +3026,7 @@ int* primeFactors(int num) {
         num = num / 2;
         if(outPos == outSize) {
             out = realloc(out, (outSize + 11) * sizeof(int));
+            if(out == NULL) { error(mallocError);return NULL; }
             memset(out + outSize, 0, 11 * sizeof(int));
             outSize += 10;
         }
@@ -2989,6 +3038,7 @@ int* primeFactors(int num) {
             num = num / i;
             if(outPos == outSize) {
                 out = realloc(out, (outSize + 11) * sizeof(int));
+                if(out == NULL) { error(mallocError);return NULL; }
                 memset(out + outSize, 0, 11 * sizeof(int));
                 outSize += 10;
             }

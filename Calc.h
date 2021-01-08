@@ -194,6 +194,8 @@ extern const double metricNumValues[];
 //Metric base units, used for toStringUnit
 extern const char* baseUnits[];
 extern const char numberChars[];
+//Error message for when malloc returns zero
+extern const char* mallocError;
 #pragma endregion
 //Functions
 /**
