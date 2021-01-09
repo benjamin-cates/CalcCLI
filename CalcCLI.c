@@ -584,12 +584,12 @@ void runLine(char* input) {
             //Get string
             char* numString = valueToString(out, 10);
             //Free values
+            //Print output
+            printf("= %s %s\n", numString, input + 5);
             freeValue(unit);
             freeValue(value);
             freeValue(out);
-            free(numString);
-            //Print output
-            printf("= %s %s\n", numString, input + 5);
+            if(numString != NULL) free(numString);
         }
         else if(startsWith(input, "-parse")) {
             //Clean and generate tree

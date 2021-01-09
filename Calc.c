@@ -234,7 +234,6 @@ char* toStringNumber(Number num, double base) {
     char* imag = doubleToString(num.i, base);
     if(imag == NULL) imag = "NULL";
     char* unit = toStringUnit(num.u);
-    if(unit == NULL) unit = "NULL";
     int outLength = (num.u != 0 ? strlen(unit) + 2 : 0) + (num.i == 0 ? 0 : strlen(imag)) + strlen(real) + 3;
     char* out = calloc(outLength, 1);
     if(out == NULL) { error(mallocError);return NULL; }
@@ -245,7 +244,7 @@ char* toStringNumber(Number num, double base) {
         strcat(out, imag);
         strcat(out, "i");
     }
-    if(num.u != 0) {
+    if(unit != NULL) {
         strcat(out, "[");
         strcat(out, unit);
         strcat(out, "]");
