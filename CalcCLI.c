@@ -274,7 +274,7 @@ void error(const char* format, ...) {
     //Set error to true
     globalError = true;
 };
-void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
+void graphEquation(const char* equation, double left, double right, double top, double bottom, int rows, int columns) {
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
     char** xArgName = calloc(2, sizeof(char*));

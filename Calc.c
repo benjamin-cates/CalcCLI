@@ -87,17 +87,17 @@ const char metricNums[] = "yzafpnumchkMGTPEZY";
 const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 100, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
 const char* baseUnits[] = { "m", "kg", "s", "A", "K", "mol", "$", "bit" };
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const char* mallocError="malloc returned null";
+const char* mallocError = "malloc returned null";
 #pragma endregion
 #pragma region Units
-unitStandard newUnit(char* name, double mult, unit_t units) {
+unitStandard newUnit(const char* name, double mult, unit_t units) {
     unitStandard out;
     out.name = name;
     out.multiplier = mult;
     out.baseUnits = units;
     return out;
 }
-Number getUnitName(char* name) {
+Number getUnitName(const char* name) {
     int useMetric = -1;
     int i;
     for(i = 0; i < metricCount; i++)
@@ -200,7 +200,7 @@ Number newNum(double r, double i, unit_t u) {
     out.u = u;
     return out;
 }
-double parseNumber(char* num, double base) {
+double parseNumber(const char* num, double base) {
     int i;
     int numLength = strlen(num);
     int periodPlace = numLength;
@@ -1187,7 +1187,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     int i;
     //Get function name and name length
     int strLength;
-    const char* functionName="ERROR";
+    const char* functionName = "ERROR";
     if(tree.optype == optype_builtin) {
         strLength = stdfunctions[tree.op].nameLen + 2;
         functionName = stdfunctions[tree.op].name;
@@ -1215,7 +1215,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     out[strLength - 2] = ')';
     return out;
 }
-Value computeTree(Tree tree, Value* args, int argLen) {
+Value computeTree(Tree tree, const Value* args, int argLen) {
     if(tree.optype == optype_builtin) {
         if(tree.op == op_val)
             return copyValue(tree.value);
@@ -1952,7 +1952,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
     }
     return NULLVAL;
 }
-Tree treeCopy(Tree tree, Tree* args, bool unfold, int replaceArgs, bool optimize) {
+Tree treeCopy(Tree tree, const Tree* args, bool unfold, int replaceArgs, bool optimize) {
     Tree out = tree;
     if(tree.optype == optype_anon) {
         out.argNames = argListCopy(tree.argNames);
@@ -2009,7 +2009,7 @@ int getCharType(char in, int curType, int base, bool useUnits) {
     if((in >= '*' && in <= '/' && in != '.') || in == '%' || in == '^') return 6;
     return -1;
 }
-Tree generateTree(char* eq, char** argNames, double base) {
+Tree generateTree(const char* eq, char** argNames, double base) {
     bool useUnits = base != 0;
     if(base == 0) base = 10;
     if(verbose) {
@@ -2663,7 +2663,7 @@ Tree derivative(Tree tree) {
     error("not all functions are supported in dx currently");
     return NULLOPERATION;
 }
-Value calculate(char* eq, double base) {
+Value calculate(const char* eq, double base) {
     //Clean input
     char* cleanInput = inputClean(eq);
     if(globalError) return NULLVAL;
@@ -2739,7 +2739,7 @@ char* argListToString(char** argList) {
     out[totalLen] = ')';
     return out;
 }
-char** parseArgumentList(char* list) {
+char** parseArgumentList(const char* list) {
     if(list[0] == '=') {
         return calloc(1, sizeof(char*));
     }
@@ -2790,7 +2790,7 @@ Function newFunction(char* name, Tree* tree, char argCount, char** argNames) {
     out.tree = tree;
     return out;
 }
-void generateFunction(char* eq) {
+void generateFunction(const char* eq) {
     //Parse first half a(x)
     int i, equalPos, openBracket = 0, argCount = 1;
     for(i = 0; i < strlen(eq); i++) {
@@ -2866,7 +2866,7 @@ void generateFunction(char* eq) {
     }
     customfunctions[numFunctions++] = newFunction(name, tree, argCount, argNames);
 }
-Tree findFunction(char* name) {
+Tree findFunction(const char* name) {
     Tree out;
     //Get function id from name
     int len = strlen(name), i;
@@ -2920,7 +2920,7 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
 };
 #pragma endregion
 #pragma region Main Program
-char* inputClean(char* input) {
+char* inputClean(const char* input) {
     if(input[0] == '\0') {
         error("no equation", NULL);
         return NULL;
