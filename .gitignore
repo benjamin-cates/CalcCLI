@@ -1,2 +1,4 @@
 calc
 Calc.o
+test/test
+test/test.exe

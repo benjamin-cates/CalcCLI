@@ -6,3 +6,10 @@ Don't worry if you forget these, but they are helpful to follow.
 
 ## What to do with your idea
 If you have a great idea on how to improve the project, but are too intimidated to write it, submit an issue. I will at least consider it.
+
+## Test
+Before submitting a pull request run the tests.
+- `cd test`
+- `./buildtest`
+- or `buildtest.bat`
+It should say `Failed 0 tests.`
