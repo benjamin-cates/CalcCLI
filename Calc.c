@@ -2058,6 +2058,12 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         if(ch == ']' && eq[i + 1] == '_' && brackets == 1) {
             sectionTypes[sectionCount - 1] = 5;
             curType = getCharType(eq[i + 2], curType, base, useUnits);
+            if(eq[i + 2] == '[' || eq[i + 2] == '(' || eq[i + 2] == '<') {
+                brackets++;
+                i++;
+                int type = ch == '(' ? 3 : (ch == '[' ? 4 : 7);
+                curType=type;
+            }
             brackets--;
             i++;
             continue;
