@@ -9,7 +9,7 @@
 bool useColors = true;
 void CLI_cleanup() {
     cleanup();
-    if(useColors) printf("\b\b\33[1;34m-\33[0mquit\n");
+    if(useColors) printf("\b\b\33[34;1m-quit\33[0m\n");
     else printf("\b\b-quit\n");
     exit(0);
 }
@@ -94,20 +94,28 @@ bool useFancyInput = true;
 void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
-    bool isComment = false;
     //Print input
     if(useColors) {
-        if(string[0] == '-' || string[0] == '.') {
-            printf("\33[1;34m%c\33[0m", string[0]);
-            string++;
+        const char* colorCodes[] = {
+            "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36"
+        };
+        char* simpleSyntax = highlightSyntax(string);
+        char* colors = advancedHighlight(string, simpleSyntax, false, NULL, NULL);
+        int i = 0;
+        int prevColor = 0;
+        printf("\033[0m");
+        for(i = 0;i < strlen(string);i++) {
+            if(prevColor != colors[i]) {
+                prevColor = colors[i];
+                printf("\033[0m\033[%sm", colorCodes[prevColor]);
+            }
+            putchar(string[i]);
         }
-        if(string[0] == '#' || (string[0] == '/' && string[1] == '/')) {
-            isComment = true;
-            printf("\33[1;32m");
-        }
+        printf("\033[0m");
+        free(colors);
+        free(simpleSyntax);
     }
-    printf("%s ", string);
-    if(isComment) printf("\33[0m");
+    else printf("%s ", string);
     //Set cursor position
     if(cursorPos == -1) return;
     printf("\0338");
@@ -261,6 +269,7 @@ char* readLine(bool erasePrevious) {
 };
 #endif
 void error(const char* format, ...) {
+    if(ignoreError) return;
     //Print error
     if(useColors) printf("\033[1;31m");
     printf("Error: ");
@@ -654,6 +663,36 @@ void runLine(char* input) {
             }
             freeValue(out);
         }
+        //Debug commands
+        else if(startsWith(input, "-d")) {
+            if(startsWith(input, "-dsyntax")) {
+                input += 9;
+                char* normalSyntax = highlightSyntax(input);
+                char* advancedSyntax = advancedHighlight(input, normalSyntax, false, NULL, NULL);
+                int i;
+                int len = strlen(input);
+                for(i = 0;i < 2;i++) {
+                    char* syntax = i ? advancedSyntax : normalSyntax;
+                    if(i == 0) printf("Regular syntax:\n");
+                    if(i == 1) printf("Advanced syntax:\n");
+                    int j;
+                    int type = 0;
+                    putchar('"');
+                    for(j = 0;j < len + 1;j++) {
+                        if(syntax[j] != type) {
+                            if(type != 0) printf("\" %s, \"", syntaxTypes[type]);
+                            type = syntax[j];
+                        }
+                        putchar(input[j]);
+                    }
+                    putchar('"');
+                    putchar('\n');
+                }
+            }
+            else {
+                error("command '%s' is not a valid debugging command", input + 2);
+            }
+        }
         else {
             error("command '%s' not recognized.", input + 1);
             return;
@@ -664,7 +703,7 @@ void runLine(char* input) {
         //Replace $() instances
         if(useFancyInput) {
             printf("\0338\33[J\r");
-            if(useColors) printf("\33[1;32m");
+            if(useColors) printf("\33[32m");
             int i = -1;
             //Print each character
             while(input[++i] != '\0') {

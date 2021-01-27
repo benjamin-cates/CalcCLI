@@ -169,6 +169,8 @@ extern int historyCount;
 extern bool verbose;
 //Error has occured
 extern bool globalError;
+//Whether to ignore errors or not
+extern bool ignoreError;
 //Number with r=0, i=0, and u=0
 extern Number NULLNUM;
 //Value with number 0
@@ -196,6 +198,8 @@ extern const char* baseUnits[];
 extern const char numberChars[];
 //Error message for when malloc returns zero
 extern const char* mallocError;
+//List of syntax type names
+extern const char* syntaxTypes[];
 #pragma endregion
 //Functions
 /**
@@ -565,6 +569,17 @@ char* inputClean(const char* input);
 int* primeFactors(int num);
 bool isPrime(int num);
 void getRatio(double num, int* numerOut, int* denomOut);
+/*
+    Returns a string with the syntax color codes for the text
+    Return value must be free()d
+*/
+char* highlightSyntax(const char* eq);
+/*
+    Takes equation and syntax from highlightSyntax and adds more
+    This will identify variable types and identify invalid operators
+    Return value must be free()d
+*/
+char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, char** arguments, char** localVariables);
 #pragma endregion
 #ifdef __cplusplus
 }
