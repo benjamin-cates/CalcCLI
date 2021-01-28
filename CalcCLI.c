@@ -613,7 +613,9 @@ void runLine(char* input) {
             free(out);
         }
         else if(startsWith(input, "-factors")) {
-            int num = parseNumber(input + 9, 10);
+            Value val = calculate(input + 9, 0);
+            int num=getR(val);
+            freeValue(val);
             int* factors = primeFactors(num);
             //If num is prime
             if(factors[0] == 0) {
