@@ -3270,6 +3270,7 @@ char* highlightSyntax(const char* eq) {
             out[i] = 6;
             out[i + 1] = 6;
             i++;
+            state=0;
             continue;
         }
         //Numbers
