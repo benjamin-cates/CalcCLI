@@ -1,5 +1,18 @@
 # Description of the data structures of CalcCLI
 Most structures can be found near the top of [Calc.h](../Calc.h).
+
+## Arb
+
+Arb is an arbitrary precision data type, it stores one number.
+
+Members:
+- `mantissa` - The dynamically-allocated, base-256 mantissa of the number (unsigned char*)
+- `len` - The actual length of the current mantissa (short)
+- `accu` - The maximum length of the mantissa (short)
+- `exp` - The exponent of the value (base-256), increasing by one multiplies the value by 256. (short)
+- `sign` - 0 if it's negative, 1 if it's positive. (char)
+
+
 ## Number
 Number contains three components: a real component, an imaginary component, and a unit. The real and imaginary components are both 64-bit doubles, and the unit is a 64-bit long composed of 8 different numbers. It has a size of 24 bytes.
 
@@ -7,6 +20,9 @@ The members are:
 - `r` - Real component (double)
 - `i` - Imaginary component (double)
 - `u` - Unit (unsigned long long)
+
+## ArbNum
+See [Number], this is identical to Number, except it uses arbitrary precision types instead of floating-point doubles.
 
 ## Vector
 A vector is a two dimensional array of numbers. In reality, this array is one dimensional, and has a length of `vec.total`. It has a size of
@@ -36,6 +52,9 @@ Members for type == value_vec:
 Members for type == value_func:
 - `tree` - Pointer to the tree to compute (Tree*) (run with `computeTree(val.tree[0],...`)
 - `argNames` - list of argument names (char**) (used when printing the value)
+
+Members for type == value_arb:
+- `numArb` - Pointer to a ArbNum type. The pointer saves space so that sizeof(Value) does not increase. (ArbNum*)
 
 ## unitStandard
 This struct is not used in most of the code, it only describes the structure for the constant array `unitList`.
