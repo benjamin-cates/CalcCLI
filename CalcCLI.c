@@ -719,6 +719,29 @@ void runLine(char* input) {
                     putchar('\n');
                 }
             }
+            if(startsWith(input, "-darb")) {
+                input += 5;
+                Value out = calculate(input, 0);
+                if(out.type != value_arb || out.numArb == NULL) {
+                    error("Returned value is not arbitrary precision");
+                    return;
+                }
+                struct ArbNumber n = *out.numArb;
+                if(n.r.mantissa != NULL) {
+                    printf("r (len:%d, accu:%d): %c{", n.r.len, n.r.accu, n.r.sign ? '-' : '+');
+                    for(int i = 0;i < n.r.len;i++) printf("%d,", n.r.mantissa[i]);
+                    printf("}exp%d\n", n.r.exp);
+                }
+                else printf("r: NULL");
+                if(n.i.mantissa != NULL) {
+                    printf("i (len:%d, accu:%d): %c{", n.i.len, n.i.accu, n.i.sign ? '-' : '+');
+                    for(int i = 0;i < n.i.len;i++) printf("%d,", n.i.mantissa[i]);
+                    printf("}exp%d\n", n.i.exp);
+                }
+                else printf("i: NULL");
+                appendToHistory(out,10,true);
+                freeValue(out);
+            }
             else {
                 error("command '%s' is not a valid debugging command", input + 2);
             }
