@@ -445,7 +445,7 @@ void runLine(char* input) {
             //Error if name not found
             error("Function '%s' not found", input + 5);
         }
-        else if(startsWith(input, "-g")) {
+        else if(startsWith(input, "-g ")) {
             //Graph
             char* cleanInput = inputClean(input + 3);
             if(globalError) return;
@@ -665,6 +665,33 @@ void runLine(char* input) {
             }
             freeValue(out);
         }
+        else if(startsWith(input, "-setaccu")) {
+            Value accu = calculate(input + 9, 10);
+            double accuR = getR(accu);
+            freeValue(accu);
+            globalAccuracy = ((accuR + 5) * log(10) / log(256));
+            digitAccuracy = accuR;
+            if(accuR == 0) {
+                printf("Exited accurate mode.\n");
+                useArb = false;
+                return;
+            }
+            else useArb = true;
+            if(globalAccuracy > 30000) {
+                printf("Warning: Accuracy has been capped at 60000 hexadecimal digits.\n");
+                globalAccuracy = 30000;
+                digitAccuracy = 72244;
+            }
+            else printf("Accuracy set to %d hexadecimal digits\n", globalAccuracy * 2);
+            if(useColors) printf("\033[1;31mWarning: \033[0mthis feature is experimental and may not be accurate. Some features are not implemented. To go back to normal mode, type \"\033[1;34m-\033[0msetaccu 0\".\n");
+            else printf("Warning: this feature is experimental and may not be accurate. Some features are not implemented. To go back to normal mode, type \"-setaccu 0\".\n");
+        }
+        else if(startsWith(input, "-getaccu")) {
+            if(!useArb) {
+                printf("Currently not in accurate mode (13 hexadecimal digits).\n");
+                return;
+            }
+            printf("Current accuracy is %d hexadecimal digits.\n", globalAccuracy * 2);
         //Debug commands
         else if(startsWith(input, "-d")) {
             if(startsWith(input, "-dsyntax")) {
