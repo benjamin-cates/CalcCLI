@@ -60,7 +60,7 @@ Members for type == value_arb:
 This struct is not used in most of the code, it only describes the structure for the constant array `unitList`.
 
 Members:
-- `name` - Name of the unit (char*)
+- `name` - Name of the unit (const char*)
 - `multiplier` - Offset from the base unit (negative when it supports metric prefixes) (double)
 - `baseUnits` - Base units of this unit (unsigned long long)
 

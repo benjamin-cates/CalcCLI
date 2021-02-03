@@ -9,12 +9,13 @@
 bool useColors = true;
 void CLI_cleanup() {
     cleanup();
-    if(useColors) printf("\b\b\33[1;34m-\33[0mquit\n");
+    if(useColors) printf("\b\b\33[34;1m-quit\33[0m\n");
     else printf("\b\b-quit\n");
     exit(0);
 }
 char* readLineRaw() {
     char* out = calloc(10, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     int outLen = 10;
     int charPos = 0;
     while(true) {
@@ -26,6 +27,7 @@ char* readLineRaw() {
         if(character == '\n') return out;
         if(charPos == outLen) {
             out = realloc(out, (outLen += 10));
+            if(out == NULL) { error(mallocError);return NULL; }
         }
         out[charPos++] = character;
     }
@@ -92,20 +94,28 @@ bool useFancyInput = true;
 void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
-    bool isComment = false;
     //Print input
     if(useColors) {
-        if(string[0] == '-' || string[0] == '.') {
-            printf("\33[1;34m%c\33[0m", string[0]);
-            string++;
+        const char* colorCodes[] = {
+            "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36"
+        };
+        char* simpleSyntax = highlightSyntax(string);
+        char* colors = advancedHighlight(string, simpleSyntax, false, NULL, NULL);
+        int i = 0;
+        int prevColor = 0;
+        printf("\033[0m");
+        for(i = 0;i < strlen(string);i++) {
+            if(prevColor != colors[i]) {
+                prevColor = colors[i];
+                printf("\033[0m\033[%sm", colorCodes[prevColor]);
+            }
+            putchar(string[i]);
         }
-        if(string[0] == '#' || (string[0] == '/' && string[1] == '/')) {
-            isComment = true;
-            printf("\33[1;32m");
-        }
+        printf("\033[0m");
+        free(colors);
+        free(simpleSyntax);
     }
-    printf("%s ", string);
-    if(isComment) printf("\33[0m");
+    else printf("%s ", string);
     //Set cursor position
     if(cursorPos == -1) return;
     printf("\0338");
@@ -115,6 +125,7 @@ void printInput(char* string, int cursorPos) {
 }
 char* readLine(bool erasePrevious) {
     char* input = calloc(11, 1);
+    if(input == NULL) { error(mallocError);return NULL; }
     int strLenAllocated = 10;
     int strLen = 0;
     int cursorPos = 0;
@@ -243,6 +254,7 @@ char* readLine(bool erasePrevious) {
         if(strLen == strLenAllocated) {
             strLenAllocated += 10;
             input = realloc(input, strLenAllocated + 1);
+            if(input == NULL) { error(mallocError);return NULL; }
         }
         cursorPos++;
     }
@@ -257,6 +269,7 @@ char* readLine(bool erasePrevious) {
 };
 #endif
 void error(const char* format, ...) {
+    if(ignoreError) return;
     //Print error
     if(useColors) printf("\033[1;31m");
     printf("Error: ");
@@ -270,11 +283,13 @@ void error(const char* format, ...) {
     //Set error to true
     globalError = true;
 };
-void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns) {
+void graphEquation(const char* equation, double left, double right, double top, double bottom, int rows, int columns) {
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
     char** xArgName = calloc(2, sizeof(char*));
+    if(xArgName == NULL) { error(mallocError);return; }
     xArgName[0] = calloc(2, 1);
+    if(xArgName[0] == NULL) { error(mallocError);return; }
     xArgName[0][0] = 'x';
     Tree tree = generateTree(equation, xArgName, 0);
     int i;
@@ -370,7 +385,7 @@ void printRatio(double out, bool forceSign) {
     if(numer == 0 && denom == 0) {
         char* string = doubleToString(sign == '-' ? -out : out, 10);
         printf("%s", string);
-        free(string);
+        if(string != NULL) free(string);
     }
     else {
         if(sign == '-' || forceSign) printf("%c", sign);
@@ -378,7 +393,22 @@ void printRatio(double out, bool forceSign) {
         if(floor(fabs(out)) == 0) printf("%d/%d", numer, denom);
         else printf("%d%c%d/%d", (int)floor(fabs(out)), sign, numer, denom);
     }
-
+}
+void compPrintRatio(Number num) {
+    //Print ratio for R
+    if(num.r != 0) printRatio(num.r, false);
+    //Print ratio for I
+    if(num.i != 0) {
+        if(num.r != 0) printf(" ");
+        printRatio(num.i, num.r != 0);
+        printf(" i");
+    }
+    //Print unit
+    if(num.u != 0) {
+        char* string = toStringUnit(num.u);
+        printf(" [%s]", string);
+        free(string);
+    }
 }
 void runLine(char* input) {
     int i;
@@ -392,21 +422,27 @@ void runLine(char* input) {
             int strLen = strlen(input);
             //Delete function or variable
             for(i = 0; i < numFunctions; i++) {
+                //Continue if name does not match
                 if(customfunctions[i].nameLen != strLen - 5) continue;
                 if(strcmp(input + 5, customfunctions[i].name) != 0) continue;
+                //Print message
                 printf("Function '%s' has been deleted.\n", customfunctions[i].name);
+                //Free members
                 customfunctions[i].nameLen = 0;
                 freeTree(*customfunctions[i].tree);
                 free(customfunctions[i].tree);
                 free(customfunctions[i].name);
+                //Free argNames
                 int j = -1;
                 char** argNames = customfunctions[i].argNames;
                 while(argNames[++j] != NULL) free(argNames[j]);
                 free(argNames);
+                //Set tree to NULL
                 customfunctions[i].tree = NULL;
                 customfunctions[i].argCount = 0;
                 return;
             }
+            //Error if name not found
             error("Function '%s' not found", input + 5);
         }
         else if(startsWith(input, "-g ")) {
@@ -420,16 +456,22 @@ void runLine(char* input) {
             int strLen = strlen(input);
             //Read lines from a file
             FILE* file = fopen(input + 3, "r");
+            //Initialize lines
             unsigned long lineSize = 300;
             char* line = malloc(300);
+            if(line == NULL) { error("malloc error");return; }
+            //Loop through lines
             while(fgets(line, lineSize, file)) {
                 int i;
+                //Remove endline character
                 while(line[i++] != '\0') if(line[i] == '\n')
                     line[i] = '\0';
+                //Print and run line
                 printf("%s", line);
                 runLine(line);
                 globalError = false;
             }
+            //Close and free line
             free(line);
             fclose(file);
         }
@@ -444,6 +486,7 @@ void runLine(char* input) {
             for(i = 0; i < numFunctions; i++) {
                 if(customfunctions[i].nameLen == 0) continue;
                 num++;
+                //Get equation
                 char* equation = treeToString(*(customfunctions[i].tree), false, customfunctions[i].argNames);
                 //Print name
                 printf("%s", customfunctions[i].name);
@@ -464,16 +507,24 @@ void runLine(char* input) {
             printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
         }
         else if(startsWith(input, "-dx")) {
+            //Clean input
             char* cleanInput = inputClean(input + 4);
             if(globalError) return;
+            //Set x
             char** x = calloc(2, sizeof(char*));
+            if(x == NULL) { error(mallocError);return; }
             x[0] = calloc(2, 1);
+            if(x[0] == NULL) { error(mallocError);return; }
             x[0][0] = 'x';
+            //Get tree
             Tree ops = generateTree(cleanInput, x, 0);
             free(cleanInput);
+            //Clean tree
             Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
+            //Get derivative and clean it
             Tree dx = derivative(cleanedOps);
             Tree dxClean = treeCopy(dx, NULL, false, false, true);
+            //Print output
             char* out = treeToString(dxClean, false, x);
             printf("=%s\n", out);
             free(out);
@@ -485,45 +536,50 @@ void runLine(char* input) {
         else if(startsWith(input, "-base")) {
             //format: -base(16) 46 will return 2E
             int i, expStart = 0;
+            //Find end of base
             for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
                 expStart = i + 1;
                 input[i] = '\0';
                 break;
             }
-            Value base = calculate(input + 5, 0);
-            Number baseNum;
-            if(base.type == value_num) baseNum = base.num;
-            if(base.r > 36 || base.r < 1) {
+            //Calculate base
+            Value baseVal = calculate(input + 5, 0);
+            int base = getR(baseVal);
+            if(base > 36 || base < 1) {
                 error("base out of bounds", NULL);
                 return;
             }
+            //Calculate and append to history
             Value out = calculate(input + expStart, 0);
-            appendToHistory(out, base.r, true);
+            appendToHistory(out, base, true);
         }
         else if(startsWith(input, "-degset")) {
+            //If "rad"
             if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
+            //If "deg"
             else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
+            //If "grad"
             else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
+            //Else custom value
             else {
                 Value deg = calculate(input + 7, 0);
-                if(deg.type != value_num) {
-                    error("Degree ratio is not a numeral", NULL);
-                    freeValue(deg);
-                    return;
-                }
-                degrat = deg.r;
+                degrat = getR(deg);
+                freeValue(deg);
             }
             printf("Degree ratio set to %g\n", degrat);
         }
         else if(startsWith(input, "-unit")) {
             int i, unitStart = 0;
+            //Find end of unit
             for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
                 unitStart = i + 1;
                 input[i] = '\0';
                 break;
             }
+            //Calculate unit and value
             Value unit = calculate(input + 5, 10);
             Value value = calculate(input + unitStart, 0);
+            //Check if they are compatible
             if(unit.u != value.u) {
                 char* unitOne = toStringUnit(unit.u);
                 char* unitTwo = toStringUnit(value.u);
@@ -532,35 +588,44 @@ void runLine(char* input) {
                 free(unitTwo);
                 return;
             }
+            //Divide them
             Value out = valDivide(value, unit);
+            //Get string
             char* numString = valueToString(out, 10);
+            //Free values
+            //Print output
+            printf("= %s %s\n", numString, input + 5);
             freeValue(unit);
             freeValue(value);
             freeValue(out);
-            printf("= %s %s\n", numString, input + 5);
-            free(numString);
+            if(numString != NULL) free(numString);
         }
         else if(startsWith(input, "-parse")) {
+            //Clean and generate tree
             char* clean = inputClean(input + 7);
             Tree tree = generateTree(clean, NULL, 0);
             free(clean);
             if(globalError) return;
+            //Convert to string, print, and free
             char* out = treeToString(tree, false, NULL);
-            freeTree(tree);
             printf("Parsed as: %s\n", out);
+            freeTree(tree);
             free(out);
         }
         else if(startsWith(input, "-factors")) {
             int num = parseNumber(input + 9, 10);
             int* factors = primeFactors(num);
+            //If num is prime
             if(factors[0] == 0) {
                 printf("%d is prime\n", num);
             }
+            //Else list factors
             else {
                 printf("Factors of %d:", num);
                 int i = -1;
                 int prev = factors[0];
                 int count = 0;
+                //List through each factor
                 while(factors[++i] != 0) {
                     if(factors[i] != prev) {
                         if(count != 1) printf(" %d^%d *", prev, count);
@@ -577,39 +642,22 @@ void runLine(char* input) {
         }
         else if(startsWith(input, "-ratio")) {
             Value out = calculate(input + 7, 0);
+            //If out is a number
             if(out.type == value_num) {
-                if(out.r != 0) printRatio(out.r, false);
-                if(out.i != 0) {
-                    if(out.r != 0) printf(" ");
-                    printRatio(out.i, out.r != 0);
-                    printf(" i");
-                }
-                if(out.u != 0) {
-                    char* string = toStringUnit(out.u);
-                    printf(" [%s]", string);
-                    free(string);
-                }
+                compPrintRatio(out.num);
                 printf("\n");
             }
+            //If it is a vector
             if(out.type == value_vec) {
                 int i, j;
                 printf("<");
                 int width = out.vec.width;
+                //Loop through all numbers
                 for(j = 0;j < out.vec.height;j++) for(i = 0;i < width;i++) {
                     Number num = out.vec.val[i + j * width];
                     if(i == 0 && j != 0) printf(";");
                     if(i != 0) printf(",");
-                    if(num.r != 0) printRatio(num.r, false);
-                    if(num.i != 0) {
-                        if(num.r != 0) printf(" ");
-                        printRatio(num.i, num.r != 0);
-                        printf(" i");
-                    }
-                    if(num.u != 0) {
-                        char* string = toStringUnit(num.u);
-                        printf(" [%s]", string);
-                        free(string);
-                    }
+                    compPrintRatio(num);
                 }
                 printf(">\n");
             }
@@ -642,20 +690,54 @@ void runLine(char* input) {
                 return;
             }
             printf("Current accuracy is %d hexadecimal digits.\n", globalAccuracy * 2);
+        //Debug commands
+        else if(startsWith(input, "-d")) {
+            if(startsWith(input, "-dsyntax")) {
+                input += 9;
+                char* normalSyntax = highlightSyntax(input);
+                char* advancedSyntax = advancedHighlight(input, normalSyntax, false, NULL, NULL);
+                int i;
+                int len = strlen(input);
+                for(i = 0;i < 2;i++) {
+                    char* syntax = i ? advancedSyntax : normalSyntax;
+                    if(i == 0) printf("Regular syntax:\n");
+                    if(i == 1) printf("Advanced syntax:\n");
+                    int j;
+                    int type = 0;
+                    putchar('"');
+                    for(j = 0;j < len + 1;j++) {
+                        if(syntax[j] != type) {
+                            if(type != 0) printf("\" %s, \"", syntaxTypes[type]);
+                            type = syntax[j];
+                        }
+                        putchar(input[j]);
+                    }
+                    putchar('"');
+                    putchar('\n');
+                }
+            }
+            else {
+                error("command '%s' is not a valid debugging command", input + 2);
+            }
         }
         else {
             error("command '%s' not recognized.", input + 1);
             return;
         }
     }
+    //If comment
     else if(input[0] == '#' || (input[0] == '/' && input[0] == '/')) {
+        //Replace $() instances
         if(useFancyInput) {
             printf("\0338\33[J\r");
-            if(useColors) printf("\33[1;32m");
+            if(useColors) printf("\33[32m");
             int i = -1;
+            //Print each character
             while(input[++i] != '\0') {
+                //If is $()
                 if(input[i] == '$' && input[i + 1] == '(') {
                     int j = i, endBracket = 0, bracketCount = 0;
+                    //Find end bracket
                     while(input[++j]) {
                         if(input[j] == '(') bracketCount++;
                         else if(input[j] == ')') if(--bracketCount == 0) {
@@ -663,44 +745,54 @@ void runLine(char* input) {
                             break;
                         }
                     }
+                    //If no end bracket
                     if(endBracket == 0) {
                         error("no ending bracket");
                         return;
                     }
+                    //Copy expression to stringToParse
                     char stringToParse[endBracket - i - 1];
                     memcpy(stringToParse, input + i + 2, endBracket - i - 2);
                     stringToParse[endBracket - i - 2] = '\0';
+                    //Calculate value
                     Value out = calculate(stringToParse, 0);
                     char* outString = valueToString(out, 10);
                     freeValue(out);
+                    //Print value
                     printf("%s", outString);
                     free(outString);
                     i = endBracket + 1;
                 }
+                //Print character
                 putchar(input[i]);
-
             }
+            //Print endline and color reset
             putchar('\n');
             printf("\33[0m");
-
         }
         //If it is a comment, ignore
         return;
     }
+    //If dot command
     else if(input[0] == '.') {
+        //If in raw mode
         if(!useFancyInput) {
             error("dot command is not supported in raw mode");
             return;
         }
+        //Delete input
         printf("\0338\033[J\r");
+        //Calculate value
         Value out = calculate(input + 1, 0);
         char* outString = valueToString(out, 10);
         freeValue(out);
+        //Print if no error
         if(!globalError) {
             if(useColors) printf("\33[1;34m= \033[0m%s", outString);
             else printf("= %s", outString);
         }
         free(outString);
+        //Read character before being erased by next readLine() call
         readCharacter();
         printf("\0338");
         return;

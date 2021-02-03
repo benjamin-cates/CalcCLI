@@ -16,6 +16,7 @@ bool globalError = false;
 int globalAccuracy = 0;
 int digitAccuracy = 0;
 bool useArb = false;
+bool ignoreError = false;
 Number NULLNUM;
 Value* history;
 Value NULLVAL;
@@ -89,9 +90,17 @@ const char metricNums[] = "yzafpnumchkMGTPEZY";
 const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 100, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
 const char* baseUnits[] = { "m", "kg", "s", "A", "K", "mol", "$", "bit" };
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char* mallocError = "malloc returned null";
 #pragma endregion
 #pragma region Units
-Number getUnitName(char* name) {
+unitStandard newUnit(const char* name, double mult, unit_t units) {
+    unitStandard out;
+    out.name = name;
+    out.multiplier = mult;
+    out.baseUnits = units;
+    return out;
+}
+Number getUnitName(const char* name) {
     int useMetric = -1;
     int i;
     for(i = 0; i < metricCount; i++)
@@ -119,12 +128,14 @@ char* toStringUnit(unit_t unit) {
         if(unitList[i].multiplier == -1 && unit == unitList[i].baseUnits) {
             //Copy its name into a dynamic memory address
             char* out = calloc(strlen(unitList[i].name), 1);
+            if(out == NULL) { error(mallocError);return NULL; }
             strcat(out, unitList[i].name);
             return out;
         }
     }
     //Else generate a custom string
     char* out = calloc(54, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     bool mult = false;
     for(i = 0; i < 8; i++) {
         char val = (unit >> (i * 8)) & 255;
@@ -815,7 +826,7 @@ Number newNum(double r, double i, unit_t u) {
     out.u = u;
     return out;
 }
-double parseNumber(char* num, double base) {
+double parseNumber(const char* num, double base) {
     int i;
     int numLength = strlen(num);
     int periodPlace = numLength;
@@ -845,10 +856,13 @@ double parseNumber(char* num, double base) {
 }
 char* toStringNumber(Number num, double base) {
     char* real = doubleToString(num.r, base);
+    if(real == NULL) real = "NULL";
     char* imag = doubleToString(num.i, base);
+    if(imag == NULL) imag = "NULL";
     char* unit = toStringUnit(num.u);
     int outLength = (num.u != 0 ? strlen(unit) + 2 : 0) + (num.i == 0 ? 0 : strlen(imag)) + strlen(real) + 3;
     char* out = calloc(outLength, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     memset(out, 0, outLength);
     if(num.r != 0 || num.i == 0) strcat(out, real);
     if(num.r != 0 && num.i > 0) strcat(out, "+");
@@ -856,7 +870,7 @@ char* toStringNumber(Number num, double base) {
         strcat(out, imag);
         strcat(out, "i");
     }
-    if(num.u != 0) {
+    if(unit != NULL) {
         strcat(out, "[");
         strcat(out, unit);
         strcat(out, "]");
@@ -869,12 +883,14 @@ char* toStringNumber(Number num, double base) {
 char* doubleToString(double num, double base) {
     if(num == 0 || base <= 1 || base > 36) {
         char* out = calloc(2, 1);
+        if(out == NULL) error(mallocError);
         out[0] = '0';
         return out;
     }
     if(isnan(num)) {
         int pos = 0;
         char* out = malloc(5);
+        if(out == NULL) { error(mallocError);return NULL; }
         if(num < 0) out[pos++] = '-';
         out[pos] = 'N';
         out[pos + 1] = 'a';
@@ -885,6 +901,7 @@ char* doubleToString(double num, double base) {
     if(isinf(num)) {
         int pos = 0;
         char* out = malloc(5);
+        if(out == NULL) { error(mallocError);return NULL; }
         if(num < 0) out[pos++] = '-';
         out[pos] = 'I';
         out[pos + 1] = 'n';
@@ -894,6 +911,7 @@ char* doubleToString(double num, double base) {
     }
     //Allocate string
     char* out = calloc(24, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     int outPos = 0;
     //Negative numbers
     if(num < 0) {
@@ -940,6 +958,7 @@ char* doubleToString(double num, double base) {
 void appendToHistory(Value num, double base, bool print) {
     if(historySize - 1 == historyCount) {
         history = realloc(history, (historySize + 25) * sizeof(Value));
+        if(history == NULL) { error(mallocError);return; }
         historySize += 25;
     }
     if(print) {
@@ -968,6 +987,8 @@ Number compMultiply(Number one, Number two) {
 Number compPower(Number one, Number two) {
     double logabs = log(one.r * one.r + one.i * one.i);
     double arg = atan2(one.i, one.r);
+    //the builtin atan2 is wrong for this edge case
+    if(one.i == 0 && one.r < 0) arg = M_PI;
     if(one.r == 0 && one.i == 0)
         arg = 0;
     double p1 = exp(two.r * 0.5 * logabs - two.i * arg);
@@ -1036,7 +1057,8 @@ Number compGamma(Number one) {
 }
 Number compTrig(int type, Number num) {
     //Trigonometric functions
-    if(type < 18) {
+    if(type < 21) {
+        //Apply degree ratio
         num.r *= degrat;
         num.i *= degrat;
         if(type == op_sin)
@@ -1045,18 +1067,35 @@ Number compTrig(int type, Number num) {
             return newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
         if(type == op_tan)
             return compDivide(compSine(num), newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
+        if(type == op_sinh) {
+            //sinh(x+y) = sinh(x)*cosh(y)+cosh(x)*sinh(y)
+            //sinh(i*x) = i * sin(x)
+            //sinh(a+bi) = sinh(a)*cos(b) + cosh(a) * i * sin(b)
+            return newNum(sinh(num.r) * cos(num.i), cosh(num.r) * sin(num.i), num.u);
+        }
+        if(type == op_cosh) {
+            //cosh(x+y) =cosh(x)*cosh(y)+sinh(x)*sinh(y)
+            //cosh(x*i) = cos(x)
+            //cosh(a+bi) = cosh(a)*cos(b)+sinh(a)*i*sin(b)
+            return newNum(cosh(num.r) * cos(num.i), sinh(num.r) * sin(num.i), num.u);
+        }
+        if(type == op_tanh) {
+            //tanh(x+y) = (tanh(x)+tanh(y))/(1+tanh(x)*tanh(y))
+            //tanh(y*i) = i * tan(y)
+            //tanh(a+bi) = (tanh(a)+i*tan(b))/(1+tanh(a)*i*tan(b))
+            Number numer = newNum(tanh(num.r), tan(num.i), num.u);
+            Number denom = newNum(1, tanh(num.r) * tan(num.i), 0);
+            return compDivide(numer, denom);
+        }
         Number out;
         bool reciprocal = false;
         // csc, sec, tan
-        if(type > 11) {
-            reciprocal = true;
-            type -= 3;
-        }
-        if(type == op_sin)
+        if(type == op_csc || type == op_sec || type == op_cot) reciprocal = true;
+        if(type == op_csc)
             out = compSine(num);
-        if(type == op_cos)
+        if(type == op_sec)
             out = newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), num.u);
-        if(type == op_tan)
+        if(type == op_cot)
             out = compDivide(compSine(num), newNum(cos(num.r) * cosh(num.i), sin(num.r) * sinh(num.i), 0));
         if(reciprocal) {
             double denom = out.r * out.r + (out.i * out.i);
@@ -1070,7 +1109,8 @@ Number compTrig(int type, Number num) {
         //https://proofwiki.org/wiki/Definition:Inverse_Sine/Arcsine
         int opID = type;
         Number out;
-        if(type > 20 && type < 24) {
+        //acsc, asec, acot: invert and change opID
+        if(type == op_acsc || type == op_asec || type == op_acot) {
             unit_t unit = num.u;
             num = compDivide(newNum(1, 0, 0), num);
             num.u = unit;
@@ -1085,8 +1125,8 @@ Number compTrig(int type, Number num) {
                 out = newNum(1.570796326794896619 - atan2(num.i, num.r), 0.5 * log(num.r * num.r + num.i * num.i), num.u);
             else out = newNum(atan2(num.i, num.r), -0.5 * log(num.r * num.r + num.i * num.i), num.u);
         }
-        if(opID == op_tan) {
-            Number out = compDivide(newNum(-num.r, 1 - num.i, 0), newNum(num.r, 1 + num.i, 0));
+        if(opID == op_atan) {
+            out = compDivide(newNum(-num.r, 1 - num.i, 0), newNum(num.r, 1 + num.i, 0));
             out = newNum(0.5 * atan2(out.i, out.r), -0.25 * log(out.r * out.r + out.i * out.i), num.u);
         }
         //Hyperbolic Arccosine and hyperbolic sine
@@ -1107,6 +1147,7 @@ Number compTrig(int type, Number num) {
             Number div = compDivide(p1, p2);
             out = newNum(0.25 * log(div.r * div.r + div.i * div.i), 0.5 * atan2(div.i, div.r), num.u);
         }
+        //Apply degree ratio
         out.r /= degrat;
         out.i /= degrat;
         return out;
@@ -1148,6 +1189,7 @@ Vector newVecScalar(Number num) {
     Vector out;
     out.width = out.height = out.total = 1;
     out.val = malloc(sizeof(Number));
+    if(out.val == NULL) error(mallocError);
     out.val[0] = num;
     return out;
 }
@@ -1157,6 +1199,7 @@ Vector newVec(short width, short height) {
     out.height = height;
     out.total = width * height;
     out.val = calloc(out.total, sizeof(Number));
+    if(out.val == NULL) error(mallocError);
     return out;
 }
 Number determinant(Vector vec) {
@@ -1357,6 +1400,7 @@ char* valueToString(Value val, double base) {
             len += 1 + strlen(values[i + j * vec.width]);
         }
         char* out = calloc(len, sizeof(char));
+        if(out == NULL) { error(mallocError);return NULL; }
         strcat(out, "<");
         for(j = 0;j < vec.height;j++) for(i = 0;i < vec.width;i++) {
             if(i != 0) strcat(out, ",");
@@ -1442,6 +1486,7 @@ Value copyValue(Value val) {
     }
     if(val.type == value_func) {
         out.tree = malloc(sizeof(Tree));
+        if(out.tree == NULL) error(mallocError);
         *out.tree = treeCopy(*val.tree, NULL, false, false, false);
         out.argNames = argListCopy(val.argNames);
     }
@@ -1525,7 +1570,8 @@ Value valAdd(Value one, Value two) {
         out.type = value_num;
         out.r = one.r + two.r;
         out.i = one.i + two.i;
-        if(one.u == 0) out.u = two.u;
+        if(one.u == two.u) out.u = one.u;
+        else if(one.u == 0) out.u = two.u;
         else if(two.u == 0) out.u = one.u;
         else error("cannot add two different units", NULL);
         return out;
@@ -1739,6 +1785,7 @@ Tree newOpVal(double r, double i, unit_t u) {
 }
 Tree* allocArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
     Tree* out = malloc(2 * sizeof(Tree));
+    if(out == NULL) { error(mallocError);return NULL; }
     if(copyOne)
         out[0] = treeCopy(one, NULL, 0, 0, 0);
     else
@@ -1751,6 +1798,7 @@ Tree* allocArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
 }
 Tree* allocArg(Tree one, bool copy) {
     Tree* out = malloc(sizeof(Tree));
+    if(out == NULL) { error(mallocError);return NULL; }
     if(copy)
         out[0] = treeCopy(one, NULL, 0, 0, 0);
     else
@@ -1782,6 +1830,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         char* treeString = treeToString(tree.branch[0], true, newArgNames);
         int argListLen = strlen(argListString);
         char* out = calloc(argListLen + 2 + strlen(treeString) + 1, 1);
+        if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argListString);
         strcpy(out + argListLen, "=>");
         strcpy(out + argListLen + 2, treeString);
@@ -1794,12 +1843,14 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     if(tree.optype == optype_argument) {
         if(argNames == NULL) {
             char* num = calloc(10, 1);
+            if(num == NULL) { error(mallocError);return NULL; }
             sprintf(num, "{%d}", tree.op);
             return num;
         }
         else {
             int len = strlen(argNames[tree.op]);
             char* out = calloc(len + 1, 1);
+            if(out == NULL) { error(mallocError);return NULL; }
             memcpy(out, argNames[tree.op], len);
             return out;
         }
@@ -1818,6 +1869,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         if(tree.op == op_add) op = "+";
         if(tree.branch == NULL) {
             char* out = calloc(10, 1);
+            if(out == NULL) { error(mallocError);return NULL; }
             snprintf(out, 10, "NULL%sNULL", op);
             return out;
         }
@@ -1828,6 +1880,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         //Allocate string
         int len = strlen(one) + strlen(two) + 2 + bracket * 2;
         char* out = calloc(len, 1);
+        if(out == NULL) { error(mallocError);return NULL; }
         //Print -(one) if tree.op==op_neg, or (one op two) otherwise
         snprintf(out, len, "%s%s%s%s%s%s", tree.op == op_neg ? "-" : "", bracket ? "(" : "", one, tree.op == op_neg ? "" : op, two, bracket ? ")" : "");
         //Free one and two, return
@@ -1845,6 +1898,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
             len += 1 + strlen(values[i]);
         }
         char* out = calloc(len, sizeof(char));
+        if(out == NULL) { error(mallocError);return NULL; }
         strcat(out, "<");
         int height = tree.argCount / tree.argWidth;
         for(j = 0;j < height;j++) for(i = 0;i < tree.argWidth;i++) {
@@ -1861,7 +1915,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     int i;
     //Get function name and name length
     int strLength;
-    const char* functionName;
+    const char* functionName = "ERROR";
     if(tree.optype == optype_builtin) {
         strLength = stdfunctions[tree.op].nameLen + 2;
         functionName = stdfunctions[tree.op].name;
@@ -1877,6 +1931,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     }
     //Compile together the strings of the branches
     char* out = calloc(strLength, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     strcat(out, functionName);
     if(tree.argCount == 0) return out;
     strcat(out, "(");
@@ -1888,7 +1943,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     out[strLength - 2] = ')';
     return out;
 }
-Value computeTree(Tree tree, Value* args, int argLen) {
+Value computeTree(Tree tree, const Value* args, int argLen) {
     if(tree.optype == optype_builtin) {
         if(tree.op == op_val)
             return copyValue(tree.value);
@@ -1969,7 +2024,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                         error("argument error");
                         return NULLVAL;
                     }
-                    Value vec = args[tree.branch[0].op];
+                    vec = args[tree.branch[0].op];
                 }
                 else if(tree.branch[0].optype == optype_builtin && tree.branch[0].op == op_val) {
                     vec = tree.branch[0].value;
@@ -2158,9 +2213,14 @@ Value computeTree(Tree tree, Value* args, int argLen) {
             }
             if(tree.op == op_arg) {
                 if(one.type == value_num) {
-                    one.r = atan2(one.i, one.r);
-                    one.i = 0;
-                    return one;
+                    Value out;
+                    out.type = value_num;
+                    out.r = atan2(one.i, one.r);
+                    //The builtin atan2 is wrong for this edge case
+                    if(one.i == 0 && one.r < 0) out.r = M_PI;
+                    out.i = 0;
+                    out.u = one.u;
+                    return out;
                 }
                 if(one.type == value_vec) {
                     int i;
@@ -2398,6 +2458,7 @@ Value computeTree(Tree tree, Value* args, int argLen) {
                     if(tree.argCount > 1) freeValue(two);
                 }
                 Value* inputs = calloc(tree.argCount, sizeof(Value));
+                if(inputs == NULL) { error(mallocError);return NULLVAL; }
                 inputs[0] = two;
                 int i;
                 for(i = 1;i < argCount;i++) {
@@ -2607,6 +2668,8 @@ Value computeTree(Tree tree, Value* args, int argLen) {
         out.type = value_func;
         out.tree = malloc(sizeof(Tree));
         Tree* replaceArgs = calloc(argLen, sizeof(Tree));
+        if(replaceArgs == NULL) { error(mallocError);return NULLVAL; }
+        if(out.tree == NULL || replaceArgs == NULL) { error(mallocError);return NULLVAL; }
         int i;
         for(i = 0;i < argLen;i++) {
             replaceArgs[i] = newOpValue(args[i]);
@@ -2617,11 +2680,12 @@ Value computeTree(Tree tree, Value* args, int argLen) {
     }
     return NULLVAL;
 }
-Tree treeCopy(Tree tree, Tree* args, bool unfold, int replaceArgs, bool optimize) {
+Tree treeCopy(Tree tree, const Tree* args, bool unfold, int replaceArgs, bool optimize) {
     Tree out = tree;
     if(tree.optype == optype_anon) {
         out.argNames = argListCopy(tree.argNames);
         out.branch = malloc(sizeof(Tree));
+        if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
         *out.branch = treeCopy(tree.branch[0], args, unfold, replaceArgs, optimize);
         out.argWidth -= replaceArgs;
         return out;
@@ -2638,7 +2702,10 @@ Tree treeCopy(Tree tree, Tree* args, bool unfold, int replaceArgs, bool optimize
         else out.op -= replaceArgs;
     }
     //Copy tree branches
-    if(tree.argCount != 0) out.branch = malloc(tree.argCount * sizeof(Tree));
+    if(tree.argCount != 0) {
+        out.branch = malloc(tree.argCount * sizeof(Tree));
+        if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
+    }
     int i;
     bool crunch = true;
     for(i = 0; i < tree.argCount; i++) {
@@ -2670,7 +2737,7 @@ int getCharType(char in, int curType, int base, bool useUnits) {
     if((in >= '*' && in <= '/' && in != '.') || in == '%' || in == '^') return 6;
     return -1;
 }
-Tree generateTree(char* eq, char** argNames, double base) {
+Tree generateTree(const char* eq, char** argNames, double base) {
     bool useUnits = base != 0;
     if(base == 0) base = 10;
     if(verbose) {
@@ -2715,23 +2782,18 @@ Tree generateTree(char* eq, char** argNames, double base) {
             sectionTypes[sectionCount] = type;
             sections[sectionCount++] = i;
         }
-        //Closed square brackets with _
+        //Closed square brackets with underscore
         if(ch == ']' && eq[i + 1] == '_' && brackets == 1) {
             sectionTypes[sectionCount - 1] = 5;
             curType = getCharType(eq[i + 2], curType, base, useUnits);
+            if(eq[i + 2] == '[' || eq[i + 2] == '(' || eq[i + 2] == '<') {
+                brackets++;
+                i++;
+                int type = ch == '(' ? 3 : (ch == '[' ? 4 : 7);
+                curType = type;
+            }
             brackets--;
             i++;
-            continue;
-        }
-        // (x,y)=> arrow notation
-        if(ch == ')' && brackets == 1 && eq[i + 1] == '=' && eq[i + 2] == '>') {
-            sectionTypes[sectionCount - 1] = 8;
-            i += 3;
-            curType = getCharType(eq[i], curType, base, useUnits);
-            brackets--;
-            if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
-                brackets++;
-            }
             continue;
         }
         //Close brackets
@@ -2743,15 +2805,14 @@ Tree generateTree(char* eq, char** argNames, double base) {
             continue;
         }
         if(brackets != 0) continue;
-        //Arrow notation with a single variable
-        if(ch == '=' && curType == 1 && eq[i + 1] == '>') {
+        //Arrow notation
+        if(ch == '=' && (curType == 1 || curType == 3) && eq[i + 1] == '>') {
+            //Set current type to 8 and fill the section with the rest of the string
             sectionTypes[sectionCount - 1] = 8;
-            i += 2;
-            curType = getCharType(eq[i], curType, base, useUnits);
-            if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
-                brackets++;
-            }
-            continue;
+            i++;
+            curType = 8;
+            while(eq[++i] != '\0');
+            break;
         }
         //Get character type
         int chType = getCharType(ch, curType, base, useUnits);
@@ -2784,7 +2845,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
     bool nextNegative = false;
     for(i = 0; i < sectionCount; i++) {
         //Get section substring
-        int j, sectionLength = sections[i + 1] - sections[i];
+        int sectionLength = sections[i + 1] - sections[i];
         char section[sectionLength + 1];
         memcpy(section, eq + sections[i], sectionLength);
         section[sectionLength] = '\0';
@@ -2852,6 +2913,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
                 return NULLOPERATION;
             }
             Tree* args = calloc(commaCount, sizeof(Tree));
+            if(args == NULL) { error(mallocError);return NULLOPERATION; }
             for(j = 0; j < commaCount; j++) {
                 char argText[commas[j + 1] - commas[j] + 1];
                 memset(argText, 0, sizeof(argText));
@@ -2903,20 +2965,27 @@ Tree generateTree(char* eq, char** argNames, double base) {
         else if(sectionTypes[i] == 6) {
             int opID = 0;
             //For negative operations eg. *-
-            if(first == '*' && section[1] == '*')
-                opID = op_pow;
-            else if(sectionLength > 1) {
+            if(sectionLength > 1) {
                 if(section[1] == '-')
                     nextNegative = true;
+                // ** as pow
+                else if(first == '*' && section[1] == '*') {
+                    if(section[2] == '-') nextNegative = true;
+                    ops[i] = newOp(NULL, 0, op_pow, 0);
+                    continue;
+                }
+                //Else invalid
                 else
                     error("'%s' not a valid operator", section);
             }
-            else if(first == '-' && i == 0) {
+            //If - is the first character and first section
+            if(first == '-' && i == 0) {
                 //This operation is multplied by the next value, it is a place holder
                 ops[i] = newOpVal(1, 0, 0);
                 nextNegative = true;
                 continue;
             }
+            //Standard operation IDs
             else if(first == '^') opID = op_pow;
             else if(first == '%') opID = op_mod;
             else if(first == '*') opID = op_mult;
@@ -2924,22 +2993,24 @@ Tree generateTree(char* eq, char** argNames, double base) {
             else if(first == '+') opID = op_add;
             else if(first == '-') opID = op_sub;
             else error("'%s' is not a valid operator", section);
+            // Insert operation with the correct id
             ops[i] = newOp(NULL, 0, opID, 0);
             continue;
         }
         else if(sectionTypes[i] == 8) {
+            //Get arglist
             char** argList = parseArgumentList(section);
             char** appendedArgList = mergeArgList(argNames, argList);
+            //Find '=' position
             int eqPos = 0;
             while(section[++eqPos] != '=');
-            if(section[eqPos + 2] == '(') {
-                eqPos++;
-                section[sectionLength - 1] = '\0';
-            }
+            //Generate tree
             Tree tree = generateTree(section + eqPos + 2, appendedArgList, base);
             free(appendedArgList);
+            //Return tree
             Tree out;
             out.branch = malloc(sizeof(Tree));
+            if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
             *(out.branch) = tree;
             out.optype = optype_anon;
             out.argNames = argList;
@@ -3029,6 +3100,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             }
             section[sectionLength - 1] = '\0';
             Tree* args = calloc(width * height, sizeof(Tree));
+            if(args == NULL) { error(mallocError);return NULLOPERATION; }
             for(y = 0;y < height;y++) for(x = 0;x < width;x++) {
                 if(pos[y][x] == 0 && x != 0) {
                     args[x + y * width] = NULLOPERATION;
@@ -3043,7 +3115,7 @@ Tree generateTree(char* eq, char** argNames, double base) {
             error("unable to parse '%s'", section);
             return NULLOPERATION;
         }
-        if(nextNegative && !(first > '*' && first < '/') && first != '^' && first != '%') {
+        if(nextNegative && !(first > '*' && first < '/' && first != '.') && first != '^' && first != '%') {
             nextNegative = false;
             ops[i] = newOp(allocArg(ops[i], false), 1, op_neg, 0);
         }
@@ -3074,17 +3146,25 @@ Tree generateTree(char* eq, char** argNames, double base) {
     }
     ops[i] = ops[i + offset];
     //Condense operations: ^%*/+-
-    for(i = 3; i < 9; i++) {
+    for(i = 0; i < 3; i++) {
         offset = 0;
         int j;
         for(j = 0; j < sectionCount + offset; j++) {
             ops[j] = ops[j + offset];
-            if(ops[j].op != i || ops[j].optype != optype_builtin || ops[j].argCount != 0) continue;
+            //Configure order of operations
+            int op = ops[j].op;
+            if(i == 0) if(op != op_pow) continue;
+            if(i == 1) if(op != op_mod && op != op_mult && op != op_div) continue;
+            if(i == 2) if(op != op_add && op != op_sub) continue;
+            //Confirm that current item is a builtin operation
+            if(ops[j].optype != optype_builtin || ops[j].argCount != 0) continue;
+            //Check for missing argument
             if(j == 0 || j == sectionCount - 1) {
                 error("missing argument in operation", NULL);
                 return NULLOPERATION;
             }
-            ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, i, 0);
+            //Combine previous and next, set offset
+            ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, op, 0);
             ops[j - 1] = ops[j];
             j--;
             sectionCount -= 2;
@@ -3316,6 +3396,7 @@ Tree derivative(Tree tree) {
             out.argCount = tree.argCount;
             out.argWidth = tree.argWidth;
             out.branch = malloc(tree.argCount * sizeof(Tree));
+            if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
             int i;
             for(i = 0;i < tree.argCount;i++) {
                 out.branch[i] = derivative(tree.branch[i]);
@@ -3326,7 +3407,7 @@ Tree derivative(Tree tree) {
     error("not all functions are supported in dx currently");
     return NULLOPERATION;
 }
-Value calculate(char* eq, double base) {
+Value calculate(const char* eq, double base) {
     //Clean input
     char* cleanInput = inputClean(eq);
     if(globalError) return NULLVAL;
@@ -3358,10 +3439,12 @@ char** argListCopy(char** argList) {
     if(argList == NULL) return NULL;
     int len = argListLen(argList);
     char** out = calloc(len + 1, sizeof(char*));
+    if(out == NULL) { error(mallocError);return NULL; }
     int i;
     for(i = 0;i < len;i++) {
         int strLen = strlen(argList[i]);
         out[i] = calloc(strLen + 1, 1);
+        if(out[i] == NULL) { error(mallocError);return NULL; }
         strcpy(out[i], argList[i]);
     }
     return out;
@@ -3371,6 +3454,7 @@ char** mergeArgList(char** one, char** two) {
     if(one != NULL) oneLen = argListLen(one);
     if(two != NULL) twoLen = argListLen(two);
     char** out = calloc(oneLen + twoLen + 1, sizeof(char*));
+    if(out == NULL) { error(mallocError);return NULL; }
     memcpy(out, one, oneLen * sizeof(char*));
     memcpy(out + oneLen, two, twoLen * sizeof(char*));
     return out;
@@ -3383,10 +3467,12 @@ char* argListToString(char** argList) {
     }
     if(i == 1) {
         char* out = calloc(strlen(argList[0]), 1);
+        if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argList[0]);
         return out;
     }
     char* out = calloc(totalLen + 3, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     out[0] = '(';
     i = -1;
     while(argList[++i]) {
@@ -3397,8 +3483,8 @@ char* argListToString(char** argList) {
     out[totalLen] = ')';
     return out;
 }
-char** parseArgumentList(char* list) {
-    if(list[0] == '=') {
+char** parseArgumentList(const char* list) {
+    if(list[0] == '=' || list[0] == '\0') {
         return calloc(1, sizeof(char*));
     }
     int listLen = strlen(list);
@@ -3417,10 +3503,12 @@ char** parseArgumentList(char* list) {
     }
     //Null terminated
     char** out = calloc(argCount + 1, sizeof(char*));
+    if(out == NULL) { error(mallocError);return NULL; }
     int j;
     for(i = 0;i < argCount;i++) {
         int stringPos = 0;
         out[i] = calloc(commaPos[i + 1] - commaPos[i], 1);
+        if(out[i] == NULL) { error(mallocError);return NULL; }
         for(j = commaPos[i] + 1;j < commaPos[i + 1];j++) {
             if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9')) out[i][stringPos++] = list[j];
             else if(list[j] >= 'A' && list[j] <= 'Z') out[i][stringPos++] = list[j] + 32;
@@ -3428,7 +3516,7 @@ char** parseArgumentList(char* list) {
             else error("invalid '%c' in argument list", list[j]);
         }
         if(out[i][0] < 'a') error("argument name '%s' starts with a numeral", out[i]);
-        if(globalError) {
+        if(globalError && !ignoreError) {
             for(;i >= 0;i--) free(out[i]);
             free(out);
             return NULL;
@@ -3446,7 +3534,7 @@ Function newFunction(char* name, Tree* tree, char argCount, char** argNames) {
     out.tree = tree;
     return out;
 }
-void generateFunction(char* eq) {
+void generateFunction(const char* eq) {
     //Parse first half a(x)
     int i, equalPos, openBracket = 0, argCount = 1;
     for(i = 0; i < strlen(eq); i++) {
@@ -3473,6 +3561,7 @@ void generateFunction(char* eq) {
     }
     //Get function name
     char* name = calloc(openBracket + 1, 1);
+    if(name == NULL) { error(mallocError);return; }
     for(i = 0;i < openBracket;i++) {
         if(eq[i] >= 'A' && eq[i] <= 'Z') name[i] = eq[i] + 32;
         else name[i] = eq[i];
@@ -3497,12 +3586,12 @@ void generateFunction(char* eq) {
     }
     //Get argument names
     char** argNames = parseArgumentList(eq + openBracket);
-    if(argNames == NULL) {
+    //Compute tree
+    Tree* tree = malloc(sizeof(Tree));
+    if(argNames == NULL || tree == NULL) {
         free(name);
         return;
     }
-    //Compute tree
-    Tree* tree = malloc(sizeof(Tree));
     char* cleaninput = inputClean(eq + equalPos + 1);
     *tree = generateTree(cleaninput, argNames, 0);
     free(cleaninput);
@@ -3516,11 +3605,12 @@ void generateFunction(char* eq) {
     //Append to functions
     if(functionArrayLength == numFunctions) {
         customfunctions = realloc(customfunctions, (functionArrayLength + 10) * sizeof(Function));
+        if(customfunctions == NULL) { error(mallocError);return; }
         functionArrayLength += 10;
     }
     customfunctions[numFunctions++] = newFunction(name, tree, argCount, argNames);
 }
-Tree findFunction(char* name) {
+Tree findFunction(const char* name) {
     Tree out;
     //Get function id from name
     int len = strlen(name), i;
@@ -3559,7 +3649,7 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
 {0, 0, " "}, {0, 0, " "},
     {1, 4, "sqrt"}, {1, 4, "cbrt"}, {1, 3, "exp"}, {1, 2, "ln"}, {1, 6, "logten"}, {2, 3, "log"}, {1, 4, "fact"},
     {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
-    {1, 3, "sgn"}, {1, 3, "abs"}, {1, 3, "arg"}, {1, 4, "norm"},
+    {1, 3, "sgn"}, {1, 3, "abs"}, {1, 3, "arg"}, {0, 0, " "},
     {1, 5, "round"}, {1, 5, "floor"}, {1, 4, "ceil"}, {1, 4, "getr"}, {1, 4, "geti"}, {1, 4, "getu"}, {2, 6, "grthan"}, {2, 5, "equal"}, {2, 3, "min"}, {2, 3, "max"}, {3, 4, "lerp"}, {2, 4, "dist"},
     {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
     {1, 3, "not"}, {0, 0, " "}, {2, 3, "and"}, {2, 2, "or"}, {2, 3, "xor"}, {2, 2, "ls"}, {2, 2, "rs"},
@@ -3574,13 +3664,14 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
 };
 #pragma endregion
 #pragma region Main Program
-char* inputClean(char* input) {
+char* inputClean(const char* input) {
     if(input[0] == '\0') {
         error("no equation", NULL);
         return NULL;
     }
     //Allocate out
     char* out = calloc(strlen(input) + 1, 1);
+    if(out == NULL) { error(mallocError);return NULL; }
     int outPos = 0, i = 0;
     char prev = 0;
     bool allowHex = false, insideSquare = false;
@@ -3662,11 +3753,13 @@ void startup() {
     historySize = 10;
     //Allocate functions
     customfunctions = calloc(functionArrayLength, sizeof(Function));
+    if(history == NULL || customfunctions == NULL) error(mallocError);
 }
 #pragma endregion
 #pragma region Misc
 int* primeFactors(int num) {
     int* out = calloc(11, sizeof(int));
+    if(out == NULL) { error(mallocError);return NULL; }
     int outSize = 10;
     int outPos = 0;
     int max = num / 2;
@@ -3676,6 +3769,7 @@ int* primeFactors(int num) {
         num = num / 2;
         if(outPos == outSize) {
             out = realloc(out, (outSize + 11) * sizeof(int));
+            if(out == NULL) { error(mallocError);return NULL; }
             memset(out + outSize, 0, 11 * sizeof(int));
             outSize += 10;
         }
@@ -3687,6 +3781,7 @@ int* primeFactors(int num) {
             num = num / i;
             if(outPos == outSize) {
                 out = realloc(out, (outSize + 11) * sizeof(int));
+                if(out == NULL) { error(mallocError);return NULL; }
                 memset(out + outSize, 0, 11 * sizeof(int));
                 outSize += 10;
             }
@@ -3742,5 +3837,429 @@ void getRatio(double num, int* numerOut, int* denomOut) {
     }
     *numerOut = denom;
     *denomOut = numer;
+}
+int getVariableType(const char* name, bool useUnits, char** argNames, char** localVars) {
+    //Remove spaces
+    int len = strlen(name);
+    char nameClear[len + 1];
+    int i = -1;
+    int j = 0;
+    while(name[++i] != '\0') if(name[i] != ' ') {
+        if(name[i] >= 'A' && name[i] <= 'Z') {
+            nameClear[j++] = name[i] + 'a' - 'A';
+        }
+        else nameClear[j++] = name[i];
+    }
+    nameClear[j] = '\0';
+    int nameLen = strlen(nameClear);
+    i = 0;
+    //Units
+    if(useUnits) {
+        char nameCase[len+1];
+        i=-1;
+        j=0;
+        while(name[++i]!='\0') if(name[i]!=' ') nameCase[j++]=name[i];
+        nameCase[j]='\0';
+        int prefix = -1;
+        char first = nameCase[0];
+        for(i = 0;i < metricCount;i++) if(first == metricNums[i]) {
+            prefix = i;
+            break;
+        }
+        if(prefix != -1) {
+            const char* nameNoPrefix = nameCase + 1;
+            for(i = 0;i < unitCount;i++) {
+                const char* unit = unitList[i].name;
+                if(strcmp(nameCase, unit) == 0) return 17;
+                if(strcmp(nameNoPrefix, unit) == 0) return 17;
+            }
+        }
+        else for(i = 0;i < unitCount;i++) {
+            const char* unit = unitList[i].name;
+            if(strcmp(nameCase, unit) == 0) return 17;
+        }
+    }
+    //Argument Names
+    if(argNames != NULL) {
+        i = -1;
+        while(argNames[++i] != NULL) {
+            if(strcmp(argNames[i], nameClear) == 0) return 16;
+        }
+    }
+    //Local Variables
+    if(localVars != NULL) {
+        i = -1;
+        while(localVars[++i] != NULL) {
+            if(strcmp(localVars[i], nameClear) == 0) return 18;
+        }
+    }
+    //Custom functions
+    for(i = 0;i < numFunctions;i++) {
+        if(customfunctions[i].nameLen != nameLen) continue;
+        if(strcmp(customfunctions[i].name, nameClear) == 0) return 15;
+    }
+    //Builtin functions
+    //Possibly use a sorted list?
+    for(i = 0;i < immutableFunctions;i++) {
+        if(stdfunctions[i].nameLen != nameLen) continue;
+        if(strcmp(stdfunctions[i].name, nameClear) == 0) return 14;
+    }
+    return 13;
+}
+const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Null11","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable" };
+char* highlightSyntax(const char* eq) {
+    /*
+        0 - Null (white)
+        1 - Number
+        2 - Variable
+        3 - Comment (green)
+        4 - Error character (red)
+        5 - Bracket (white)
+        6 - Operator (bright black)
+        7 - String (yellow)
+        8 - Command (blue)
+        9 - Space (white)
+        10 - Escape sequence (for strings)
+        Advanced only
+        11 -
+        12 - Invalid operator
+        13 - Invalid varible name
+        14 - Builtin variable
+        15 - Custom functions
+        16 - Arguments
+        17 - Unit
+        18 - Local Variable
+    */
+    int eqLen = strlen(eq);
+    char* out = calloc(eqLen, 1);
+    bool isComment = false;
+    int i = -1;
+    if(eq[0] == '/' && eq[1] == '/') {
+        out[0] = out[1] = 3;
+        isComment = true;
+        i += 2;
+    }
+    if(eq[0] == '#') {
+        out[0] = 3;
+        isComment = true;
+        i += 1;
+    }
+    if(eq[0] == '.') {
+        i++;
+        out[0] = 8;
+    }
+    int bracket = 0;
+    if(eq[0] == '-') {
+        int j = 0;
+        while(eq[j] != ' ' && eq[j] != '\0') {
+            out[j] = 8;
+            j++;
+        }
+        i = j - 1;
+    }
+    int state = 0;
+    int base = 10;
+    while(eq[++i] != '\0') {
+        char ch = eq[i];
+        if(ch == ' ' || ch == '\t') out[i] = 9;
+        if(state == 0) base = 10;
+        //Commented characters
+        if(bracket == 0 && isComment) {
+            out[i] = 3;
+            if(eq[i] == '$' && eq[i + 1] == '(') {
+                out[i] = 6;
+                out[i + 1] = 5;
+                i++;
+                bracket++;
+                continue;
+            }
+            continue;
+        }
+        if(ch == '(' || ch == '[' || ch == '<' || ch == ')' || ch == ']' || (ch == '>' && eq[i - 1] != '=')) {
+            out[i] = 5;
+            state = 0;
+            if(ch == '(' || ch == '[' || ch == '<') bracket++;
+            else {
+                bracket--;
+                // Error if no opening bracket
+                if(bracket < 0) out[i] = 4;
+                // ]_ base syntax
+                if(ch == ']') {
+                    if(eq[i + 1] == '_') {
+                        out[i + 1] = 6;
+                        i++;
+                    }
+                }
+            }
+            continue;
+        }
+        if(ch == ',') {
+            state = 0;
+            out[i] = 5;
+            continue;
+        }
+        if(ch == '*' || ch == '/' || ch == '+' || ch == '-' || ch == '^' || ch == '%') {
+            state = 0;
+            out[i] = 6;
+            continue;
+        }
+        if(ch == '=' && eq[i + 1] == '>') {
+            out[i] = 6;
+            out[i + 1] = 6;
+            i++;
+            continue;
+        }
+        //Numbers
+        if(((ch >= '0' && ch <= '9') || ch == '.') && state != 2) {
+            if(ch == '0' && state != 1) {
+                char b = eq[i + 1];
+                base = 10;
+                if(b == 'x') base = 16;
+                if(b == 'd') base = 10;
+                if(b == 'o') base = 8;
+                if(b == 't') base = 3;
+                if(b == 'b') base = 2;
+                if(base != 10) {
+                    out[i] = 1;
+                    i++;
+                }
+            }
+            out[i] = 1;
+            state = 1;
+            continue;
+        }
+        // ABCDEF for hexadecimal
+        if(ch >= 'A' && state != 2 && (ch - 'A' < base - 10)) {
+            out[i] = 1;
+            state = 1;
+            continue;
+        }
+        //Variables
+        if((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '$' || (state == 2 && ((ch >= '0' && ch <= '9') || ch == '.' || ch == '_'))) {
+            out[i] = 2;
+            state = 2;
+            continue;
+        }
+        //Spaces
+        if(ch == ' ' || ch == '\t') out[i] = 9;
+        //Error character
+        else {
+            out[i] = 4;
+            state = 0;
+        }
+    }
+    if(bracket > 0) {
+        bracket = 0;
+        int i = eqLen - 1;
+        //Find unmatched brackets
+        for(i = eqLen - 1;i > -1;i--) {
+            if(out[i] == 3) continue;
+            char ch = eq[i];
+            if(ch == '(' || ch == '<' || ch == '[') {
+                bracket--;
+                if(bracket < 0) {
+                    out[i] = 4;
+                    bracket = 0;
+                }
+            }
+            if(ch == ')' || (ch == '>' && eq[i - 1] != '=') || ch == ']') {
+                bracket++;
+            }
+
+        }
+    }
+    return out;
+}
+char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, char** arguments, char** localVariables) {
+    int i = -1;
+    int prev = 0;
+    int prevPos = 0;
+    int bracket = 0;
+    bool useUnits = forceUnits;
+    int unitBracketID = -1;
+    int len = strlen(eq);
+    char* out = calloc(len, 1);
+    memcpy(out, syntax, len);
+    char** oldArgs = arguments;
+    char** freeArgs = NULL;
+    if(eq[0] == '-') {
+        char name[strlen(eq)];
+        int j = 0;
+        int nameI = 0;
+        while(eq[++j] != ' ' && eq[j] != '\0') {
+            name[nameI++] = eq[j];
+        }
+        name[nameI] = '\0';
+        if(strcmp(name, "f") == 0) {
+
+        }
+        if(strcmp(name, "dx") == 0 || strcmp(name, "g") == 0) {
+            char x[2] = "x";
+            char* xArgs[2];
+            xArgs[0] = x;
+            xArgs[1] = NULL;
+            arguments = mergeArgList(arguments, xArgs);
+        }
+        if(strcmp(name, "def") == 0) {
+            int equal = 4;
+            while(eq[++equal] != '=' && eq[equal] != '\0');
+            if(eq[equal] == '=') {
+                out[equal] = 8;
+                //Find ( position
+                int br = 4;
+                while(eq[++br] != '(' && br < equal);
+                if(br != equal) {
+                    ignoreError = true;
+                    char** args = parseArgumentList(eq + br);
+                    ignoreError = false;
+                    freeArgs = args;
+                    arguments = mergeArgList(arguments, args);
+                }
+                memset(out + 5, 15, br - 5);
+            }
+        }
+        if(strcmp(name, "degset") == 0) {
+            char rad[4] = "rad";
+            char deg[4] = "deg";
+            char grad[5] = "grad";
+            char* args[4];
+            args[0] = rad;
+            args[1] = deg;
+            args[2] = grad;
+            args[3] = NULL;
+            arguments = mergeArgList(arguments, args);
+        }
+    }
+    while(eq[i] != '\0' || i == -1) {
+        i++;
+        //Spaces
+        if(syntax[i] == 9) continue;
+        if(prev != syntax[i]) {
+            //Operators
+            if(prev == 6) {
+                if(eq[prevPos] == '=' && eq[prevPos + 1] == '>') {
+                    i = prevPos + 2;
+                    //Find start of arguments
+                    int j = prevPos - 1;
+                    //Multiple variables
+                    if(eq[prevPos - 1] == ')') {
+                        while(j != 0 && eq[--j] != '(') {
+                            if(syntax[j] != 2 && syntax[j] != 5) out[j] = 4;
+                            if(syntax[j] == 13 || syntax[j] == 2) out[j] = 16;
+                        }
+                    }
+                    //Single variable
+                    else {
+                        j++;
+                        while(true) {
+                            j--;
+                            if(j == -1) break;
+                            if(syntax[j] == 2 || (syntax[j] > 12 && syntax[j] < 19)) {
+                                out[j] = 16;
+                                continue;
+                            }
+                            break;
+                        }
+                        j++;
+                    }
+                    //Calculate argument list
+                    ignoreError = true;
+                    char** argList = parseArgumentList(eq + j);
+                    char** newArguments = mergeArgList(arguments, argList);
+                    //Find function bounding range
+                    int startBracket = bracket;
+                    int x = i;
+                    for(x = i;eq[x] != '\0';x++) {
+                        bool isCloseBracket = (eq[x] == ')' || eq[x] == ']' || (eq[x] == '>' && eq[x - 1] != '='));
+                        if(bracket == startBracket && (eq[x] == ',' || isCloseBracket)) break;
+                        if(isCloseBracket) bracket--;
+                        if(eq[x] == '(' || eq[x] == '[' || eq[x] == '<') bracket++;
+                    }
+                    //Copy strings
+                    char expression[x - i + 2];
+                    memcpy(expression, eq + i, x - i);
+                    expression[x - i] = '\0';
+                    char syn[x - i + 2];
+                    memcpy(syn, syntax + i, x - i);
+                    syn[x - i] = '\0';
+                    //Highlight anonymous function contents
+                    char* highlighted = advancedHighlight(expression, syn, useUnits, newArguments, localVariables);
+                    memcpy(out + i, highlighted, x - i);
+
+                    //Cleanup
+                    ignoreError = false;
+                    freeArgList(argList);
+                    free(newArguments);
+                    i = x;
+                    prev = 0;
+                    prevPos = i;
+                    continue;
+                }
+                else {
+                    //This block determines if it is a valid operator
+                    bool isValid = false;
+                    char op[i - prevPos + 1];
+                    int x = prevPos - 1, y = 0;
+                    while(++x != i) if(eq[x] != ' ') op[y++] = eq[x];
+                    op[y] = '\0';
+                    int len = strlen(op);
+                    //Possible negative character
+                    if(op[len - 1] == '-' && len != 1) {
+                        op[len - 1] = '\0';
+                        len--;
+                    }
+                    if(len == 1) {
+                        const char* ops = "+-/*^%";
+                        char opchar = op[0];
+                        if(opchar == '+') isValid = true;
+                        if(opchar == '-') isValid = true;
+                        if(opchar == '/') isValid = true;
+                        if(opchar == '*') isValid = true;
+                        if(opchar == '^') isValid = true;
+                        if(opchar == '%') isValid = true;
+                        if(opchar == '_' && eq[prevPos - 1] == ']') isValid = true;
+                        // $() in comments
+                        if(opchar == '$' && syntax[prevPos - 1] == 3) isValid = true;
+                    }
+                    // **
+                    if(len == 2 && op[0] == '*' && op[1] == '*') isValid = true;
+                    if(!isValid) memset(out + prevPos, 12, i - prevPos);
+                }
+            }
+            //Variables
+            if(prev == 2) {
+                //Copy name
+                char name[i - prevPos + 1];
+                memcpy(name, eq + prevPos, i - prevPos);
+                name[i - prevPos] = '\0';
+                //Get name type
+                int type = getVariableType(name, useUnits, arguments, localVariables);
+                //Set type to out
+                memset(out + prevPos, type, i - prevPos);
+            }
+            prev = out[i];
+            prevPos = i;
+        }
+        if(syntax[i] == 3) continue;
+        //Opening brackets
+        if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
+            if(eq[i] == '[' && unitBracketID == -1) {
+                unitBracketID = bracket;
+                useUnits = true;
+            }
+            bracket++;
+        }
+        //Closing brackets
+        if(eq[i] == ']' || eq[i] == ')' || (eq[i] == '>' && eq[i - 1] != '=')) {
+            bracket--;
+            if(eq[i] == ']' && unitBracketID == bracket) {
+                unitBracketID = -1;
+                if(!forceUnits) useUnits = false;
+            }
+        }
+    }
+    if(arguments != oldArgs) free(arguments);
+    if(freeArgs != NULL) freeArgList(freeArgs);
+    return out;
 }
 #pragma endregion

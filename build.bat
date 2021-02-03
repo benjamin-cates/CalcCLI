@@ -1,0 +1,1 @@
+gcc -O2 Calc.c CalcCLI.c -lm -o calc

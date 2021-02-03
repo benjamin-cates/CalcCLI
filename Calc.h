@@ -127,7 +127,7 @@ typedef struct ValueStruct {
  * @param multiplier multiplier of the unit compared to metric values
  */
 typedef struct UnitStandardStuct {
-    char* name;
+    const char* name;
     double multiplier;
     unit_t baseUnits;
     //Multiplier is negative when it supports metric prefixes
@@ -200,6 +200,8 @@ extern int globalAccuracy;
 extern bool useArb;
 //Global arbitrary precision accuracy in base 10
 extern int digitAccuracy;
+//Whether to ignore errors or not
+extern bool ignoreError;
 //Number with r=0, i=0, and u=0
 extern Number NULLNUM;
 //Value with number 0
@@ -225,6 +227,12 @@ extern const double metricNumValues[];
 //Metric base units, used for toStringUnit
 extern const char* baseUnits[];
 extern const char numberChars[];
+//Error message for when malloc returns zero
+extern const char* mallocError;
+//List of syntax type names
+extern const char* syntaxTypes[];
+#pragma endregion
+//Functions
 /**
  * Prints an error message as printf("Error: "+format,message), then sets globalError to true
  * @param format error format
@@ -281,7 +289,7 @@ Number newNum(double r, double i, unit_t u);
  * @param num Text of the number
  * @param base Base to be parsed in
  */
-double parseNumber(char* num, double base);
+double parseNumber(const char* num, double base);
 /**
  * Returns the string representation of num (ex. 3+4.5i[m])
  * @param num Number to be printed
@@ -415,13 +423,13 @@ bool valIsEqual(Value one, Value two);
  * @param mult Multiplier compared to base unit (negative if this unit uses metric prefixes
  * @param units Base units of the unit
  */
-unitStandard newUnit(char* name, double mult, unit_t units);
+unitStandard newUnit(const char* name, double mult, unit_t units);
 /**
  * Returns a number with the unit from the unit name
  * @param name Name of the unit
  * @return Number with u=baseUnits and r=multiplier
  */
-Number getUnitName(char* name);
+Number getUnitName(const char* name);
 /**
  * Returns the base units or metric unit
  * @param unit base units
@@ -496,7 +504,7 @@ void freeTree(Tree op);
  * @param optimize whether to precalculate non-variable branches
  * @return return value must be freeTree()ed
  */
-Tree treeCopy(Tree op, Tree* args, bool unfold, int replaceArgs, bool optimize);
+Tree treeCopy(Tree op, const Tree* args, bool unfold, int replaceArgs, bool optimize);
 /**
  * Returns the string form of operation op, output must be free()d
  * @param op operation to print
@@ -510,7 +518,7 @@ char* treeToString(Tree op, bool bracket, char** argNames);
  * @param op Tree to compute
  * @param args Arguments (only used for functions)
  */
-Value computeTree(Tree op, Value* args, int argLen);
+Value computeTree(Tree op, const Value* args, int argLen);
 /**
  * Returns the type of character in is.
  * @param in The character to determine the type of
@@ -532,7 +540,7 @@ int getCharType(char in, int curType, int base, bool useUnits);
  * @param base base to compute in, defaults to 10, if base is not 0, eq will be treated as inside square brackets
  * @return Tree, must be freeTree()ed
  */
-Tree generateTree(char* eq, char** argNames, double base);
+Tree generateTree(const char* eq, char** argNames, double base);
 /**
  * Returns the derivative of operation
  * @param op Tree to take the derivative of must be copied before passing
@@ -567,7 +575,7 @@ char* argListToString(char** argList);
 /**
  * Returns an argument list from a string
  */
-char** parseArgumentList(char* list);
+char** parseArgumentList(const char* list);
 /**
  * Function constructor
  * @param name name of the function
@@ -581,12 +589,12 @@ Function newFunction(char* name, Tree* tree, char argCount, char** argNames);
  * @param name name of the function
  * @return function ID of name, returns 0 if not found
  */
-Tree findFunction(char* name);
+Tree findFunction(const char* name);
 /**
  * Parses the equation eq and adds it to the function list
  * @param eq Equation (ex. "f(a)=a^2")
  */
-void generateFunction(char* eq);
+void generateFunction(const char* eq);
 #pragma endregion
 /**
  * Prints graph of equation to stdout
@@ -598,13 +606,13 @@ void generateFunction(char* eq);
  * @param rows number of rows (changes scale)
  * @param columns number of columns (changes scale)
 */
-void graphEquation(char* equation, double left, double right, double top, double bottom, int rows, int columns);
+void graphEquation(const char* equation, double left, double right, double top, double bottom, int rows, int columns);
 /**
  * Cleans input, generates tree, and computes it
  * @param eq Equation
  * @param base Base to calculate in
  */
-Value calculate(char* eq, double base);
+Value calculate(const char* eq, double base);
 /**
  * Frees units, functions, and history. Must be run after every call of startup() to prevent leaks
  */
@@ -624,11 +632,22 @@ void runLine(char* input);
  * @param input
  * @return output, must be free()d
  */
-char* inputClean(char* input);
+char* inputClean(const char* input);
 #pragma region Misc
 int* primeFactors(int num);
 bool isPrime(int num);
 void getRatio(double num, int* numerOut, int* denomOut);
+/*
+    Returns a string with the syntax color codes for the text
+    Return value must be free()d
+*/
+char* highlightSyntax(const char* eq);
+/*
+    Takes equation and syntax from highlightSyntax and adds more
+    This will identify variable types and identify invalid operators
+    Return value must be free()d
+*/
+char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, char** arguments, char** localVariables);
 #pragma endregion
 #ifdef __cplusplus
 }
@@ -676,7 +695,6 @@ void getRatio(double num, int* numerOut, int* denomOut);
 #define op_sgn 43
 #define op_abs 44
 #define op_arg 45
-#define op_norm 46
 #define op_round 47
 #define op_floor 48
 #define op_ceil 49
