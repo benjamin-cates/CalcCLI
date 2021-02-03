@@ -614,7 +614,7 @@ void runLine(char* input) {
         }
         else if(startsWith(input, "-factors")) {
             Value val = calculate(input + 9, 0);
-            int num=getR(val);
+            int num = getR(val);
             freeValue(val);
             int* factors = primeFactors(num);
             //If num is prime
@@ -692,6 +692,7 @@ void runLine(char* input) {
                 return;
             }
             printf("Current accuracy is %d hexadecimal digits.\n", globalAccuracy * 2);
+        }
         //Debug commands
         else if(startsWith(input, "-d")) {
             if(startsWith(input, "-dsyntax")) {
