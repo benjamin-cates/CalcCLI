@@ -687,7 +687,7 @@ Arb arb_mult(Arb one, Arb two) {
         //Set factors
         Arb out;
         out.accu = one.accu > two.accu ? one.accu : two.accu;
-        out.len = one.len + two.len;
+        out.len = one.len + two.len + 1;
         if(out.len > out.accu) out.len = out.accu + 1;
         long mantissaOut[out.len + 8];
         memset(mantissaOut, 0, (out.len + 8) * sizeof(long));
@@ -699,7 +699,7 @@ Arb arb_mult(Arb one, Arb two) {
             long* m;
             m = mantissaOut + i;
             long oneVal = one.mantissa[i];
-            int count = out.len - i;
+            int count = out.len - i - 1;
             for(j = 0;j < count;j++) m[j] += oneVal * two.mantissa[j];
         }
         //Carry overflow
@@ -720,7 +720,8 @@ Arb arb_mult(Arb one, Arb two) {
         }
         //Copy cells
         unsigned char* mant = calloc(out.len, 1);
-        memcpy(mant, mantissaOut, out.len);
+        //Memcpy cannot be used here because mantissaOut is a long*
+        for(int i = 0;i < out.len;i++) mant[i] = mantissaOut[i];
         out.mantissa = mant;
         out.len--;
         trimZeroes(&out);
@@ -3855,11 +3856,11 @@ int getVariableType(const char* name, bool useUnits, char** argNames, char** loc
     i = 0;
     //Units
     if(useUnits) {
-        char nameCase[len+1];
-        i=-1;
-        j=0;
-        while(name[++i]!='\0') if(name[i]!=' ') nameCase[j++]=name[i];
-        nameCase[j]='\0';
+        char nameCase[len + 1];
+        i = -1;
+        j = 0;
+        while(name[++i] != '\0') if(name[i] != ' ') nameCase[j++] = name[i];
+        nameCase[j] = '\0';
         int prefix = -1;
         char first = nameCase[0];
         for(i = 0;i < metricCount;i++) if(first == metricNums[i]) {
@@ -4007,7 +4008,7 @@ char* highlightSyntax(const char* eq) {
             out[i] = 6;
             out[i + 1] = 6;
             i++;
-            state=0;
+            state = 0;
             continue;
         }
         //Numbers
