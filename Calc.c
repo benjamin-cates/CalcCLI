@@ -677,68 +677,64 @@ Arb arb_subtract(Arb one, Arb two) {
     return out;
 }
 Arb arb_mult(Arb one, Arb two) {
-    //Traditional algorithm if total multiplication count is less than 1000
-    if(one.len * two.len < 1000) {
-        if(one.len > two.len) {
-            Arb tmp = one;
-            one = two;
-            two = tmp;
-        }
-        //Set factors
-        Arb out;
-        out.accu = one.accu > two.accu ? one.accu : two.accu;
-        out.len = one.len + two.len + 1;
-        if(out.len > out.accu) out.len = out.accu + 1;
-        long mantissaOut[out.len + 8];
-        memset(mantissaOut, 0, (out.len + 8) * sizeof(long));
-        out.exp = one.exp + two.exp;
-        out.sign = one.sign ^ two.sign;
-        int i, j;
-        //Multiply
-        for(i = 0;i < one.len;i++) {
-            long* m;
-            m = mantissaOut + i;
-            long oneVal = one.mantissa[i];
-            int count = out.len - i - 1;
-            for(j = 0;j < count;j++) m[j] += oneVal * two.mantissa[j];
-        }
-        //Carry overflow
-        i = out.len;
-        while(--i >= 1) {
-            if(mantissaOut[i] > 255) {
-                mantissaOut[i - 1] += mantissaOut[i] / 256;
-                mantissaOut[i] %= 256;
-            }
-        }
-        while(mantissaOut[0] > 255) {
-            if(out.len == out.accu) out.len--;
-            memmove(mantissaOut + 1, mantissaOut, out.len);
-            mantissaOut[0] = mantissaOut[1] / 256;
-            mantissaOut[1] %= 256;
-            out.len++;
-            out.exp++;
-        }
-        //Copy cells
-        unsigned char* mant = calloc(out.len, 1);
-        //Memcpy cannot be used here because mantissaOut is a long*
-        for(int i = 0;i < out.len;i++) mant[i] = mantissaOut[i];
-        out.mantissa = mant;
-        out.len--;
-        trimZeroes(&out);
-        //Return
-        return out;
+    if(one.len > two.len) {
+        Arb tmp = one;
+        one = two;
+        two = tmp;
     }
-    else {
-        //https://en.wikipedia.org/wiki/Karatsuba_algorithm if greater than 1000
-        /*
-            (az+b)*(cz+d)
-
-            Calculate ac, bd, (a+b)(c+d)
-            return ac*z^2 + ((a+b)*(c+d) - ac - bd)z + bd
-            = a*c*z^2 + bcz + adz + bd
-
-        */
+    //Set factors
+    Arb out;
+    out.accu = one.accu > two.accu ? one.accu : two.accu;
+    out.len = one.len + two.len + 1;
+    if(out.len > out.accu) out.len = out.accu + 1;
+    long mantissaOut[out.len + 8];
+    memset(mantissaOut, 0, (out.len + 8) * sizeof(long));
+    out.exp = one.exp + two.exp;
+    out.sign = one.sign ^ two.sign;
+    int i, j;
+    //Multiply
+    for(i = 0;i < one.len;i++) {
+        long* m;
+        m = mantissaOut + i;
+        long oneVal = one.mantissa[i];
+        int count = out.len - i - 1;
+        for(j = 0;j < count;j++) m[j] += oneVal * two.mantissa[j];
     }
+    //Carry overflow
+    i = out.len;
+    while(--i >= 1) {
+        if(mantissaOut[i] > 255) {
+            mantissaOut[i - 1] += mantissaOut[i] / 256;
+            mantissaOut[i] %= 256;
+        }
+    }
+    while(mantissaOut[0] > 255) {
+        if(out.len == out.accu) out.len--;
+        memmove(mantissaOut + 1, mantissaOut, out.len);
+        mantissaOut[0] = mantissaOut[1] / 256;
+        mantissaOut[1] %= 256;
+        out.len++;
+        out.exp++;
+    }
+    //Copy cells
+    unsigned char* mant = calloc(out.len, 1);
+    //Memcpy cannot be used here because mantissaOut is a long*
+    for(int i = 0;i < out.len;i++) mant[i] = mantissaOut[i];
+    out.mantissa = mant;
+    out.len--;
+    trimZeroes(&out);
+    //Return
+    return out;
+    //https://en.wikipedia.org/wiki/Karatsuba_algorithm if greater than 1000
+    /*
+        (az+b)*(cz+d)
+
+        Calculate ac, bd, (a+b)(c+d)
+        return ac*z^2 + ((a+b)*(c+d) - ac - bd)z + bd
+        = a*c*z^2 + bcz + adz + bd
+
+    */
+
 }
 Arb arb_recip(Arb one) {
     /*
