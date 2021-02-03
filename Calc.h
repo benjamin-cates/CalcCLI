@@ -198,6 +198,8 @@ extern bool globalError;
 extern int globalAccuracy;
 //Global use arbitrary precision
 extern bool useArb;
+//Global arbitrary precision accuracy in base 10
+extern int digitAccuracy;
 //Number with r=0, i=0, and u=0
 extern Number NULLNUM;
 //Value with number 0
@@ -246,7 +248,7 @@ Arb multByInt(Arb one, int two);
 //Arb conversions
 Arb parseArb(char* string, int base, int accu);
 double arbToDouble(Arb arb);
-char* arbToString(Arb arb, int base);
+char* arbToString(Arb arb, int base, int digitAccuracy);
 Arb doubleToArb(double val, int accu);
 //Math functions
 Arb arb_floor(Arb one);

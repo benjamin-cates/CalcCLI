@@ -14,6 +14,7 @@ int historyCount = 0;
 bool verbose = false;
 bool globalError = false;
 int globalAccuracy = 0;
+int digitAccuracy = 0;
 bool useArb = false;
 Number NULLNUM;
 Value* history;
@@ -184,6 +185,10 @@ unit_t unitInteract(unit_t one, unit_t two, char op, double twor) {
 }
 #pragma endregion
 #pragma region Arbitrary Precision
+int getArbDigitCount(int base) {
+    if(base == 10) return digitAccuracy;
+    return (int)(digitAccuracy * log(10) / log(base)) + 1;
+}
 Arb arbCTR(unsigned char* mant, short len, short exp, char sign, short accu) {
     Arb out;
     out.mantissa = mant;
@@ -230,6 +235,7 @@ Arb multByInt(Arb one, int two) {
         if(out.len > out.accu) out.len = out.accu;
         memmove(out.mantissa + 1, out.mantissa, out.len - 1);
         out.mantissa[0] = new;
+        out.exp++;
     }
     trimZeroes(&out);
     return out;
@@ -238,20 +244,46 @@ Arb arb_divModInt(Arb one, unsigned char two, int* carryOut) {
     //Returs one/two and sets carryOut to the remainder.
     //Return value is an integer Arb
     //one is treated as an integer Arb
-    int outlen = one.len;
-    if(outlen > one.exp + 1) outlen = one.exp + 1;
+    int outlen = one.exp + 1;
+    if(outlen > one.accu) outlen = one.accu;
     Arb out = arbCTR(calloc(outlen, 1), outlen, outlen - 1, one.sign ^ two < 0 ? 1 : 0, one.accu);
     int carry = 0;
     for(int i = 0; i < outlen; i++) {
         int cur = carry * 256;
-        if(i >= one.accu) {
-            cur = one.mantissa[i] + carry * 256;
-            out.mantissa[i] = cur / two;
-        }
+        cur += one.mantissa[i];
+        out.mantissa[i] = cur / two;
         carry = cur % two;
     }
     trimZeroes(&out);
-    *carryOut = carry;
+    // Repeated squaring modular arithmetic to find the carry out if exp >= accu
+    if(one.exp >= one.accu) {
+        //Number of powers
+        int exp = one.exp - one.accu + 1;
+        int i = 0;
+        //Current power (256^(2^i))
+        int curPow = 256 % two;
+        //Calculate Cout as (256^exp)%base
+        int Cout = 1;
+        while(exp != 0) {
+            //If ith bit is one
+            if((exp & (1 << i)) != 0) {
+                //Set ith bit to zero
+                exp ^= 1 << i;
+                //Multiply CarryOut by 256^(2^i)
+                Cout *= curPow;
+                Cout %= two;
+                if(Cout == 0) break;
+            }
+            //Square current power
+            curPow *= curPow;
+            curPow %= two;
+            if(curPow == 0) break;
+            i++;
+        }
+        // carryOut = mod(carry*(256^exp),base)
+        *carryOut = (carry * Cout) % two;
+    }
+    else *carryOut = carry;
     return out;
 }
 void trimZeroes(Arb* arb) {
@@ -293,6 +325,7 @@ Arb parseArb(char* string, int base, int accu) {
     bool hasDecimal = false;
     int digitIndex = 0;
     int stringIndex = 0;
+    //Read digits to array
     while(digitIndex != maxDigits) {
         char ch = string[stringIndex++];
         if(ch == '.') {
@@ -312,11 +345,15 @@ Arb parseArb(char* string, int base, int accu) {
     }
     unsigned char* baseMant = calloc(1, 1);
     baseMant[0] = base;
+    //Set base numbers
     Arb baseArb = arbCTR(baseMant, 1, 0, 0, accu + 10);
     Arb baseInv = arb_recip(baseArb);
+    //Set out
     Arb out = arbCTR(calloc(1, 1), 1, 0, 0, accu);
+    //Set current base
     Arb curBase = arbCTR(calloc(1, 1), 1, 0, 0, accu);
     curBase.mantissa[0] = 1;
+    //Integer digits
     int i;
     for(i = power;i >= 0;i--) {
         if(i < maxDigits) {
@@ -332,22 +369,25 @@ Arb parseArb(char* string, int base, int accu) {
             curBase = newCurBase;
         }
     }
+    //Fractional digits
+    freeArb(curBase);
     curBase = copyArb(baseInv);
     for(i = power + 1;i < digitIndex;i++) {
-        if(i < maxDigits) {
+        if(i < maxDigits && i >= 0) {
             Arb val = multByInt(curBase, digits[i]);
             Arb newOut = arb_add(out, val);
             freeArb(val);
             freeArb(out);
             out = newOut;
         }
-        if(i + 1 != maxDigits) {
+        if(i + 1 != maxDigits && i + 1 != digitIndex) {
             Arb newCurBase = arb_mult(curBase, baseInv);
             freeArb(curBase);
             curBase = newCurBase;
             if(-curBase.exp > accu + 1) break;
         }
     }
+    //Free values and return
     freeArb(baseArb);
     freeArb(baseInv);
     freeArb(curBase);
@@ -383,9 +423,13 @@ double arbToDouble(Arb arb) {
     if(arb.sign == 1) out = -out;
     return out;
 }
-char* arbToString(Arb arb, int base) {
+char* arbToString(Arb arb, int base, int digitCount) {
+    if(arb.len == 0 || (arb.len == 1 && arb.mantissa[0] == 0)) {
+        char* out = calloc(2, 1);
+        out[0] = '0';
+        return out;
+    }
     if(base == 16) {
-        const char* dig = "012345679ABCDEF";
         int outPos = 0;
         char* out = calloc(arb.len * 2 + 2, 1);
         if(arb.exp < 0) {
@@ -394,57 +438,109 @@ char* arbToString(Arb arb, int base) {
         int i;
         for(i = 0;i < arb.len;i++) {
             unsigned char val = arb.mantissa[i];
-            if(outPos != 0 || val >> 4 != 0) out[outPos++] = dig[val >> 4];
-            if(i != arb.len - 1 || val & 15 == 0) out[outPos++] = dig[val & 15];
+            if(outPos != 0 || val >> 4 != 0) out[outPos++] = numberChars[val >> 4];
+            if(i != arb.len - 1 || val & 15 == 0) out[outPos++] = numberChars[val & 15];
             if(arb.exp - i) out[outPos++] = '.';
         }
-
+        return out;
     }
     Arb floor = arb_floor(arb);
     Arb fraction = arb_subtract(arb, floor);
-    int digitSize = 20;
-    int intDigitCount = 0;
-    unsigned char* integerDigits = calloc(20, 1);
-    int i = 0;
-    while(floor.exp >= 0) {
-        i++;
-        if(i == digitSize) {
-            integerDigits = realloc(integerDigits, digitSize + 20);
-            memset(integerDigits + digitSize, 0, 20);
-            digitSize += 20;
-        }
+    unsigned char digits[digitCount + 10];
+    memset(digits, 0, digitCount + 10);
+    int i = digitCount + 10;
+    int exponent = 0;
+    //Add integer digits
+    while(floor.len != 1 || floor.mantissa[0] != 0) {
+        i--;
         int digit = 0;
         Arb new = arb_divModInt(floor, base, &digit);
-        integerDigits[i] = digit;
         freeArb(floor);
+        digits[i] = numberChars[digit];
         floor = new;
+        if(i == 0) {
+            memmove(digits + 10, digits, digitCount);
+            i = 10;
+        }
     }
     freeArb(floor);
-    intDigitCount = i;
-    digitSize = 20;
-    int factDigitCount = 0;
-    unsigned char* fractionalDigits = calloc(20, 1);
-
-    /*
-        to get the decimals, multiply arb.mantissa by base and take the floor of that, repeat
-        Example: {128,10}exp-1 to base 10 (0.800A in b16):
-            Multiply by 10 to get: {5,0,100}exp 0, first digit is 5
-            Subtract 5: {100}exp-2
-            Multiply by 10: {3,232}exp-1, second digit is 0
-            Multiply by 10: {39,16}exp-1, third digit is 0
-            {1,134,160}exp0, fourth is 1
-            {5,66,64}exp0, fifth is 5
-            {2,150,118}exp0 sixth is 2
-        To get the integer part:
-            repeatedly use divModInt
-    */
-    free(fractionalDigits);
-    return integerDigits;
-    free(integerDigits);
+    if(i != digitCount + 10) {
+        memmove(digits, digits + i, digitCount + 10 - i);
+        memset(digits + digitCount + 10 - i, 0, i);
+    }
+    i = digitCount + 10 - i;
+    exponent = i - 1;
+    //Remove trailing zeros fraction if floor==0
+    while(digits[0] == '\0') {
+        Arb newFraction = multByInt(fraction, base);
+        freeArb(fraction);
+        fraction = newFraction;
+        //If newfraction is not zero: append to list and break
+        if(fraction.exp == 0) {
+            digits[0] = numberChars[fraction.mantissa[0]];
+            fraction.mantissa[0] = 0;
+            i++;
+            break;
+        }
+        exponent--;
+    }
+    //Fractional Digits (repeatedly multByInt)
+    for(;i < digitCount;i++) {
+        Arb newFraction = multByInt(fraction, base);
+        freeArb(fraction);
+        fraction = newFraction;
+        //If (fraction equals zero) break;
+        if(fraction.len == 1 && fraction.mantissa[0] == 0) break;
+        //Get digit to add
+        char digitToAdd = '0';
+        if(fraction.exp == 0) {
+            digitToAdd = numberChars[fraction.mantissa[0]];
+            fraction.mantissa[0] = 0;
+        }
+        digits[i] = digitToAdd;
+    }
+    freeArb(fraction);
+    //Turn digits into printable number
+    int digitLen = strlen(digits);
+    //Write in exponent notation
+    if(exponent < -15 || exponent > digitCount) {
+        char* out = calloc(digitLen + 12, 1);
+        out[0] = digits[0];
+        out[1] = '.';
+        memcpy(out + 2, digits + 1, digitLen - 1);
+        out[digitLen + 1] = 'e';
+        snprintf(out + digitLen + 2, 8, "%d", exponent);
+        return out;
+    }
+    //Write fractional number with zero padding
+    else if(exponent < 0) {
+        char* out = calloc(digitLen + 5 - exponent, 1);
+        out[0] = '0';
+        out[1] = '.';
+        memset(out + 2, '0', -exponent - 1);
+        memcpy(out - exponent + 1, digits, digitLen);
+        return out;
+    }
+    //Write normally
+    else {
+        char* out = calloc(digitLen + 3, 1);
+        int outPos = 0;
+        for(int i = 0;i < digitLen;i++) {
+            out[outPos++] = digits[i];
+            if(i == exponent && i != digitLen - 1) out[outPos++] = '.';
+        }
+        return out;
+    }
 }
 int arbCmp(Arb one, Arb two) {
+    //Note: this function ignores the sign of a number
+    if(one.len == 1 && one.mantissa[0] == 0) {
+        if(two.len == 1 && two.mantissa[0] == 0) return 0;
+        return -1;
+    }
+    if(two.len == 1 && two.mantissa[0] == 0) return 1;
     if(one.exp > two.exp) return 1;
-    if(two.exp < one.exp) return -1;
+    if(one.exp < two.exp) return -1;
     int len = one.len > two.len ? two.len : one.len;
     int cmp = memcmp(one.mantissa, two.mantissa, len);
     if(cmp != 0) return cmp;
@@ -460,11 +556,19 @@ int arbCmp(Arb one, Arb two) {
     return 0;
 }
 Arb arb_floor(Arb one) {
-    int outlen = one.len;
-    if(outlen > one.exp + 1) outlen = one.exp + 1;
-    Arb out = arbCTR(malloc(outlen), outlen, outlen - 1, one.sign, one.accu);
-    memcpy(out.mantissa, one.mantissa, outlen);
-    return out;
+    //If one is greater than 0
+    if(one.exp >= 0) {
+        int outlen = one.len;
+        if(outlen > one.exp + 1) outlen = one.exp + 1;
+        if(outlen > one.accu) outlen = one.accu;
+        Arb out = arbCTR(calloc(outlen + 1, 1), outlen, one.exp, one.sign, one.accu);
+        memcpy(out.mantissa, one.mantissa, outlen);
+        return out;
+    }
+    //else return 0
+    else {
+        return arbCTR(calloc(1, 1), 1, 0, 0, one.accu);
+    }
 }
 Arb arb_add(Arb one, Arb two) {
     if(one.sign != two.sign) {
@@ -533,7 +637,7 @@ Arb arb_subtract(Arb one, Arb two) {
     }
     if(arbCmp(one, two) == -1) {
         Arb out = arb_subtract(two, one);
-        out.sign = out.sign == 1 ? 0 : 1;
+        out.sign ^= 1;
         return out;
     }
     Arb out;
@@ -550,7 +654,7 @@ Arb arb_subtract(Arb one, Arb two) {
         int oneCell = one.mantissa[i];
         int twoCell = two.mantissa[i];
         if(i > one.len) oneCell = 0;
-        if(i > two.len + twoDiff || i < twoDiff) twoCell = 0;
+        if(i >= two.len + twoDiff || i < twoDiff) twoCell = 0;
         int new = oneCell - twoCell + carry;
         outMant[i] = new;
         carry = new < 0 ? -1 : 0;
@@ -573,7 +677,7 @@ Arb arb_mult(Arb one, Arb two) {
         Arb out;
         out.accu = one.accu > two.accu ? one.accu : two.accu;
         out.len = one.len + two.len;
-        if(out.len > out.accu) out.len = out.accu+1;
+        if(out.len > out.accu) out.len = out.accu + 1;
         long mantissaOut[out.len + 8];
         memset(mantissaOut, 0, (out.len + 8) * sizeof(long));
         out.exp = one.exp + two.exp;
@@ -584,7 +688,7 @@ Arb arb_mult(Arb one, Arb two) {
             long* m;
             m = mantissaOut + i;
             long oneVal = one.mantissa[i];
-            int count=out.len-i;
+            int count = out.len - i;
             for(j = 0;j < count;j++) m[j] += oneVal * two.mantissa[j];
         }
         //Carry overflow
@@ -605,7 +709,7 @@ Arb arb_mult(Arb one, Arb two) {
         }
         //Copy cells
         unsigned char* mant = calloc(out.len, 1);
-        for(i = 0;i < out.len;i++) mant[i] = mantissaOut[i];
+        memcpy(mant, mantissaOut, out.len);
         out.mantissa = mant;
         out.len--;
         trimZeroes(&out);
@@ -663,6 +767,7 @@ Arb arb_recip(Arb one) {
             if(error.exp < -1) arbRightShift(&error, -error.exp - 1);
             int i = 0;
             for(i = 0;i < error.len;i++) error.mantissa[i] = 255 - error.mantissa[i];
+            error.mantissa[i - 1] += 1;
             error.sign = 0;
         }
         trimZeroes(&error);
@@ -1273,21 +1378,22 @@ char* valueToString(Value val, double base) {
     }
     if(val.type == value_arb) {
         char* out;
-        char* r = NULL;
-        char* i = NULL;
-        char* u = NULL;
-        int length = 1;
         if(val.numArb == NULL) {
             out = calloc(2, 1);
             out[0] = '0';
             return out;
         }
+        char* r = NULL;
+        char* i = NULL;
+        char* u = NULL;
+        int length = 1;
+        int digitCount = getArbDigitCount((int)base);
         if(val.numArb->r.mantissa != NULL) {
-            r = arbToString(val.numArb->r, base);
+            r = arbToString(val.numArb->r, base, digitCount);
             length += strlen(r);
         }
         if(val.numArb->i.mantissa != NULL) {
-            i = arbToString(val.numArb->r, base);
+            i = arbToString(val.numArb->i, base, digitCount);
             length += 4 + strlen(i);
         }
         if(val.numArb->u != 0) {
@@ -1318,6 +1424,9 @@ char* valueToString(Value val, double base) {
             strcat(out, u);
             strcat(out, "]");
         }
+        if(r != NULL) free(r);
+        if(i != NULL) free(i);
+        if(u != NULL) free(u);
         return out;
     }
     return NULL;

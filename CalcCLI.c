@@ -620,6 +620,7 @@ void runLine(char* input) {
             double accuR = getR(accu);
             freeValue(accu);
             globalAccuracy = ((accuR + 5) * log(10) / log(256));
+            digitAccuracy = accuR;
             if(accuR == 0) {
                 printf("Exited accurate mode.\n");
                 useArb = false;
@@ -629,6 +630,7 @@ void runLine(char* input) {
             if(globalAccuracy > 30000) {
                 printf("Warning: Accuracy has been capped at 60000 hexadecimal digits.\n");
                 globalAccuracy = 30000;
+                digitAccuracy = 72244;
             }
             else printf("Accuracy set to %d hexadecimal digits\n", globalAccuracy * 2);
             if(useColors) printf("\033[1;31mWarning: \033[0mthis feature is experimental and may not be accurate. Some features are not implemented. To go back to normal mode, type \"\033[1;34m-\033[0msetaccu 0\".\n");
@@ -751,21 +753,21 @@ int main(int argc, char** argv) {
     if(useFancyInput) enableRawMode();
     //Test VT-100 compatability
     printf("\033[c");
-    int firstChar=readCharacter();
-    if(firstChar!=27) {
-        useFancyInput=false;
+    int firstChar = readCharacter();
+    if(firstChar != 27) {
+        useFancyInput = false;
         printf("\r    \r");
         printf("Reverting to raw mode\n");
         disableRawMode();
-        printf("%c",firstChar);
-        #ifdef USE_CONIO_H
+        printf("%c", firstChar);
+#ifdef USE_CONIO_H
         ungetch(firstChar);
-        #else
-        ungetc(firstChar,stdin);
-        #endif
+#else
+        ungetc(firstChar, stdin);
+#endif
     }
     else {
-        while(readCharacter()!='c');
+        while(readCharacter() != 'c');
         printf("\r           \r");
     }
     //Main loop
