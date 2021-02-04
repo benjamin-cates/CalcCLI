@@ -257,7 +257,7 @@ Arb arb_divModInt(Arb one, unsigned char two, int* carryOut) {
     //one is treated as an integer Arb
     int outlen = one.exp + 1;
     if(outlen > one.accu) outlen = one.accu;
-    Arb out = arbCTR(calloc(outlen, 1), outlen, outlen - 1, one.sign ^ two < 0 ? 1 : 0, one.accu);
+    Arb out = arbCTR(calloc(outlen, 1), outlen, outlen - 1, one.sign ^ (two < 0 ? 1 : 0), one.accu);
     int carry = 0;
     for(int i = 0; i < outlen; i++) {
         int cur = carry * 256;
@@ -450,7 +450,7 @@ char* arbToString(Arb arb, int base, int digitCount) {
         for(i = 0;i < arb.len;i++) {
             unsigned char val = arb.mantissa[i];
             if(outPos != 0 || val >> 4 != 0) out[outPos++] = numberChars[val >> 4];
-            if(i != arb.len - 1 || val & 15 == 0) out[outPos++] = numberChars[val & 15];
+            if(i != arb.len - 1 || (val & 15) == 0) out[outPos++] = numberChars[val & 15];
             if(arb.exp - i) out[outPos++] = '.';
         }
         return out;
@@ -512,7 +512,7 @@ char* arbToString(Arb arb, int base, int digitCount) {
     }
     freeArb(fraction);
     //Turn digits into printable number
-    int digitLen = strlen(digits);
+    int digitLen = strlen((char*)digits);
     //Write in exponent notation
     if(exponent < -15 || exponent > digitCount) {
         char* out = calloc(digitLen + 12, 1);
