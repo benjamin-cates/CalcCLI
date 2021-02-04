@@ -952,19 +952,26 @@ char* doubleToString(double num, double base) {
 
     return out;
 }
-void appendToHistory(Value num, double base, bool print) {
+char* appendToHistory(Value num, double base, bool print) {
     if(historySize - 1 == historyCount) {
         history = realloc(history, (historySize + 25) * sizeof(Value));
-        if(history == NULL) { error(mallocError);return; }
+        if(history == NULL) { error(mallocError);return NULL; }
         historySize += 25;
-    }
-    if(print) {
-        char* ansString = valueToString(num, base);
-        printf("$%d = %s\n", historyCount, ansString);
-        free(ansString);
     }
     history[historyCount] = num;
     historyCount++;
+    char* ansString = valueToString(num, base);
+    if(print) {
+        printf("$%d = %s\n", historyCount - 1, ansString);
+        free(ansString);
+        return NULL;
+    }
+    else {
+        char* out = calloc(strlen(ansString) + 20, 1);
+        snprintf(out, strlen(ansString) + 20, "$%d = %s", historyCount - 1, ansString);
+        free(ansString);
+        return out;
+    }
 }
 Number compAdd(Number one, Number two) {
     one.r += two.r;
@@ -3822,8 +3829,8 @@ char* runCommand(char* input) {
         ret.type = value_func;
         ret.tree = malloc(sizeof(Tree));
         *ret.tree = dxClean;
-        appendToHistory(ret, 10, true);
-        return calloc(1, 1);
+        ret.argNames = x;
+        return appendToHistory(ret, 10, false);
     }
     else if(startsWith(input, "-degset")) {
         char* type = input + 8;
@@ -3902,8 +3909,7 @@ char* runCommand(char* input) {
         }
         //Calculate and append to history
         Value out = calculate(input + expStart, 0);
-        appendToHistory(out, base, true);
-        return calloc(1, 1);
+        return appendToHistory(out, base, false);
     }
     else return NULL;
 }

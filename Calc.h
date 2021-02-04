@@ -308,8 +308,10 @@ char* doubleToString(double num, double base);
  * Appends a number to history
  * @param num Number to append
  * @param base Base to output in
+ * @param print Whether to print or return the message
+ * @return Returns the message if print is false (return must be freed)
  */
-void appendToHistory(Value num, double base, bool print);
+char* appendToHistory(Value num, double base, bool print);
 //Returns one+two
 Number compAdd(Number one, Number two);
 //Returns one-two
