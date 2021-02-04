@@ -283,6 +283,22 @@ void error(const char* format, ...) {
     //Set error to true
     globalError = true;
 };
+void printPerformance(const char* type, clock_t t, int runCount) {
+    //Print name
+    printf("%s took ",type);
+    //Print time
+    float msTime = ((float)t) / CLOCKS_PER_SEC * 1000;
+    if(msTime>1000) printf("%f s",msTime/1000.0);
+    else printf("%f ms",msTime);
+    //Print clock time and runCount
+    printf(" (%d clock) to complete %d runs", t, runCount, msTime*1000 / (float)runCount);
+    //Print average
+    float avg=msTime/(float)runCount;
+    if(avg<1.0) printf("(%f µs avg)",avg*1000);
+    else printf("(%f ms avg)",avg);
+    //Print endline
+    putchar('\n');
+}
 void graphEquation(const char* equation, double left, double right, double top, double bottom, int rows, int columns) {
     double columnWidth = (right - left) / columns;
     double rowHeight = (top - bottom) / rows;
@@ -739,8 +755,78 @@ void runLine(char* input) {
                     printf("}exp%d\n", n.i.exp);
                 }
                 else printf("i: NULL");
-                appendToHistory(out,10,true);
+                appendToHistory(out, 10, true);
                 freeValue(out);
+            }
+            if(startsWith(input, "-dperf")) {
+                //Syntax: -dperf{count} {type} {exp}
+                //Find space
+                int i = 5;
+                while(input[++i] != ' ');
+                //Parse runCount
+                input[i] = '\0';
+                int runCount = parseNumber(input + 6, 10);
+                printf("Run Count: %d, Clocks per second: %d\n", runCount, CLOCKS_PER_SEC);
+                //Get runtype
+                char* runType = input + i + 1;
+                if(startsWith(runType, "syntax")) {
+                    char* in = runType + 6;
+                    clock_t t = clock();
+                    //Time basic syntax
+                    for(int i = 0;i < runCount;i++) {
+                        char* out = highlightSyntax(in);
+                        free(out);
+                    }
+                    t = clock() - t;
+                    printPerformance("Basic syntax", t, runCount);
+                    //Time advanced syntax
+                    char* basicSyn = highlightSyntax(in);
+                    t = clock();
+                    for(int i = 0;i < runCount;i++) {
+                        char* out = advancedHighlight(in, basicSyn, false, NULL, NULL);
+                        free(out);
+                    }
+                    t = clock() - t;
+                    printPerformance("Advanced syntax", t, runCount);
+                    free(basicSyn);
+                    return;
+                }
+                else if(startsWith(runType, "runline")) {
+                    char* in = runType + 8;
+                    clock_t t = clock();
+                    for(int i = 0;i < runCount;i++) runLine(in);
+                    t = clock() - t;
+                    printPerformance("Runline", t, runCount);
+                    return;
+                }
+                else if(startsWith(runType, "parse")) {
+                    char* in = inputClean(runType + 6);
+                    clock_t t = clock();
+                    for(int i = 0;i < runCount;i++) {
+                        Tree out = generateTree(in, NULL, 0);
+                        freeTree(out);
+                    }
+                    t = clock() - t;
+                    printPerformance("Parse", t, runCount);
+                    free(in);
+                    return;
+                }
+                else if(startsWith(runType, "calc")) {
+                    char* in = inputClean(runType + 5);
+                    Tree tr = generateTree(in, NULL, 0);
+                    free(in);
+                    clock_t t = clock();
+                    for(int i = 0;i < runCount;i++) {
+                        Value val = computeTree(tr, NULL, 0);
+                        freeValue(val);
+                    }
+                    t = clock() - t;
+                    printPerformance("Calculation", t, runCount);
+                    freeTree(tr);
+                    return;
+                }
+                else error("Performance test type unrecognized.");
+                return;
             }
             else {
                 error("command '%s' is not a valid debugging command", input + 2);
