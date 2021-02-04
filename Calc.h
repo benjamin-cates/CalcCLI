@@ -298,6 +298,11 @@ double parseNumber(const char* num, double base);
  */
 char* toStringNumber(Number num, double base);
 /**
+ * Prints the number num as a ratio if it is one
+ * Return value must be freed
+ */
+char* toStringAsRatio(Number num);
+/**
  * Returns the string form of num in base base
  * @param num Number to print
  * @param base base to print it in
@@ -653,6 +658,11 @@ char* runCommand(char* input);
 int* primeFactors(int num);
 bool isPrime(int num);
 void getRatio(double num, int* numerOut, int* denomOut);
+/**
+ * Print a double as a ratio
+ * Return value must be freed
+ */
+char* printRatio(double in, bool forceSign);
 /*
     Returns a string with the syntax color codes for the text
     Return value must be free()d

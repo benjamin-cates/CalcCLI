@@ -387,46 +387,12 @@ void graphEquation(const char* equation, double left, double right, double top, 
     }
     freeTree(tree);
 }
-void printRatio(double out, bool forceSign) {
-    char sign = out < 0 ? '-' : '+';
-    //Get ratio
-    int numer = 0;
-    int denom = 0;
-    getRatio(out, &numer, &denom);
-    //Print number if no ratio exists
-    if(numer == 0 && denom == 0) {
-        char* string = doubleToString(sign == '-' ? -out : out, 10);
-        printf("%s", string);
-        if(string != NULL) free(string);
-    }
-    else {
-        if(sign == '-' || forceSign) printf("%c", sign);
-        if(forceSign) printf(" ");
-        if(floor(fabs(out)) == 0) printf("%d/%d", numer, denom);
-        else printf("%d%c%d/%d", (int)floor(fabs(out)), sign, numer, denom);
-    }
-}
-void compPrintRatio(Number num) {
-    //Print ratio for R
-    if(num.r != 0) printRatio(num.r, false);
-    //Print ratio for I
-    if(num.i != 0) {
-        if(num.r != 0) printf(" ");
-        printRatio(num.i, num.r != 0);
-        printf(" i");
-    }
-    //Print unit
-    if(num.u != 0) {
-        char* string = toStringUnit(num.u);
-        printf(" [%s]", string);
-        free(string);
-    }
-}
 void runLine(char* input) {
     int i;
     //If command
     if(input[0] == '-') {
         char* output = runCommand(input);
+        if(globalError) return;
         if(output != NULL) {
             if(output[0] != '\0') printf("%s\n", output);
             free(output);
@@ -487,38 +453,6 @@ void runLine(char* input) {
             }
             printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
         }
-        else if(startsWith(input, "-unit")) {
-            int i, unitStart = 0;
-            //Find end of unit
-            for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
-                unitStart = i + 1;
-                input[i] = '\0';
-                break;
-            }
-            //Calculate unit and value
-            Value unit = calculate(input + 5, 10);
-            Value value = calculate(input + unitStart, 0);
-            //Check if they are compatible
-            if(unit.u != value.u) {
-                char* unitOne = toStringUnit(unit.u);
-                char* unitTwo = toStringUnit(value.u);
-                error("units %s and %s are not compatible", unitOne, unitTwo);
-                free(unitOne);
-                free(unitTwo);
-                return;
-            }
-            //Divide them
-            Value out = valDivide(value, unit);
-            //Get string
-            char* numString = valueToString(out, 10);
-            //Free values
-            //Print output
-            printf("= %s %s\n", numString, input + 5);
-            freeValue(unit);
-            freeValue(value);
-            freeValue(out);
-            if(numString != NULL) free(numString);
-        }
         else if(startsWith(input, "-factors")) {
             Value val = calculate(input + 9, 0);
             int num = getR(val);
@@ -548,29 +482,6 @@ void runLine(char* input) {
                 else printf(" %d^%d\n", prev, count);
             }
             free(factors);
-        }
-        else if(startsWith(input, "-ratio")) {
-            Value out = calculate(input + 7, 0);
-            //If out is a number
-            if(out.type == value_num) {
-                compPrintRatio(out.num);
-                printf("\n");
-            }
-            //If it is a vector
-            if(out.type == value_vec) {
-                int i, j;
-                printf("<");
-                int width = out.vec.width;
-                //Loop through all numbers
-                for(j = 0;j < out.vec.height;j++) for(i = 0;i < width;i++) {
-                    Number num = out.vec.val[i + j * width];
-                    if(i == 0 && j != 0) printf(";");
-                    if(i != 0) printf(",");
-                    compPrintRatio(num);
-                }
-                printf(">\n");
-            }
-            freeValue(out);
         }
         //Debug commands
         else if(startsWith(input, "-d")) {

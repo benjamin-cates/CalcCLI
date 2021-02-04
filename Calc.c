@@ -877,6 +877,44 @@ char* toStringNumber(Number num, double base) {
     free(unit);
     return out;
 }
+char* toStringAsRatio(Number num) {
+    //Print ratio for R
+    char* r = NULL;
+    if(num.r != 0) r = printRatio(num.r, false);
+    //Print ratio for I
+    char* i = NULL;
+    if(num.i != 0) i = printRatio(num.i, num.r != 0);
+    //Print unit
+    char* u = NULL;
+    if(num.u != 0) u = toStringUnit(num.u);
+    //Compile into out
+    //Calculate Length
+    int outlen = 3;
+    if(r != NULL) outlen += strlen(r);
+    if(i != NULL) outlen += strlen(i) + 3;
+    if(u != NULL) outlen += strlen(u) + 3;
+    char* out = calloc(outlen, 1);
+    //Append r
+    if(r != NULL) {
+        strcpy(out, r);
+        free(r);
+    }
+    //Append i
+    if(i != NULL) {
+        if(r != NULL)strcat(out, " ");
+        strcat(out, i);
+        strcat(out, " i");
+        free(i);
+    }
+    //Append u
+    if(u != NULL) {
+        strcat(out, " [");
+        strcat(out, u);
+        strcat(out, "]");
+        free(u);
+    }
+    return out;
+}
 char* doubleToString(double num, double base) {
     if(num == 0 || base <= 1 || base > 36) {
         char* out = calloc(2, 1);
@@ -3911,6 +3949,135 @@ char* runCommand(char* input) {
         Value out = calculate(input + expStart, 0);
         return appendToHistory(out, base, false);
     }
+    else if(startsWith(input, "-factors") || startsWith(input, "-factor")) {
+        char* expression = input[7] == 's' ? input + 9 : input + 8;
+        Value val = calculate(expression, 0);
+        double num = getR(val);
+        freeValue(val);
+        if(num > 2147483647 || num < -2147483647) {
+            error("%g is out of bounds", num);
+        }
+        int* factors = primeFactors((int)num);
+        //If num is prime
+        if(factors[0] == 0) {
+            free(factors);
+            char* out = calloc(20, 1);
+            snprintf(out, 20, "%d is prime", (int)num);
+            return out;
+        }
+        //Else list factors
+        else {
+            char* out = calloc(200, 1);
+            snprintf(out, 200, "Factors of %d:", (int)num);
+            int outPos = strlen(out);
+            int outSize = 200;
+            int i = -1;
+            int prev = factors[0];
+            int count = 0;
+            //List through each factor
+            while(factors[++i] != 0) {
+                if(factors[i] != prev) {
+                    char temp[50];
+                    if(count != 1) snprintf(temp, 49, " %d^%d *", prev, count);
+                    else snprintf(temp, 49, " %d *", prev);
+                    int tempLen = strlen(temp);
+                    if(tempLen + outPos >= outSize - 50) {
+                        outSize += 200;
+                        out = realloc(out, outSize);
+                        memset(out + outSize - 200, 0, 200);
+                    }
+                    strcpy(out + outPos, temp);
+                    outPos += tempLen;
+                    count = 1;
+                }
+                else count++;
+                prev = factors[i];
+            }
+            if(count == 1) snprintf(out + outPos, outSize - outPos - 1, " %d", prev);
+            else snprintf(out + outPos, outSize - outPos - 1, " %d^%d", prev, count);
+            free(factors);
+            return out;
+        }
+    }
+    else if(startsWith(input, "-ratio")) {
+        Value val = calculate(input + 7, 0);
+        //If out is a number
+        if(val.type == value_num) {
+            char* ratioString = toStringAsRatio(val.num);
+            free(appendToHistory(val, 10, false));
+            int outLen = strlen(ratioString) + 10;
+            char* out = calloc(outLen, 1);
+            snprintf(out, outLen, "$%d = %s", historyCount - 1, ratioString);
+            free(ratioString);
+            return out;
+        }
+        //If it is a vector
+        if(val.type == value_vec) {
+            char* out = calloc(100, 1);
+            int outSize = 100;
+            free(appendToHistory(val, 10, false));
+            sprintf(out, "$%d = <", historyCount - 1);
+            int outPos = strlen(out);
+            int width = val.vec.width;
+            //Loop through all numbers
+            int i, j;
+            for(j = 0;j < val.vec.height;j++) for(i = 0;i < width;i++) {
+                Number num = val.vec.val[i + j * width];
+                //Add ; or , if applicable
+                if(i == 0 && j != 0) out[outPos++] = ';';
+                if(i != 0) out[outPos++] = ',';
+                //Append ratio
+                char* ratio = toStringAsRatio(num);
+                int ratioLen = strlen(ratio);
+                if(ratioLen + outPos > outSize - 10) {
+                    outSize += 100;
+                    out = realloc(out, outSize);
+                    memset(out + outSize - 100, 0, 100);
+                }
+                strcpy(out + outPos, ratio);
+                outPos += ratioLen;
+            }
+            out[outPos++] = '>';
+            return out;
+        }
+        freeValue(val);
+
+    }
+    else if(startsWith(input, "-unit")) {
+        int i, unitStart = 0;
+        //Find end of unit
+        for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
+            unitStart = i + 1;
+            input[i] = '\0';
+            break;
+        }
+        //Calculate unit and value
+        Value unit = calculate(input + 5, 10);
+        Value value = calculate(input + unitStart, 0);
+        //Check if they are compatible
+        if(unit.u != value.u) {
+            char* unitOne = toStringUnit(unit.u);
+            char* unitTwo = toStringUnit(value.u);
+            error("units %s and %s are not compatible", unitOne, unitTwo);
+            free(unitOne);
+            free(unitTwo);
+            return NULL;
+        }
+        //Divide them
+        Value out = valDivide(value, unit);
+        //Get string
+        char* numString = valueToString(out, 10);
+        //Free values
+        freeValue(value);
+        freeValue(unit);
+        freeValue(out);
+        //Create output output
+        int retLen = strlen(numString) + strlen(input + 5) + 10;
+        char* ret = calloc(retLen, 1);
+        snprintf(ret, retLen, "= %s %s", numString, input + 5);
+        if(numString != NULL) free(numString);
+        return ret;
+    }
     else return NULL;
 }
 #pragma endregion
@@ -3995,6 +4162,32 @@ void getRatio(double num, int* numerOut, int* denomOut) {
     }
     *numerOut = denom;
     *denomOut = numer;
+}
+char* printRatio(double in, bool forceSign) {
+    char sign = in < 0 ? '-' : '+';
+    //Get ratio
+    int numer = 0;
+    int denom = 0;
+    getRatio(in, &numer, &denom);
+    //Print number if no ratio exists
+    if(numer == 0 && denom == 0) {
+        char* string = doubleToString(sign == '-' ? -in : in, 10);
+        char* out = calloc(strlen(string) + 3, 1);
+        if(forceSign || sign == '-') out[0] = sign;
+        if(forceSign) out[1] = ' ';
+        strcpy(out + strlen(out), string);
+        free(string);
+        return out;
+    }
+    else {
+        char* out = calloc(25, 1);
+        if(sign == '-' || forceSign) out[0] = sign;
+        if(forceSign) out[1] = ' ';
+        int outlen = strlen(out);
+        if(floor(fabs(in)) == 0) snprintf(out + outlen, 24 - outlen, "%d/%d", numer, denom);
+        else snprintf(out + outlen, 24 - outlen, "%d%c%d/%d", (int)floor(fabs(in)), sign, numer, denom);
+        return out;
+    }
 }
 int getVariableType(const char* name, bool useUnits, char** argNames, char** localVars) {
     //Remove spaces
