@@ -285,17 +285,17 @@ void error(const char* format, ...) {
 };
 void printPerformance(const char* type, clock_t t, int runCount) {
     //Print name
-    printf("%s took ",type);
+    printf("%s took ", type);
     //Print time
     float msTime = ((float)t) / CLOCKS_PER_SEC * 1000;
-    if(msTime>1000) printf("%f s",msTime/1000.0);
-    else printf("%f ms",msTime);
+    if(msTime > 1000) printf("%f s", msTime / 1000.0);
+    else printf("%f ms", msTime);
     //Print clock time and runCount
-    printf(" (%d clock) to complete %d runs", t, runCount, msTime*1000 / (float)runCount);
+    printf(" (%d clock) to complete %d runs", t, runCount, msTime * 1000 / (float)runCount);
     //Print average
-    float avg=msTime/(float)runCount;
-    if(avg<1.0) printf("(%f µs avg)",avg*1000);
-    else printf("(%f ms avg)",avg);
+    float avg = msTime / (float)runCount;
+    if(avg < 1.0) printf("(%f µs avg)", avg * 1000);
+    else printf("(%f ms avg)", avg);
     //Print endline
     putchar('\n');
 }
@@ -387,10 +387,6 @@ void graphEquation(const char* equation, double left, double right, double top, 
     }
     freeTree(tree);
 }
-bool startsWith(char* string, char* sw) {
-    int compareLength = strlen(sw);
-    return memcmp(string, sw, compareLength) == 0 ? true : false;
-}
 void printRatio(double out, bool forceSign) {
     char sign = out < 0 ? '-' : '+';
     //Get ratio
@@ -430,36 +426,10 @@ void runLine(char* input) {
     int i;
     //If command
     if(input[0] == '-') {
-        if(startsWith(input, "-def ")) {
-            //Define function
-            generateFunction(input + 5);
-        }
-        else if(startsWith(input, "-del ")) {
-            int strLen = strlen(input);
-            //Delete function or variable
-            for(i = 0; i < numFunctions; i++) {
-                //Continue if name does not match
-                if(customfunctions[i].nameLen != strLen - 5) continue;
-                if(strcmp(input + 5, customfunctions[i].name) != 0) continue;
-                //Print message
-                printf("Function '%s' has been deleted.\n", customfunctions[i].name);
-                //Free members
-                customfunctions[i].nameLen = 0;
-                freeTree(*customfunctions[i].tree);
-                free(customfunctions[i].tree);
-                free(customfunctions[i].name);
-                //Free argNames
-                int j = -1;
-                char** argNames = customfunctions[i].argNames;
-                while(argNames[++j] != NULL) free(argNames[j]);
-                free(argNames);
-                //Set tree to NULL
-                customfunctions[i].tree = NULL;
-                customfunctions[i].argCount = 0;
-                return;
-            }
-            //Error if name not found
-            error("Function '%s' not found", input + 5);
+        char* output = runCommand(input);
+        if(output != NULL) {
+            if(output[0] != '\0') printf("%s\n", output);
+            free(output);
         }
         else if(startsWith(input, "-g ")) {
             //Graph
@@ -491,11 +461,6 @@ void runLine(char* input) {
             free(line);
             fclose(file);
         }
-        else if(startsWith(input, "-quit")) {
-            //Exit the program
-            cleanup();
-            exit(0);
-        }
         else if(startsWith(input, "-ls")) {
             //ls lists all user-defined functions
             int num = 0;
@@ -521,68 +486,6 @@ void runLine(char* input) {
                 free(equation);
             }
             printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
-        }
-        else if(startsWith(input, "-dx")) {
-            //Clean input
-            char* cleanInput = inputClean(input + 4);
-            if(globalError) return;
-            //Set x
-            char** x = calloc(2, sizeof(char*));
-            if(x == NULL) { error(mallocError);return; }
-            x[0] = calloc(2, 1);
-            if(x[0] == NULL) { error(mallocError);return; }
-            x[0][0] = 'x';
-            //Get tree
-            Tree ops = generateTree(cleanInput, x, 0);
-            free(cleanInput);
-            //Clean tree
-            Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
-            //Get derivative and clean it
-            Tree dx = derivative(cleanedOps);
-            Tree dxClean = treeCopy(dx, NULL, false, false, true);
-            //Print output
-            char* out = treeToString(dxClean, false, x);
-            printf("=%s\n", out);
-            free(out);
-            freeTree(cleanedOps);
-            freeTree(ops);
-            freeTree(dxClean);
-            freeTree(dx);
-        }
-        else if(startsWith(input, "-base")) {
-            //format: -base(16) 46 will return 2E
-            int i, expStart = 0;
-            //Find end of base
-            for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
-                expStart = i + 1;
-                input[i] = '\0';
-                break;
-            }
-            //Calculate base
-            Value baseVal = calculate(input + 5, 0);
-            int base = getR(baseVal);
-            if(base > 36 || base < 1) {
-                error("base out of bounds", NULL);
-                return;
-            }
-            //Calculate and append to history
-            Value out = calculate(input + expStart, 0);
-            appendToHistory(out, base, true);
-        }
-        else if(startsWith(input, "-degset")) {
-            //If "rad"
-            if(input[8] == 'r' && input[9] == 'a' && input[10] == 'd') degrat = 1;
-            //If "deg"
-            else if(input[8] == 'd' && input[9] == 'e' && input[10] == 'g') degrat = M_PI / 180;
-            //If "grad"
-            else if(input[8] == 'g' && input[9] == 'r' && input[10] == 'a' && input[11] == 'd') degrat = M_PI / 200;
-            //Else custom value
-            else {
-                Value deg = calculate(input + 7, 0);
-                degrat = getR(deg);
-                freeValue(deg);
-            }
-            printf("Degree ratio set to %g\n", degrat);
         }
         else if(startsWith(input, "-unit")) {
             int i, unitStart = 0;
@@ -615,18 +518,6 @@ void runLine(char* input) {
             freeValue(value);
             freeValue(out);
             if(numString != NULL) free(numString);
-        }
-        else if(startsWith(input, "-parse")) {
-            //Clean and generate tree
-            char* clean = inputClean(input + 7);
-            Tree tree = generateTree(clean, NULL, 0);
-            free(clean);
-            if(globalError) return;
-            //Convert to string, print, and free
-            char* out = treeToString(tree, false, NULL);
-            printf("Parsed as: %s\n", out);
-            freeTree(tree);
-            free(out);
         }
         else if(startsWith(input, "-factors")) {
             Value val = calculate(input + 9, 0);
@@ -680,34 +571,6 @@ void runLine(char* input) {
                 printf(">\n");
             }
             freeValue(out);
-        }
-        else if(startsWith(input, "-setaccu")) {
-            Value accu = calculate(input + 9, 10);
-            double accuR = getR(accu);
-            freeValue(accu);
-            globalAccuracy = ((accuR + 5) * log(10) / log(256));
-            digitAccuracy = accuR;
-            if(accuR == 0) {
-                printf("Exited accurate mode.\n");
-                useArb = false;
-                return;
-            }
-            else useArb = true;
-            if(globalAccuracy > 30000) {
-                printf("Warning: Accuracy has been capped at 60000 hexadecimal digits.\n");
-                globalAccuracy = 30000;
-                digitAccuracy = 72244;
-            }
-            else printf("Accuracy set to %d hexadecimal digits\n", globalAccuracy * 2);
-            if(useColors) printf("\033[1;31mWarning: \033[0mthis feature is experimental and may not be accurate. Some features are not implemented. To go back to normal mode, type \"\033[1;34m-\033[0msetaccu 0\".\n");
-            else printf("Warning: this feature is experimental and may not be accurate. Some features are not implemented. To go back to normal mode, type \"-setaccu 0\".\n");
-        }
-        else if(startsWith(input, "-getaccu")) {
-            if(!useArb) {
-                printf("Currently not in accurate mode (13 hexadecimal digits).\n");
-                return;
-            }
-            printf("Current accuracy is %d hexadecimal digits.\n", globalAccuracy * 2);
         }
         //Debug commands
         else if(startsWith(input, "-d")) {

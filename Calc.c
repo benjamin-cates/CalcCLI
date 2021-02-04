@@ -3607,6 +3607,21 @@ void generateFunction(const char* eq) {
     }
     customfunctions[numFunctions++] = newFunction(name, tree, argCount, argNames);
 }
+void deleteCustomFunction(int id) {
+    //Free members
+    customfunctions[id].nameLen = 0;
+    freeTree(*customfunctions[id].tree);
+    free(customfunctions[id].tree);
+    free(customfunctions[id].name);
+    //Free argNames
+    int j = -1;
+    char** argNames = customfunctions[id].argNames;
+    while(argNames[++j] != NULL) free(argNames[j]);
+    free(argNames);
+    //Set tree to NULL
+    customfunctions[id].tree = NULL;
+    customfunctions[id].argCount = 0;
+}
 Tree findFunction(const char* name) {
     Tree out;
     //Get function id from name
@@ -3751,6 +3766,146 @@ void startup() {
     //Allocate functions
     customfunctions = calloc(functionArrayLength, sizeof(Function));
     if(history == NULL || customfunctions == NULL) error(mallocError);
+}
+bool startsWith(char* string, char* sw) {
+    int compareLength = strlen(sw);
+    return memcmp(string, sw, compareLength) == 0 ? true : false;
+}
+char* runCommand(char* input) {
+    if(startsWith(input, "-def")) {
+        generateFunction(input + 5);
+        char* out = calloc(20, 1);
+        strcpy(out, "Function defined.");
+        return out;
+    }
+    else if(startsWith(input, "-del")) {
+        int nameLen = strlen(input + 5);
+        for(int i = 0;i < numFunctions;i++) {
+            if(customfunctions[i].nameLen != nameLen) continue;
+            if(strcmp(input + 5, customfunctions[i].name) != 0) continue;
+            char* out = calloc(nameLen + 33, 1);
+            snprintf(out, nameLen + 33, "Function '%s' has been deleted.", customfunctions[i].name);
+            deleteCustomFunction(i);
+            return out;
+        }
+        error("Function '%s' does not exist", input + 5);
+        return calloc(1, 1);
+    }
+    else if(startsWith(input, "-quit")) {
+        cleanup();
+        exit(0);
+        return NULL;
+    }
+    else if(startsWith(input, "-dx")) {
+        //Clean input
+        char* cleanInput = inputClean(input + 4);
+        if(globalError) return NULL;
+        //Set x
+        char** x = calloc(2, sizeof(char*));
+        if(x == NULL) { error(mallocError);return NULL; }
+        x[0] = calloc(2, 1);
+        if(x[0] == NULL) { error(mallocError);return NULL; }
+        x[0][0] = 'x';
+        //Get tree
+        Tree ops = generateTree(cleanInput, x, 0);
+        free(cleanInput);
+        //Clean tree
+        Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
+        freeTree(ops);
+        //Get derivative and clean it
+        Tree dx = derivative(cleanedOps);
+        freeTree(cleanedOps);
+        Tree dxClean = treeCopy(dx, NULL, false, false, true);
+        freeTree(dx);
+        //Print output
+        Value ret;
+        ret.type = value_func;
+        ret.tree = malloc(sizeof(Tree));
+        *ret.tree = dxClean;
+        appendToHistory(ret, 10, true);
+        return calloc(1, 1);
+    }
+    else if(startsWith(input, "-degset")) {
+        char* type = input + 8;
+        //If "rad"
+        if(startsWith(type, "rad")) degrat = 1;
+        //If "deg"
+        else if(startsWith(type, "deg")) degrat = M_PI / 180;
+        //If "grad"
+        else if(startsWith(type, "grad")) degrat = M_PI / 200;
+        //Else custom value
+        else {
+            Value deg = calculate(input + 8, 0);
+            degrat = getR(deg);
+            freeValue(deg);
+        }
+        char* out = calloc(50, 1);
+        snprintf(out, 50, "Degree ratio set to %g", degrat);
+        return out;
+    }
+    else if(startsWith(input, "-parse")) {
+        //Clean and generate tree
+        char* clean = inputClean(input + 7);
+        Tree tree = generateTree(clean, NULL, 0);
+        free(clean);
+        if(globalError) return NULL;
+        //Convert to string, free, and return
+        char* out = treeToString(tree, false, NULL);
+        freeTree(tree);
+        return out;
+    }
+    else if(startsWith(input, "-setaccu")) {
+        useArb = false;
+        Value accu = calculate(input + 9, 10);
+        double accuR = getR(accu);
+        freeValue(accu);
+        globalAccuracy = ((accuR + 5) * log(10) / log(256));
+        digitAccuracy = accuR;
+        if(accuR < 11) {
+            char* out = calloc(25, 1);
+            strcpy(out, "Exited accurate mode.");
+            return out;
+        }
+        else useArb = true;
+        char* out = calloc(300, 1);
+        if(globalAccuracy > 30000) {
+            strcat(out, "Warning: Accuracy has been capped at 60000 hexadecimal digits.\n");
+            globalAccuracy = 30000;
+            digitAccuracy = 72244;
+        }
+        else snprintf(out + strlen(out), 150, "Accuracy set to %d hexadecimal digits\n", globalAccuracy * 2);
+        strcat(out, "Warning: this feature is experimental and may not be accurate. Some features are not implemented. To go back to normal mode, type \"-setaccu 0\".");
+        return out;
+    }
+    else if(startsWith(input, "-getaccu")) {
+        char* out = calloc(70, 1);
+        if(!useArb) strcpy(out, "Currently not in accurate mode (13 hexadecimal digits).");
+        else snprintf(out, 70, "Current accuracy is %d hexadecimal digits.", globalAccuracy);
+        return out;
+    }
+    else if(startsWith(input, "-base")) {
+        //format: -base(16) 46 will return 2E
+        int i, expStart = 0;
+        //Find end of base
+        for(i = 5;i < strlen(input);i++) if(input[i] == ' ') {
+            expStart = i + 1;
+            input[i] = '\0';
+            break;
+        }
+        //Calculate base
+        Value baseVal = calculate(input + 5, 0);
+        int base = getR(baseVal);
+        freeValue(baseVal);
+        if(base > 36 || base < 1) {
+            error("base out of bounds", NULL);
+            return calloc(1, 1);
+        }
+        //Calculate and append to history
+        Value out = calculate(input + expStart, 0);
+        appendToHistory(out, base, true);
+        return calloc(1, 1);
+    }
+    else return NULL;
 }
 #pragma endregion
 #pragma region Misc

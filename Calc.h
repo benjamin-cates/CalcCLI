@@ -595,6 +595,10 @@ Tree findFunction(const char* name);
  * @param eq Equation (ex. "f(a)=a^2")
  */
 void generateFunction(const char* eq);
+/**
+ * Deletes the custom function with id
+ */
+void deleteCustomFunction(int id);
 #pragma endregion
 /**
  * Prints graph of equation to stdout
@@ -633,6 +637,16 @@ void runLine(char* input);
  * @return output, must be free()d
  */
 char* inputClean(const char* input);
+/**
+ * Returns whether string starts with sw
+ */
+bool startsWith(char* string, char* sw);
+/**
+ * Basic command running, returns a string with the command output
+ * Returns NULL if the command is not recognized
+ * Return value must be freed
+ */
+char* runCommand(char* input);
 #pragma region Misc
 int* primeFactors(int num);
 bool isPrime(int num);
