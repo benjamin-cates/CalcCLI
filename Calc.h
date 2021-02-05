@@ -251,13 +251,14 @@ void freeArb(Arb arb);
 int arbCmp(Arb one, Arb two);
 //Trim the zeroes and round up if len is greater than accu
 void trimZeroes(Arb* arb);
-Arb multByInt(Arb one, int two);
 //Arb conversions
 Arb parseArb(char* string, int base, int accu);
 double arbToDouble(Arb arb);
 char* arbToString(Arb arb, int base, int digitAccuracy);
 Arb doubleToArb(double val, int accu);
 //Math functions
+Arb arb_divModInt(Arb one, unsigned char two, int* carryOut);
+Arb multByInt(Arb one, int two);
 Arb arb_floor(Arb one);
 Arb arb_add(Arb one, Arb two);
 Arb arb_subtract(Arb one, Arb two);

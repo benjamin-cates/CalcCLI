@@ -91,30 +91,31 @@ void disableRawMode() {
 #endif
 #ifdef USE_FANCY_INPUT
 bool useFancyInput = true;
+void printWithHighlighting(char* str) {
+    const char* colorCodes[] = {
+        "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36"
+    };
+    int strLen = strlen(str);
+    char* simpleSyntax = highlightSyntax(str);
+    char* colors = advancedHighlight(str, simpleSyntax, false, NULL, NULL);
+    int prevColor = 0;
+    printf("\033[0m");
+    for(int i = 0;i < strLen;i++) {
+        if(prevColor != colors[i]) {
+            prevColor = colors[i];
+            printf("\033[0m\033[%sm", colorCodes[prevColor]);
+        }
+        putchar(str[i]);
+    }
+    printf("\033[0m");
+    free(colors);
+    free(simpleSyntax);
+}
 void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
     //Print input
-    if(useColors) {
-        const char* colorCodes[] = {
-            "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36"
-        };
-        char* simpleSyntax = highlightSyntax(string);
-        char* colors = advancedHighlight(string, simpleSyntax, false, NULL, NULL);
-        int i = 0;
-        int prevColor = 0;
-        printf("\033[0m");
-        for(i = 0;i < strlen(string);i++) {
-            if(prevColor != colors[i]) {
-                prevColor = colors[i];
-                printf("\033[0m\033[%sm", colorCodes[prevColor]);
-            }
-            putchar(string[i]);
-        }
-        printf("\033[0m");
-        free(colors);
-        free(simpleSyntax);
-    }
+    if(useColors) printWithHighlighting(string);
     else printf("%s ", string);
     //Set cursor position
     if(cursorPos == -1) return;
