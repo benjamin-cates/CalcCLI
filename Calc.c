@@ -3566,6 +3566,9 @@ char** mergeArgList(char** one, char** two) {
     return out;
 }
 char* argListToString(char** argList) {
+    if(argList[0]==NULL) {
+        return calloc(1,1);
+    }
     int totalLen = 0;
     int i = -1;
     while(argList[++i]) {
@@ -3824,6 +3827,53 @@ bool startsWith(char* string, char* sw) {
     return memcmp(string, sw, compareLength) == 0 ? true : false;
 }
 char* runCommand(char* input) {
+    if(startsWith(input, "-ls")) {
+        char* type = input + 4;
+        if(startsWith(type, "ls")) {
+            const char* lsTypes = "-ls ls ; list ls inputs\n-ls ; list custom functions";
+            char* out = calloc(strlen(lsTypes)+2, 1);
+            strcpy(out, lsTypes);
+            return out;
+        }
+        //List all custom function
+        if(type[0] == 0) {
+            char* functionContents[functionArrayLength];
+            char* functionInputs[functionArrayLength];
+            int outLen = 50;
+            for(int i = 0;i < numFunctions;i++) {
+                outLen += 8;
+                outLen += customfunctions[i].nameLen;
+                functionContents[i] = treeToString(*customfunctions[i].tree, false, customfunctions[i].argNames);
+                outLen += strlen(functionContents[i]);
+                functionInputs[i] = argListToString(customfunctions[i].argNames);
+                outLen += strlen(functionInputs[i]);
+            }
+            char* out = calloc(outLen, 1);
+            int outPos = 0;
+            for(int i = 0;i < numFunctions;i++) {
+                strcpy(out + outPos, customfunctions[i].name);
+                outPos += customfunctions[i].nameLen;
+                bool addBrackets=functionInputs[i][0]!='('&&functionInputs[i][0]!='\0';
+                if(addBrackets) out[outPos++]='(';
+                strcpy(out + outPos, functionInputs[i]);
+                outPos += strlen(functionInputs[i]);
+                if(addBrackets) out[outPos++]=')';
+                free(functionInputs[i]);
+                strcpy(out + outPos, " = ");
+                outPos += 3;
+                strcpy(out + outPos, functionContents[i]);
+                outPos += strlen(functionContents[i]);
+                free(functionContents[i]);
+                out[outPos++] = '\n';
+            }
+            snprintf(out + outPos, outLen - outPos, "There are %d custom functions.", numFunctions);
+            return out;
+        }
+        else {
+            error("ls type '%s' not recognized", type);
+            return NULL;
+        }
+    }
     if(startsWith(input, "-def")) {
         generateFunction(input + 5);
         char* out = calloc(20, 1);

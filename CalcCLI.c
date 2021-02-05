@@ -428,62 +428,6 @@ void runLine(char* input) {
             free(line);
             fclose(file);
         }
-        else if(startsWith(input, "-ls")) {
-            //ls lists all user-defined functions
-            int num = 0;
-            for(i = 0; i < numFunctions; i++) {
-                if(customfunctions[i].nameLen == 0) continue;
-                num++;
-                //Get equation
-                char* equation = treeToString(*(customfunctions[i].tree), false, customfunctions[i].argNames);
-                //Print name
-                printf("%s", customfunctions[i].name);
-                //Print arguments (if it has them)
-                if(customfunctions[i].argNames != NULL) {
-                    printf("(");
-                    int j;
-                    for(j = 0;j < customfunctions[i].argCount;j++) {
-                        if(j != 0) printf(",");
-                        printf("%s", customfunctions[i].argNames[j]);
-                    }
-                    printf(")");
-                }
-                //Print equation
-                printf(" = %s\n", equation);
-                free(equation);
-            }
-            printf("There %s %d user-defined function%s.\n", num == 1 ? "is" : "are", num, num == 1 ? "" : "s");
-        }
-        else if(startsWith(input, "-factors")) {
-            Value val = calculate(input + 9, 0);
-            int num = getR(val);
-            freeValue(val);
-            int* factors = primeFactors(num);
-            //If num is prime
-            if(factors[0] == 0) {
-                printf("%d is prime\n", num);
-            }
-            //Else list factors
-            else {
-                printf("Factors of %d:", num);
-                int i = -1;
-                int prev = factors[0];
-                int count = 0;
-                //List through each factor
-                while(factors[++i] != 0) {
-                    if(factors[i] != prev) {
-                        if(count != 1) printf(" %d^%d *", prev, count);
-                        else printf(" %d *", prev);
-                        count = 1;
-                    }
-                    else count++;
-                    prev = factors[i];
-                }
-                if(count == 1)printf(" %d\n", prev);
-                else printf(" %d^%d\n", prev, count);
-            }
-            free(factors);
-        }
         //Debug commands
         else if(startsWith(input, "-d")) {
             if(startsWith(input, "-dsyntax")) {
