@@ -3566,8 +3566,8 @@ char** mergeArgList(char** one, char** two) {
     return out;
 }
 char* argListToString(char** argList) {
-    if(argList[0]==NULL) {
-        return calloc(1,1);
+    if(argList[0] == NULL) {
+        return calloc(1, 1);
     }
     int totalLen = 0;
     int i = -1;
@@ -3633,6 +3633,51 @@ char** parseArgumentList(const char* list) {
     }
     return out;
 }
+#pragma endregion
+#pragma region -include Functions
+const char* includeFuncTypes[] = {
+    "quaternion",
+    "random",
+    "probability",
+    "vectors",
+    "geometry",
+};
+struct LibraryFunction includeFuncs[includeFuncsLen] = {
+    {"ncr","(n,r)","(fact(n)/fact(n-r))/fact(r)",2},
+    {"npr","(n,r)","fact(n)/fact(n-r)",2},
+    {"choose","(n,r)","(fact(n)/fact(n-r))/fact(r)",2},
+    //Mean of a vector
+    {"mean","(vec)","sum(i=>ge(vec,i),0,length(vec),1)/length(vec)",1},
+    //Random Range
+    {"rand_range","(min,max)","rand*(max-min)+min",1},
+    //Random Int
+    {"rand_int","(min,max)","floor(rand*(max-min)+min)",1},
+    //Random member
+    {"rand_member","(vec)","ge(vec,floor(rand*length(vec)))",1},
+    //p(func,i) runs func i times and finds the probability it returns 1
+    {"p","(func,n)","(n-sum(i=>equal(run(func,i),0),0,n,1))/n",2},
+
+    //getrow
+    {"getrow","(vec,row)","fill(x=>ge(vec,x,row),width(vec),1)"},
+    //getcolumn
+    {"getcolumn","(vec,col)","fill((x,y)=>ge(vec,col,y),1,height(vec))"},
+    //excluderow
+    //excludecolumn
+
+    //solvesyseq
+    {"solvesyseq","(coef,out)","mat_mult(mat_inv(coef),transpose(out))",-1},
+    //solvequad
+    {"solvequad","(a,b,c)","<-b+sqrt(b^2-4a*c),-b-sqrt(b^2-4a*c)>/2a",-1},
+
+    //area_circle
+    {"area_circle","(r)","pi*r^2",4},
+    //area_triangle
+    {"area_tri","(b,h)","b*h/2",4},
+    //Volume circle
+    {"vol_sphere","(r)","4*pi*r^3/3",4},
+    //pythag(a,b)=c
+    {"pythag","(a,b)","sqrt(a^2+b^2)",4},
+};
 #pragma endregion
 Function newFunction(char* name, Tree* tree, char argCount, char** argNames) {
     Function out;
@@ -3831,7 +3876,7 @@ char* runCommand(char* input) {
         char* type = input + 4;
         if(startsWith(type, "ls")) {
             const char* lsTypes = "-ls ls ; list ls inputs\n-ls ; list custom functions";
-            char* out = calloc(strlen(lsTypes)+2, 1);
+            char* out = calloc(strlen(lsTypes) + 2, 1);
             strcpy(out, lsTypes);
             return out;
         }
@@ -3853,11 +3898,11 @@ char* runCommand(char* input) {
             for(int i = 0;i < numFunctions;i++) {
                 strcpy(out + outPos, customfunctions[i].name);
                 outPos += customfunctions[i].nameLen;
-                bool addBrackets=functionInputs[i][0]!='('&&functionInputs[i][0]!='\0';
-                if(addBrackets) out[outPos++]='(';
+                bool addBrackets = functionInputs[i][0] != '(' && functionInputs[i][0] != '\0';
+                if(addBrackets) out[outPos++] = '(';
                 strcpy(out + outPos, functionInputs[i]);
                 outPos += strlen(functionInputs[i]);
-                if(addBrackets) out[outPos++]=')';
+                if(addBrackets) out[outPos++] = ')';
                 free(functionInputs[i]);
                 strcpy(out + outPos, " = ");
                 outPos += 3;
@@ -3867,6 +3912,28 @@ char* runCommand(char* input) {
                 out[outPos++] = '\n';
             }
             snprintf(out + outPos, outLen - outPos, "There are %d custom functions.", numFunctions);
+            return out;
+        }
+        if(startsWith(type, "include")) {
+            int outLen = 60;
+            for(int i = 0;i < includeFuncsLen;i++) {
+                outLen += strlen(includeFuncs[i].name);
+                outLen += strlen(includeFuncs[i].arguments);
+                outLen += strlen(includeFuncs[i].equation);
+                outLen += 5;
+            }
+            char* out = calloc(outLen, 1);
+            for(int i = 0;i < includeFuncsLen;i++) {
+                strcat(out, includeFuncs[i].name);
+                strcat(out, includeFuncs[i].arguments);
+                strcat(out, " = ");
+                strcat(out, includeFuncs[i].equation);
+                strcat(out, "\n");
+            }
+            char* message = calloc(50, 1);
+            snprintf(message, 50, "There are %d includable functions", includeFuncsLen);
+            strcat(out, message);
+            free(message);
             return out;
         }
         else {
@@ -4134,6 +4201,37 @@ char* runCommand(char* input) {
         snprintf(ret, retLen, "= %s %s", numString, input + 5);
         if(numString != NULL) free(numString);
         return ret;
+    }
+    else if(startsWith(input, "-include")) {
+        char* name = input + 9;
+        char* nameClean = inputClean(name);
+        int includeID = -1;
+        for(int i = 0;i < includeFuncsLen;i++) {
+            if(strcmp(nameClean, includeFuncs[i].name) == 0) {
+                includeID = i;
+                int formLen = 5;
+                formLen += strlen(includeFuncs[i].name);
+                formLen += strlen(includeFuncs[i].arguments);
+                formLen += strlen(includeFuncs[i].equation);
+                char* formula = calloc(formLen, 1);
+                strcat(formula, includeFuncs[i].name);
+                strcat(formula, includeFuncs[i].arguments);
+                strcat(formula, "=");
+                strcat(formula, includeFuncs[i].equation);
+                generateFunction(formula);
+                free(formula);
+                break;
+            }
+        }
+        if(includeID == -1) {
+            error("cannot find function '%s'", nameClean);
+            free(nameClean);
+            return NULL;
+        }
+        free(nameClean);
+        char* out = calloc(20, 1);
+        strcpy(out, "Function included");
+        return out;
     }
     else return NULL;
 }
@@ -4542,6 +4640,14 @@ char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, cha
             args[2] = grad;
             args[3] = NULL;
             arguments = mergeArgList(arguments, args);
+        }
+        if(strcmp(name, "include") == 0) {
+            //Add included funcs names to arguments list
+            char* names[includeFuncsLen + 1];
+            names[includeFuncsLen] = NULL;
+            for(int i = 0;i < includeFuncsLen;i++)
+                names[i] = includeFuncs[i].name;
+            arguments = mergeArgList(arguments, names);
         }
     }
     while(eq[i] != '\0' || i == -1) {

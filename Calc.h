@@ -20,6 +20,8 @@
     #define unitCount 59
     //Number of immutable functions
     #define immutableFunctions 107
+    //Number of optional functions
+    #define includeFuncsLen 16
     /*
         Unit type
         {0: meter , 1: kilogram, 2: second, 3: Amp, 4: Kelvin, 5: mole, 6: currency, 7:bits}
@@ -182,6 +184,16 @@ struct stdFunction {
     const int nameLen;
     const char* name;
 };
+/**
+ * Stores information about an optionally included function
+ * Library functions are stored in includeFuncs
+ */
+struct LibraryFunction {
+    char* name;
+    char* arguments;
+    char* equation;
+    int libraryID;
+};
 #pragma endregion
 #pragma region External Variables
 //Degree ratio, 1 if radian, pi/180 if degrees
@@ -220,6 +232,10 @@ extern int functionArrayLength;
 extern Function* customfunctions;
 //List of all standard functions (optype_builtin)
 extern const struct stdFunction stdfunctions[immutableFunctions];
+//List of all optional functions (include with -include)
+extern struct LibraryFunction includeFuncs[includeFuncsLen];
+//Types of includeFuncs (not currently used)
+extern const char* includeFuncTypes[];
 //Metric prefixes
 extern const char metricNums[];
 //Metric prefix values
