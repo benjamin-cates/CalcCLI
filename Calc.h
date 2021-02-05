@@ -243,7 +243,6 @@ void error(const char* format, ...);
 #pragma region Arbitrary Precision
 ///General Functions
 Arb arbCTR(unsigned char* mant, short len, short exp, char sign, short accu);
-Arb nullArb(int accu);
 Arb copyArb(Arb arb);
 void freeArb(Arb arb);
 /*
