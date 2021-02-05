@@ -395,7 +395,24 @@ void runLine(char* input) {
         char* output = runCommand(input);
         if(globalError) return;
         if(output != NULL) {
-            if(output[0] != '\0') printf("%s\n", output);
+            if(output[0] != '\0') {
+                //Highligh history
+                if(output[0] == '$') {
+                    int i = 1;
+                    while(output[++i] != '=');
+                    output[i + 1] = '\0';
+                    printf("%s ", output);
+                    printWithHighlighting(output + i + 2);
+                    putchar('\n');
+                }
+                //Highlight results from parse
+                else if(startsWith(input, "-parse")) {
+                    printWithHighlighting(output);
+                    putchar('\n');
+                }
+                //Else print string
+                else printf("%s\n", output);
+            }
             free(output);
         }
         else if(startsWith(input, "-g ")) {
@@ -635,7 +652,15 @@ void runLine(char* input) {
             return;
         }
         Value out = calculate(input, 0);
-        if(!globalError) appendToHistory(out, 10, true);
+        if(globalError) return;
+        //Print output highlighted
+        char* output = appendToHistory(out, 10, false);
+        int i = 1;
+        while(output[++i] != '=');
+        output[i + 1] = '\0';
+        printf("%s ", output);
+        printWithHighlighting(output + i + 2);
+        putchar('\n');
     }
 }
 int main(int argc, char** argv) {
