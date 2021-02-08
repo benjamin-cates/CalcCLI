@@ -426,6 +426,10 @@ void runLine(char* input) {
             int strLen = strlen(input);
             //Read lines from a file
             FILE* file = fopen(input + 3, "r");
+            if(file == NULL) {
+                error("file '%s' not found", input + 3);
+                return;
+            }
             //Initialize lines
             unsigned long lineSize = 300;
             char* line = malloc(300);
