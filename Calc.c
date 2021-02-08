@@ -2268,7 +2268,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         else if(first == '(') {
             //Round bracket
             section[sectionLength - 1] = '\0';
-            ops[i] = generateTree(section + 1, argNames, 0);
+            ops[i] = generateTree(section + 1, argNames, base);
             if(globalError)
                 return NULLOPERATION;
         }
