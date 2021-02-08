@@ -1025,13 +1025,16 @@ Number compPower(Number one, Number two) {
     double arg = atan2(one.i, one.r);
     //the builtin atan2 is wrong for this edge case
     if(one.i == 0 && one.r < 0) arg = M_PI;
-    if(one.r == 0 && one.i == 0)
-        arg = 0;
+    if(one.r == 0 && one.i == 0) arg = 0;
     double p1 = exp(two.r * 0.5 * logabs - two.i * arg);
     double cis = two.i * 0.5 * logabs + two.r * arg;
-    if(isnan(cis))
-        cis = 0;
-    return newNum(p1 * cos(cis), p1 * sin(cis), unitInteract(one.u, two.u, '^', two.r));
+    if(isnan(cis)) cis = 0;
+    //If sine or cos of cis is very close to zero, set it to zero
+    double sinecis = sin(cis);
+    double coscis = cos(cis);
+    if(sinecis<1e-15 && sinecis>-1e-15) sinecis = 0;
+    if(coscis<1e-15 && coscis>-1e-15) coscis = 0;
+    return newNum(p1 * coscis, p1 * sinecis, unitInteract(one.u, two.u, '^', two.r));
 }
 Number compDivide(Number one, Number two) {
     double denominator = two.r * two.r + (two.i * two.i);
@@ -1047,12 +1050,16 @@ Number compModulo(Number one, Number two) {
     return newNum(r, i, unitInteract(one.u, two.u, '+', 0));
 }
 Number compSine(Number one) {
+    double sinhi = sinh(one.i);
+    double coshi = cosh(one.i);
+    if(one.i == 0) sinhi = 0, coshi = 1;
     return newNum(sin(one.r) * cosh(one.i), cos(one.r) * sinh(one.i), one.u);
 }
 Number compSqrt(Number one) {
     double abs = sqrt(one.r * one.r + one.i * one.i);
     double sgnI = one.i / fabs(one.i);
     if(one.i == 0) sgnI = 1;
+    if(one.r > 0 && one.i == 0) sgnI = 0;
     return newNum(sqrt((abs + one.r) / 2), sgnI * sqrt((abs - one.r) / 2), unitInteract(one.u, 0, '^', 0.5));
 }
 Number compGamma(Number one) {
