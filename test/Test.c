@@ -3,13 +3,12 @@
 void error(const char* format, ...) {
     //Print error
     printf("Error: ");
-    char* dest[256];
     va_list argptr;
     va_start(argptr, format);
     vprintf(format, argptr);
     va_end(argptr);
     printf("\n");
-    globalError=true;
+    globalError = true;
 };
 //These tests basic parsing
 const char* regularTestText[] = {
@@ -73,32 +72,63 @@ const Number regularTestResults[] = {
     {20.0,0.0,0},
     {1.0,2.0,0},
 };
-int failedCount=0;
-int testIndex=0;
-void failedTest(int index,const char* equation,const char* result,const char* expected) {
-    printf("Failed Test %d: expected %s from %s, but got %s\n",index,expected,equation,result);
+int failedCount = 0;
+int testIndex = 0;
+void failedTest(int index, const char* testType, const char* equation, const char* format, ...) {
+    printf("Failed test %d (%s)", index, testType);
+    if(globalError) printf(" with error");
+    printf(", input was \"%s\": ", equation);
+    va_list message;
+    va_start(message, format);
+    vprintf(format, message);
+    va_end(message);
+    printf("\n");
     failedCount++;
 }
 int main() {
     int i;
     //Loop over regularTests
-    for(i=0;i<sizeof(regularTestResults)/24;i++) {
+    for(i = 0;i < sizeof(regularTestResults) / 24;i++) {
         //Get result and expected
-        Value result=calculate(regularTestText[i],0);
-        Number expected=regularTestResults[i];
-        if(globalError) globalError=false;
+        Value result = calculate(regularTestText[i], 0);
+        Number expected = regularTestResults[i];
+        if(globalError) globalError = false;
         //If wrong
-        if(result.r!=expected.r||result.i!=expected.i||result.u!=expected.u) {
+        if(result.r != expected.r || result.i != expected.i || result.u != expected.u) {
             //Print error
-            char* resultString=valueToString(result,10.0);
-            char* expectedString=toStringNumber(expected,10.0);
-            failedTest(testIndex,regularTestText[i],resultString,expectedString);
+            char* resultString = valueToString(result, 10.0);
+            char* expectedString = toStringNumber(expected, 10.0);
+            failedTest(testIndex, "Regular", regularTestText[i], "expected %s, but got %s", expectedString,resultString);
             free(resultString);
             free(expectedString);
         }
         testIndex++;
     }
+    testIndex=0;
+    for(i = 0;i < unitCount;i++) {
+        for(int j = 0;j < metricCount + 1;j++) {
+            if(unitList[i].multiplier>0&&j!=metricCount) continue;
+            char input[10];
+            memset(input, 0, 10);
+            int inputPos = 0;
+            input[inputPos++] = '[';
+            if(j != metricCount) input[inputPos++] = metricNums[j];
+            int nameLen = strlen(unitList[i].name);
+            memcpy(input + inputPos, unitList[i].name, nameLen);
+            inputPos += nameLen;
+            input[inputPos++] = ']';
+            Value out = calculate(input, 0);
+            if(out.u != unitList[i].baseUnits) {
+                failedTest(testIndex, "Units (base units)", input, "expected 0x%x, but got 0x%x",unitList[i].baseUnits,out.u);
+            }
+            if((j == metricCount && out.r != fabs(unitList[i].multiplier)) || (j != metricCount && out.r != fabs(unitList[i].multiplier * metricNumValues[j]))) {
+                failedTest(testIndex, "Unit values", input, "expected %g, but got %g", fabs(unitList[i].multiplier * metricNumValues[j]), out.r);
+            }
+            testIndex++;
+            globalError=false;
+        }
+    }
     //Print failed count
-    printf("Failed %d %s.\n",failedCount,failedCount==1?"test":"tests");
+    printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
     return 0;
 }
