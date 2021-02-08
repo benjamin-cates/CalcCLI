@@ -17,7 +17,7 @@
 #endif
 #ifndef unit_t
     //Number of units#
-    #define unitCount 59
+    #define unitCount 58
     //Number of immutable functions
     #define immutableFunctions 107
     //Number of optional functions
