@@ -36,7 +36,7 @@
     */
     #define unit_t unsigned long long
     //Number of metric prefixes
-    #define metricCount 17
+    #define metricCount 18
 #endif
 #define value_num 0
 #define value_vec 1
