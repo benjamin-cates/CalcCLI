@@ -4509,6 +4509,12 @@ char* highlightSyntax(const char* eq) {
             }
             continue;
         }
+        if(ch == ';') {
+            //Set character as bracket
+            state = 0;
+            out[i] = 5;
+            continue;
+        }
         if(ch == ',') {
             state = 0;
             out[i] = 5;
