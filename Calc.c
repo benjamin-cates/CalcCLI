@@ -820,28 +820,44 @@ double parseNumber(const char* num, double base) {
     int i;
     int numLength = strlen(num);
     int periodPlace = numLength;
-    double out = 0;
-    double power = 1;
-    for(i = 0; i < numLength; i++)
-        if(num[i] == '.') {
+    int exponentPlace = numLength;
+    //Find the position of 'e' and '.'
+    for(i = 0; i < numLength; i++) {
+        if(num[i] == '.' && periodPlace == numLength) {
             periodPlace = i;
+        }
+        if(num[i] == 'e') {
+            exponentPlace = i;
             break;
         }
+    }
+    if(periodPlace>exponentPlace) periodPlace=exponentPlace;
+    //Parse integer digits
+    double power = 1;
+    double out = 0;
     for(i = periodPlace - 1; i > -1; i--) {
         double n = (double)(num[i] - 48);
-        if(n > 10)
-            n -= 7;
+        if(n > 10) n -= 7;
         out += power * n;
         power *= base;
     }
+    //Parse fractional digits
     power = 1 / base;
-    for(i = periodPlace + 1; i < numLength; i++) {
+    for(i = periodPlace + 1; i < exponentPlace; i++) {
         double n = (double)(num[i] - 48);
-        if(n > 10)
-            n -= 7;
+        if(n > 10) n -= 7;
         out += power * n;
         power /= base;
     }
+    //Parse exponent
+    double exponent = 0;
+    for(i = exponentPlace + 1;i < numLength;i++) {
+        exponent *= base;
+        double n = num[i] - 48;
+        if(n > 10) n -= 7;
+        exponent += n;
+    }
+    if(exponent != 0) out *= pow(base, exponent);
     return out;
 }
 char* toStringNumber(Number num, double base) {
@@ -2070,12 +2086,16 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         int chType = getCharType(ch, curType, base, useUnits);
         //To start a new section
         bool createSection = false;
+        //Numerals
         if(chType == 0 && curType != 0 && curType != 1) createSection = true;
+        //Operators
         if(chType == 6 && curType != 6) createSection = true;
+        //Variables
         if(chType == 1 && curType != 1) {
             if(i != 0 && eq[i - 1] == '0')
                 if(ch == 'b' || ch == 'x' || ch == 'd' || ch == 'o')
                     continue;
+            if(curType == 0 && ch == 'e') continue;
             createSection = true;
         }
         if(createSection) {
@@ -2112,6 +2132,8 @@ Tree generateTree(const char* eq, char** argNames, double base) {
             if(first == '0') {
                 char base = eq[sections[i] + 1];
                 if(base >= 'a') useBase = true;
+                //ignore things like 0e10 because e means exponent
+                if(base == 'e') useBase = false;
                 if(base == 'b') numBase = 2;
                 if(base == 'o') numBase = 8;
                 if(base == 'd') numBase = 10;
@@ -4533,7 +4555,7 @@ char* highlightSyntax(const char* eq) {
             continue;
         }
         //Numbers
-        if(((ch >= '0' && ch <= '9') || ch == '.') && state != 2) {
+        if(((ch >= '0' && ch <= '9') || ch == '.' || ch == 'e') && state != 2) {
             if(ch == '0' && state != 1) {
                 char b = eq[i + 1];
                 base = 10;

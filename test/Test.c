@@ -41,6 +41,10 @@ const char* regularTestText[] = {
     "run(n=>(5)n,4)",
     //"abs(<10,,5>)",
     "1+2i",
+    "10.5e2",
+    "1e1",
+    "[10e3]_4",
+    "0e5",
 };
 const Number regularTestResults[] = {
     {1.0,0.0,0},
@@ -71,6 +75,10 @@ const Number regularTestResults[] = {
     {40.0,0.0,0},
     {20.0,0.0,0},
     {1.0,2.0,0},
+    {1050.0,0.0,0},
+    {10.0,0.0,0},
+    {256.0,0.0,0},
+    {0.0,0.0,0},
 };
 int failedCount = 0;
 int testIndex = 0;
