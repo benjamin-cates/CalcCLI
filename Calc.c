@@ -4636,7 +4636,8 @@ char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, cha
         }
         name[nameI] = '\0';
         if(strcmp(name, "f") == 0) {
-
+            if(len>3) memset(out+3,0,len-3);
+            return out;
         }
         if(strcmp(name, "dx") == 0 || strcmp(name, "g") == 0) {
             char x[2] = "x";
