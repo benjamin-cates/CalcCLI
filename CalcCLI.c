@@ -506,6 +506,7 @@ void runLine(char* input) {
                 //Parse runCount
                 input[i] = '\0';
                 int runCount = parseNumber(input + 6, 10);
+                if(runCount == 0) runCount = 1;
                 printf("Run Count: %d, Clocks per second: %d\n", runCount, CLOCKS_PER_SEC);
                 //Get runtype
                 char* runType = input + i + 1;
@@ -563,6 +564,18 @@ void runLine(char* input) {
                     t = clock() - t;
                     printPerformance("Calculation", t, runCount);
                     freeTree(tr);
+                    return;
+                }
+                else if(startsWith(runType, "startup")) {
+                    cleanup();
+                    clock_t t = clock();
+                    for(int i = 0;i < runCount;i++) {
+                        startup();
+                        cleanup();
+                    }
+                    t = clock() - t;
+                    printPerformance("startup", t, runCount);
+                    startup();
                     return;
                 }
                 else error("Performance test type unrecognized.");
