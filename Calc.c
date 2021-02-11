@@ -77,70 +77,82 @@ int getStdFunctionID(int* list, const char* find, int count) {
     }
     else return getStdFunctionID(list, find, half);
 }
+int getUnitId(const char* name, int pos, int count) {
+    if(count < 3) {
+        if(strcmp(unitList[pos].name, name) == 0) return pos;
+        if(strcmp(unitList[pos + 1].name, name) == 0) return pos + 1;
+        return -1;
+    }
+    int half = count / 2;
+    int compare = strcmp(unitList[pos + half].name, name);
+    if(compare == 0) return pos + half;
+    else if(compare < 0) return getUnitId(name, pos + half, count - half);
+    else return getUnitId(name, pos, half);
+}
 int cmpFunctionNames(int id1, int id2) {
     return strcmp(stdfunctions[id1].name, stdfunctions[id2].name);
 }
 #pragma endregion
 #pragma region Units
 const unitStandard unitList[] = {
-    {"m", -1.0, 0x1},                  //Meter
-    {"kg", 1.0, 0x100},                //Kilogram
-    {"g", -0.001, 0x100},            //Gram
-    {"s", -1.0, 0x10000},              //Second
-    {"A", -1.0, 0x1000000},            //Ampere
-    {"K", -1.0, 0x100000000},          //Kelvin
-    {"mol", -1.0, 0x10000000000},      //Mole
     {"$", 1.0, 0x1000000000000},       //Dollar
-    {"b", -1.0, 0x100000000000000},    //Bit
+    {"A", -1.0, 0x1000000},            //Ampere
+    {"Ah",-3600.0,0x01010000},
     {"B", -8.0, 0x100000000000000},    //Byte
-    {"bps", -1.0, 0x100000000FF0000}, //Bits per second
     {"Bps", -8.0, 0x100000000FF0000}, //Bytes per second
-    {"J", -1.0, 0xFE0102},            //Joule
-    {"W", -1.0, 0xFD0102},            //Watt
-    {"V", -1.0, 0x01FD0102},          //Volt
-    {"ohm", -1.0, 0xFEFD0102},        //Ohm
-    {"H", -1.0, 0xFEFE0102},          //Henry
-    {"Wb", -1.0, 0xFFFE0102},         //Weber
-    {"Hz", -1.0, 0xFF0000},           //Hertz
-    {"S", -1.0, 0x203FFFE},           //Siemens
     {"F", -1.0, 0x204FFFE},           //Farad
-    {"T", -1.0, 0xFFFE0100},          //Tesla
-    {"Pa", -1.0, 0xFE01FF},           //Pascal
+    {"H", -1.0, 0xFEFE0102},          //Henry
+    {"Hz", -1.0, 0xFF0000},           //Hertz
+    {"J", -1.0, 0xFE0102},            //Joule
+    {"K", -1.0, 0x100000000},          //Kelvin
     {"N", -1.0, 0xFE0101},            //Newton
+    {"Pa", -1.0, 0xFE01FF},           //Pascal
+    {"S", -1.0, 0x203FFFE},           //Siemens
     {"Sv", -1.0, 0xFE0002},           //Sievert
-    {"kat", -1.0, 0x10000FF0000},     //Katal
-    {"min",60.0,0x010000},
-    {"hr",3600.0,0x010000},
-    {"day",86400.0,0x010000},
-    {"kph",0.277777777777777,0xFF0001},
-    {"mph",0.4470388888888888,0xFF0001},
-    {"mach",273,0xFF0001},
-    {"c",299792458.0,0xFF0001},
-    {"ft",0.3048,0x01},
-    {"mi",1609.344,0x01},
-    {"yd",0.9144,0x01},
-    {"in",0.0254,0x01},
-    {"nmi",1852.0,0x01},
-    {"pc",-30857000000000000.0,0x01},
+    {"T", -1.0, 0xFFFE0100},          //Tesla
+    {"V", -1.0, 0x01FD0102},          //Volt
+    {"W", -1.0, 0xFD0102},            //Watt
+    {"Wb", -1.0, 0xFFFE0102},         //Weber
+    {"Wh",-3600.0,0xFE0102},
     {"acre",4046.8564224,0x02},
     {"are",-1000.0,0x02},
-    {"ct",0.0002,0x0100},
-    {"st",6.35029318,0x0100},
-    {"lb",0.45359237,0x0100},
-    {"oz",0.028349523125,0x0100},
-    {"tn",1000.0,0x0100},
-    {"gallon",0.00454609,0x03},
-    {"cup",0.0002365882365,0x03},
-    {"floz",0.0000295735295625,0x03},
-    {"tbsp",0.00001478676478125,0x03},
-    {"tsp",0.000000492892159375,0x03},
-    {"Ah",-3600.0,0x01010000},
-    {"Wh",-3600.0,0xFE0102},
-    {"eV",-0.0000000000000000001602176620898,0xFE0102},
     {"atm",101352.0,0xFE01FF},
+    {"b", -1.0, 0x100000000000000},    //Bit
     {"bar",-100000.0,0xFE01FF},
-    {"psi",6894.75729316836133,0xFE01FF},
+    {"bps", -1.0, 0x100000000FF0000}, //Bits per second
     {"btu",1054.3503,0xFE0102},
+    {"c",299792458.0,0xFF0001},
+    {"ct",0.0002,0x0100},
+    {"cup",0.0002365882365,0x03},
+    {"day",86400.0,0x010000},
+    {"eV",-0.0000000000000000001602176620898,0xFE0102},
+    {"floz",0.0000295735295625,0x03},
+    {"ft",0.3048,0x01},
+    {"g", -0.001, 0x100},            //Gram
+    {"gallon",0.00454609,0x03},
+    {"hr",3600.0,0x010000},
+    {"in",0.0254,0x01},
+    {"kat", -1.0, 0x10000FF0000},     //Katal
+    {"kg", 1.0, 0x100},                //Kilogram
+    {"kph",0.277777777777777,0xFF0001},
+    {"lb",0.45359237,0x0100},
+    {"m", -1.0, 0x1},                  //Meter
+    {"mach",340.3,0xFF0001},
+    {"mi",1609.344,0x01},
+    {"min",60.0,0x010000},
+    {"mol", -1.0, 0x10000000000},      //Mole
+    {"mph",0.4470388888888888,0xFF0001},
+    {"nmi",1852.0,0x01},
+    {"ohm", -1.0, 0xFEFD0102},        //Ohm
+    {"oz",0.028349523125,0x0100},
+    {"pc",-30857000000000000.0,0x01},
+    {"psi",6894.75729316836133,0xFE01FF},
+    {"s", -1.0, 0x10000},              //Second
+    {"st",6.35029318,0x0100},
+    {"tbsp",0.00001478676478125,0x03},
+    {"tn",1000.0,0x0100},
+    {"tsp",0.000000492892159375,0x03},
+    {"yd",0.9144,0x01},
 };
 const char metricNums[] = "yzafpnumchkMGTPEZY";
 const double metricNumValues[] = { 0.000000000000000000000001, 0.000000000000000000001, 0.000000000000000001, 0.000000000000001, 0.000000000001, 0.000000001, 0.000001, 0.001, 0.01, 100, 1000, 1000000.0, 1000000000.0, 1000000000000.0, 1000000000000000.0, 1000000000000000000.0, 1000000000000000000000.0, 1000000000000000000000000.0 };
@@ -153,23 +165,20 @@ unitStandard newUnit(const char* name, double mult, unit_t units) {
     return out;
 }
 Number getUnitName(const char* name) {
+    int match = getUnitId(name, 0, unitCount);
+    if(match != -1) return newNum(fabs(unitList[match].multiplier), match, unitList[match].baseUnits);
+    //Try with metric prefixes
     int useMetric = -1;
     int i;
-    for(i = 0; i < metricCount; i++)
-        if(name[0] == metricNums[i]) {
-            useMetric = i;
-            break;
-        }
-    for(i = 0; i < unitCount; i++) {
-        //If they match, return a number with u as the unit, i as the unit index, and r as the multiplier
-        if(useMetric != -1 && unitList[i].multiplier < 0)
-            if(strcmp(name + 1, unitList[i].name) == 0) {
-                return newNum(fabs(unitList[i].multiplier) * metricNumValues[useMetric], i, unitList[i].baseUnits);
-            }
-        if(strcmp(name, unitList[i].name) == 0) {
-            return newNum(fabs(unitList[i].multiplier), i, unitList[i].baseUnits);
-        }
+    for(i = 0; i < metricCount; i++) if(name[0] == metricNums[i]) {
+        useMetric = i;
+        break;
     }
+    if(useMetric != -1) {
+        match = getUnitId(name + 1, 0, unitCount);
+        if(match != -1) return newNum(fabs(unitList[match].multiplier) * metricNumValues[useMetric], match, unitList[match].baseUnits);
+    }
+    //Else return no result
     return newNum(1, -1, 0);
 }
 char* toStringUnit(unit_t unit) {
