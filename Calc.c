@@ -27,6 +27,60 @@ int numFunctions = 0;
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const char* mallocError = "malloc returned null";
 #pragma endregion
+#pragma region Basic Functions
+/**
+ * Sorts list using cmp as a compare function by applying a mergesort
+ * @param list list of integers to sort
+ * @param count length of list
+ * @param cmp function to compare list pieces
+ */
+void mergeSort(int* list, int count, int (*cmp)(int, int)) {
+    if(count == 1) return;
+    int half1 = count / 2;
+    int half2 = count - half1;
+    mergeSort(list, half1, cmp);
+    mergeSort(list + half1, half2, cmp);
+    int listCopy[count];
+    memcpy(listCopy, list, count * sizeof(int));
+    int p1pos = 0;
+    int p2pos = half1;
+    int listPos = 0;
+    while(p1pos != half1 || p2pos != count) {
+        if(p1pos == half1) list[listPos++] = listCopy[p2pos++];
+        else if(p2pos == count) list[listPos++] = listCopy[p1pos++];
+        else {
+            if((*cmp)(listCopy[p1pos], listCopy[p2pos]) > 0) list[listPos++] = listCopy[p2pos++];
+            else list[listPos++] = listCopy[p1pos++];
+        }
+    }
+    return;
+}
+/**
+ * Get stdfunction Id from find
+ * @param list list to search (must be sortedBuiltin)
+ * @param find Function name to find
+ * @param count number of elements in list
+ */
+int getStdFunctionID(int* list, const char* find, int count) {
+    if(count < 3) {
+        if(strcmp(stdfunctions[list[0]].name, find) == 0) return 0;
+        if(strcmp(stdfunctions[list[1]].name, find) == 0) return 1;
+        return -1;
+    }
+    int half = count / 2;
+    int compare = strcmp(stdfunctions[list[half]].name, find);
+    if(compare == 0) return half;
+    else if(compare < 0) {
+        int res = getStdFunctionID(list + half, find, count - half);
+        if(res == -1) return -1;
+        return res + half;
+    }
+    else return getStdFunctionID(list, find, half);
+}
+int cmpFunctionNames(int id1, int id2) {
+    return strcmp(stdfunctions[id1].name, stdfunctions[id2].name);
+}
+#pragma endregion
 #pragma region Units
 const unitStandard unitList[] = {
     {"m", -1.0, 0x1},                  //Meter
@@ -107,15 +161,16 @@ Number getUnitName(const char* name) {
             break;
         }
     for(i = 0; i < unitCount; i++) {
+        //If they match, return a number with u as the unit, i as the unit index, and r as the multiplier
         if(useMetric != -1 && unitList[i].multiplier < 0)
             if(strcmp(name + 1, unitList[i].name) == 0) {
-                return newNum(fabs(unitList[i].multiplier) * metricNumValues[useMetric], 0, unitList[i].baseUnits);
+                return newNum(fabs(unitList[i].multiplier) * metricNumValues[useMetric], i, unitList[i].baseUnits);
             }
         if(strcmp(name, unitList[i].name) == 0) {
-            return newNum(fabs(unitList[i].multiplier), 0, unitList[i].baseUnits);
+            return newNum(fabs(unitList[i].multiplier), i, unitList[i].baseUnits);
         }
     }
-    return newNum(1, 0, 0);
+    return newNum(1, -1, 0);
 }
 char* toStringUnit(unit_t unit) {
     if(unit == 0)
@@ -831,7 +886,7 @@ double parseNumber(const char* num, double base) {
             break;
         }
     }
-    if(periodPlace>exponentPlace) periodPlace=exponentPlace;
+    if(periodPlace > exponentPlace) periodPlace = exponentPlace;
     //Parse integer digits
     double power = 1;
     double out = 0;
@@ -2173,16 +2228,31 @@ Tree generateTree(const char* eq, char** argNames, double base) {
             commas[0] = openBracket;
             commas[commaCount] = sectionLength - 1;
             section[openBracket] = '\0';
-            Tree funcID = findFunction(section);
-            if(funcID.optype == 0 && funcID.op == 0) {
-                error("function '%s' does not exist", section);
+            //Find function
+            Tree op = findFunction(section, useUnits, argNames, NULL);
+            //If function doesn't exist
+            if(op.optype == 0 && op.op == 0) {
+                error("Function '%s' does not exist", section);
                 return NULLOPERATION;
             }
-            if(funcID.optype == optype_builtin && stdfunctions[funcID.op].argCount != commaCount && funcID.op != op_run && (funcID.op != op_ge || commaCount == 2) && (funcID.op != op_fill || commaCount != 3)) {
-                error("wrong number of arguments for '%s'", stdfunctions[funcID.op].name);
+            //If function doesn't accept arguments
+            if(op.optype == optype_builtin)
+                if(stdfunctions[op.op].argCount == 0) {
+                    error("'%s' does not accept arguments", stdfunctions[op.op].name);
+                    return NULLOPERATION;
+                }
+            //If it is a unit, argument, or local variable
+            if(op.optype == -1 || op.optype == optype_argument || op.optype == optype_localvar) {
+                error("'%s' does not accept arguments", stdfunctions[op.op].name);
                 return NULLOPERATION;
             }
-            if(funcID.optype == optype_custom && customfunctions[funcID.op].argCount != commaCount) {
+            //If it is builtin and has the wrong number of arguments
+            if(op.optype == optype_builtin && stdfunctions[op.op].argCount != commaCount && op.op != op_run && (op.op != op_ge || commaCount == 2) && (op.op != op_fill || commaCount != 3)) {
+                error("wrong number of arguments for '%s'", stdfunctions[op.op].name);
+                return NULLOPERATION;
+            }
+            //If it is custom and has the wrong number of arguments
+            if(op.optype == optype_custom && customfunctions[op.op].argCount != commaCount) {
                 error("wrong number of arguments for '%s'", section);
                 return NULLOPERATION;
             }
@@ -2198,30 +2268,14 @@ Tree generateTree(const char* eq, char** argNames, double base) {
                     return NULLOPERATION;
                 }
             }
-            ops[i] = newOp(args, commaCount, funcID.op, funcID.optype);
+            ops[i] = newOp(args, commaCount, op.op, op.optype);
         }
         else if(sectionTypes[i] == 1) {
             //Variables or units
-            Tree op = findFunction(section);
+            Tree op = findFunction(section, useUnits, argNames, NULL);
             Number num = NULLNUM;
-            if(argNames != NULL) {
-                int j = 0;
-                while(argNames[j++] != NULL) {
-                    if(strcmp(argNames[j - 1], section) == 0) {
-                        op.optype = optype_argument;
-                        op.op = j - 1;
-                    }
-                }
-            }
-            if(op.op == op_val && op.optype == optype_builtin && useUnits) {
-                num = getUnitName(section);
-                if(num.u == 0) {
-                    error("Variable or unit '%s' not found", section);
-                    return NULLOPERATION;
-                }
-            }
             //Check for errors
-            else if(op.optype == 0 && op.op == 0) {
+            if(op.optype == 0 && op.op == 0) {
                 error("Variable '%s' not found", section);
                 return NULLOPERATION;
             }
@@ -2233,6 +2287,8 @@ Tree generateTree(const char* eq, char** argNames, double base) {
             //Set operation
             if(op.optype == 0 && op.op == op_val)
                 ops[i] = newOpVal(num.r, num.i, num.u);
+            else if(op.optype == -1)
+                ops[i] = newOpVal(op.value.r, 0.0, op.value.u);
             else
                 ops[i] = newOp(NULL, 0, op.op, op.optype);
         }
@@ -3660,6 +3716,14 @@ char** parseArgumentList(const char* list) {
     }
     return out;
 }
+int getArgListId(char** argList, const char* name) {
+    if(argList == NULL) return -1;
+    int i = -1;
+    while(argList[++i] != NULL) {
+        if(strcmp(name, argList[i]) == 0) return i;
+    }
+    return -1;
+}
 #pragma endregion
 #pragma region -include Functions
 const char* includeFuncTypes[] = {
@@ -3807,29 +3871,52 @@ void deleteCustomFunction(int id) {
     customfunctions[id].tree = NULL;
     customfunctions[id].argCount = 0;
 }
-Tree findFunction(const char* name) {
+Tree findFunction(const char* name, bool useUnits, char** arguments, char** localVariables) {
     Tree out;
-    //Get function id from name
-    int len = strlen(name), i;
-    out.optype = 0;
-    for(i = 1; i < immutableFunctions; i++) {
-        if(stdfunctions[i].nameLen != len)
-            continue;
-        if(strcmp(name, stdfunctions[i].name) == 0) {
+    int len = strlen(name), id;
+    //Units
+    if(useUnits) {
+        Number unit = getUnitName(name);
+        if(unit.i != -1) {
+            out.optype = -1;
+            out.op = unit.i;
+            out.value.type = value_num;
+            out.value.num = newNum(unit.r, 0, unit.u);
+            return out;
+        }
+    }
+    //Arguments
+    id = getArgListId(arguments, name);
+    if(id != -1) {
+        out.optype = optype_argument;
+        out.op = id;
+        return out;
+    }
+    //Local Variables
+    id = getArgListId(localVariables, name);
+    if(id != -1) {
+        out.optype = optype_localvar;
+        out.op = id;
+        return out;
+    }
+    //Custom functions
+    for(int i = 0;i < numFunctions;i++) {
+        if(customfunctions[i].nameLen != len) continue;
+        if(strcmp(customfunctions[i].name, name) == 0) {
+            out.optype = optype_custom;
             out.op = i;
             return out;
         }
-
     }
-    out.optype = 1;
-    for(i = 0;i < numFunctions;i++) {
-        if(customfunctions[i].nameLen != len) continue;
-        if(strcmp(customfunctions[i].name, name) != 0) continue;
-        out.op = i;
+    //Test for builtin functions
+    id = getStdFunctionID(sortedBuiltin, name, sortedBuiltinLen);
+    if(id != -1) {
+        out.optype = optype_builtin;
+        out.op = sortedBuiltin[id];
         return out;
     }
-    out.op = 0;
     out.optype = 0;
+    out.op = 0;
     return out;
 }
 const char* getFunctionName(int optype, int op) {
@@ -3859,6 +3946,8 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
     {0, 0, " "}, {1, 5, "width"}, {1, 6, "height"}, {1, 6, "length"}, {3, 2, "ge"}, {2, 4, "fill"}, {2, 3, "map"}, {1, 3, "det"}, {1, 9, "transpose"}, {2, 8, "mat_mult"}, {1, 7, "mat_inv"}
 };
+int* sortedBuiltin;
+int sortedBuiltinLen;
 #pragma endregion
 #pragma region Main Program
 void cleanup() {
@@ -3893,6 +3982,16 @@ void startup() {
     //Allocate functions
     customfunctions = calloc(functionArrayLength, sizeof(Function));
     if(history == NULL || customfunctions == NULL) error(mallocError);
+    //Sort standard functions
+    sortedBuiltin = calloc(immutableFunctions, sizeof(int));
+    sortedBuiltinLen = 0;
+    //Remove functions with no name
+    for(int i = 0;i < immutableFunctions;i++) {
+        char firstchar = stdfunctions[i].name[0];
+        if(firstchar == ' ' || firstchar == '\0') continue;
+        sortedBuiltin[sortedBuiltinLen++] = i;
+    }
+    mergeSort(sortedBuiltin, sortedBuiltinLen, &cmpFunctionNames);
 }
 bool startsWith(char* string, char* sw) {
     int compareLength = strlen(sw);
@@ -4377,71 +4476,15 @@ char* printRatio(double in, bool forceSign) {
 #pragma endregion
 #pragma region Syntax Highlighting
 int getVariableType(const char* name, bool useUnits, char** argNames, char** localVars) {
-    //Remove spaces
-    int len = strlen(name);
-    char nameClear[len + 1];
-    int i = -1;
-    int j = 0;
-    while(name[++i] != '\0') if(name[i] != ' ') {
-        if(name[i] >= 'A' && name[i] <= 'Z') {
-            nameClear[j++] = name[i] + 'a' - 'A';
-        }
-        else nameClear[j++] = name[i];
+    Tree tree = findFunction(name, useUnits, argNames, localVars);
+    if(tree.optype == -1) return 17;
+    if(tree.optype == optype_builtin) {
+        if(tree.op == 0) return 13;
+        return 14;
     }
-    nameClear[j] = '\0';
-    int nameLen = strlen(nameClear);
-    i = 0;
-    //Units
-    if(useUnits) {
-        char nameCase[len + 1];
-        i = -1;
-        j = 0;
-        while(name[++i] != '\0') if(name[i] != ' ') nameCase[j++] = name[i];
-        nameCase[j] = '\0';
-        int prefix = -1;
-        char first = nameCase[0];
-        for(i = 0;i < metricCount;i++) if(first == metricNums[i]) {
-            prefix = i;
-            break;
-        }
-        if(prefix != -1) {
-            const char* nameNoPrefix = nameCase + 1;
-            for(i = 0;i < unitCount;i++) {
-                const char* unit = unitList[i].name;
-                if(strcmp(nameCase, unit) == 0) return 17;
-                if(strcmp(nameNoPrefix, unit) == 0) return 17;
-            }
-        }
-        else for(i = 0;i < unitCount;i++) {
-            const char* unit = unitList[i].name;
-            if(strcmp(nameCase, unit) == 0) return 17;
-        }
-    }
-    //Argument Names
-    if(argNames != NULL) {
-        i = -1;
-        while(argNames[++i] != NULL) {
-            if(strcmp(argNames[i], nameClear) == 0) return 16;
-        }
-    }
-    //Local Variables
-    if(localVars != NULL) {
-        i = -1;
-        while(localVars[++i] != NULL) {
-            if(strcmp(localVars[i], nameClear) == 0) return 18;
-        }
-    }
-    //Custom functions
-    for(i = 0;i < numFunctions;i++) {
-        if(customfunctions[i].nameLen != nameLen) continue;
-        if(strcmp(customfunctions[i].name, nameClear) == 0) return 15;
-    }
-    //Builtin functions
-    //Possibly use a sorted list?
-    for(i = 0;i < immutableFunctions;i++) {
-        if(stdfunctions[i].nameLen != nameLen) continue;
-        if(strcmp(stdfunctions[i].name, nameClear) == 0) return 14;
-    }
+    if(tree.optype == optype_custom) return 15;
+    if(tree.optype == optype_argument) return 16;
+    if(tree.optype == optype_localvar) return 18;
     return 13;
 }
 const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Null11","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable" };
@@ -4636,7 +4679,7 @@ char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, cha
         }
         name[nameI] = '\0';
         if(strcmp(name, "f") == 0) {
-            if(len>3) memset(out+3,0,len-3);
+            if(len > 3) memset(out + 3, 0, len - 3);
             return out;
         }
         if(strcmp(name, "dx") == 0 || strcmp(name, "g") == 0) {

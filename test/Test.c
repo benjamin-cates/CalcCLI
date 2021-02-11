@@ -94,6 +94,7 @@ void failedTest(int index, const char* testType, const char* equation, const cha
     failedCount++;
 }
 int main() {
+    startup();
     int i;
     //Loop over regularTests
     for(i = 0;i < sizeof(regularTestResults) / 24;i++) {

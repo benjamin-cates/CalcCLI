@@ -232,6 +232,10 @@ extern int functionArrayLength;
 extern Function* customfunctions;
 //List of all standard functions (optype_builtin)
 extern const struct stdFunction stdfunctions[immutableFunctions];
+//Sorted list of stdfunctions (sorted in startup)
+extern int* sortedBuiltin;
+//Length of sortedBuiltin
+extern int sortedBuiltinLen;
 //List of all optional functions (include with -include)
 extern struct LibraryFunction includeFuncs[includeFuncsLen];
 //Types of includeFuncs (not currently used)
@@ -612,7 +616,7 @@ Function newFunction(char* name, Tree* tree, char argCount, char** argNames);
  * @param name name of the function
  * @return function ID of name, returns 0 if not found
  */
-Tree findFunction(const char* name);
+Tree findFunction(const char* name, bool useUnits, char** arguments, char** localVariables);
 /**
  * Parses the equation eq and adds it to the function list
  * @param eq Equation (ex. "f(a)=a^2")
@@ -700,6 +704,7 @@ char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, cha
 #define optype_custom 1
 #define optype_argument 2
 #define optype_anon 3
+#define optype_localvar 4
 #define op_val 0
 #define op_i 1
 #define op_neg 2
