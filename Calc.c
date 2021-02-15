@@ -26,6 +26,10 @@ int functionArrayLength = 10;
 int numFunctions = 0;
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const char* mallocError = "malloc returned null";
+char** globalLocalVariables = NULL;
+Value* globalLocalVariableValues = NULL;
+int globalLocalVariableSize = 5;
+char* emptyArg = "";
 #pragma endregion
 #pragma region Basic Functions
 /**
@@ -1571,7 +1575,7 @@ char* valueToString(Value val, double base) {
         outTree.argCount = argListLen(val.argNames);
         outTree.optype = optype_anon;
         outTree.op = 0;
-        return treeToString(outTree, false, NULL);
+        return treeToString(outTree, false, NULL, globalLocalVariables);
     }
     if(val.type == value_arb) {
         char* out;
@@ -1987,7 +1991,7 @@ Tree treeCopy(Tree tree, const Tree* args, bool unfold, int replaceArgs, bool op
             crunch = false;
     }
     if(crunch && optimize && tree.argCount != 0) {
-        Tree ret = newOpValue(computeTree(tree, NULL, 0));
+        Tree ret = newOpValue(computeTree(tree, NULL, 0, NULL));
         freeTree(out);
         return ret;
     }
@@ -2069,7 +2073,27 @@ int getCharType(char in, int curType, int base, bool useUnits) {
     if((in >= '*' && in <= '/' && in != '.') || in == '%' || in == '^') return 6;
     return -1;
 }
-Tree generateTree(const char* eq, char** argNames, double base) {
+//Returns the position of the equal sign if it is a local variable assignment, else return 0
+int isLocalVariableStatement(const char* eq) {
+    int i = -1;
+    int isFirstChar = true;
+    while(eq[++i] != '\0') {
+        char ch = eq[i];
+        if(ch == '=') {
+            if(eq[i + 1] == '>') return 0;
+            if(isFirstChar) return 0;
+            else return i;
+        }
+        if(ch == ' ' || ch == '\n') continue;
+        bool isDigit = ch >= '0' && ch <= '9';
+        if(isDigit && isFirstChar) return 0;
+        isFirstChar = false;
+        if(ch == '_' || ch == '.' || isDigit || (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z')) continue;
+        else return 0;
+    }
+    return 0;
+}
+Tree generateTree(const char* eq, char** argNames, char** localVars, double base) {
     bool useUnits = base != 0;
     if(base == 0) base = 10;
     if(verbose) {
@@ -2238,7 +2262,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
             commas[commaCount] = sectionLength - 1;
             section[openBracket] = '\0';
             //Find function
-            Tree op = findFunction(section, useUnits, argNames, NULL);
+            Tree op = findFunction(section, useUnits, argNames, localVars);
             //If function doesn't exist
             if(op.optype == 0 && op.op == 0) {
                 error("Function '%s' does not exist", section);
@@ -2271,7 +2295,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
                 char argText[commas[j + 1] - commas[j] + 1];
                 memset(argText, 0, sizeof(argText));
                 memcpy(argText, section + commas[j] + 1, commas[j + 1] - commas[j] - 1);
-                args[j] = generateTree(argText, argNames, 0);
+                args[j] = generateTree(argText, argNames, localVars, 0);
                 if(globalError) {
                     free(args);
                     return NULLOPERATION;
@@ -2281,7 +2305,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         }
         else if(sectionTypes[i] == 1) {
             //Variables or units
-            Tree op = findFunction(section, useUnits, argNames, NULL);
+            Tree op = findFunction(section, useUnits, argNames, localVars);
             Number num = NULLNUM;
             //Check for errors
             if(op.optype == 0 && op.op == 0) {
@@ -2344,7 +2368,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
             int eqPos = 0;
             while(section[++eqPos] != '=');
             //Generate tree
-            Tree tree = generateTree(section + eqPos + 2, appendedArgList, base);
+            Tree tree = generateTree(section + eqPos + 2, appendedArgList, localVars, base);
             free(appendedArgList);
             //Return tree
             Tree out;
@@ -2361,7 +2385,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         else if(first == '(') {
             //Round bracket
             section[sectionLength - 1] = '\0';
-            ops[i] = generateTree(section + 1, argNames, base);
+            ops[i] = generateTree(section + 1, argNames, localVars, base);
             if(globalError)
                 return NULLOPERATION;
         }
@@ -2381,12 +2405,12 @@ Tree generateTree(const char* eq, char** argNames, double base) {
                 }
                 if(j == 0)
                     error("could not find underscore", NULL);
-                Tree tree = generateTree(section + j + 1, NULL, 0);
+                Tree tree = generateTree(section + j + 1, NULL, localVars, 0);
                 if(globalError) {
                     error("Base type must be a runtime constant", NULL);
                     return NULLOPERATION;
                 }
-                Value baseNum = computeTree(tree, NULL, 0);
+                Value baseNum = computeTree(tree, NULL, 0, NULL);
                 if(globalError)
                     return NULLOPERATION;
                 freeTree(tree);
@@ -2395,7 +2419,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
             }
             else
                 section[sectionLength - 1] = '\0';
-            ops[i] = generateTree(section + 1, argNames, base);
+            ops[i] = generateTree(section + 1, argNames, localVars, base);
             if(globalError)
                 return NULLOPERATION;
         }
@@ -2445,7 +2469,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
                     args[x + y * width] = NULLOPERATION;
                     continue;
                 }
-                args[x + y * width] = generateTree(section + pos[y][x] + 1, argNames, useUnits ? base : 0);
+                args[x + y * width] = generateTree(section + pos[y][x] + 1, argNames, localVars, useUnits ? base : 0);
             }
             ops[i] = newOp(args, width * height, op_vector, 0);
             ops[i].argWidth = width;
@@ -2465,7 +2489,7 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         for(i = 0; i < sectionCount; i++) {
             if(i != 0)
                 printf(", ");
-            char* operationString = treeToString(ops[i], false, argNames);
+            char* operationString = treeToString(ops[i], false, argNames, localVars);
             printf("%s", operationString);
             free(operationString);
         }
@@ -2511,18 +2535,18 @@ Tree generateTree(const char* eq, char** argNames, double base) {
         }
     }
     if(verbose) {
-        char* operationString = treeToString(ops[0], false, argNames);
+        char* operationString = treeToString(ops[0], false, argNames, localVars);
         printf("\nFinal Tree(%d): %s\n", sectionCount, operationString);
         free(operationString);
     }
     return ops[0];
 }
 #pragma endregion
-char* treeToString(Tree tree, bool bracket, char** argNames) {
+char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
     if(tree.optype == optype_anon) {
         char* argListString = argListToString(tree.argNames);
         char** newArgNames = mergeArgList(argNames, tree.argNames);
-        char* treeString = treeToString(tree.branch[0], true, newArgNames);
+        char* treeString = treeToString(tree.branch[0], true, newArgNames, localVars);
         int argListLen = strlen(argListString);
         char* out = calloc(argListLen + 2 + strlen(treeString) + 1, 1);
         if(out == NULL) { error(mallocError);return NULL; }
@@ -2550,6 +2574,13 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
             return out;
         }
     }
+    if(tree.optype == optype_localvar) {
+        if(localVars == NULL) { error("Fatal error in tree to string: no local variables");return NULL; }
+        char* name = localVars[tree.op];
+        char* out = calloc(strlen(name + 1), 1);
+        strcpy(out, name);
+        return out;
+    }
     //Numbers
     if(tree.optype == optype_builtin && tree.op == op_val)
         return valueToString(tree.value, 10);
@@ -2569,9 +2600,9 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
             return out;
         }
         //Tostring one and two
-        char* one = treeToString(tree.branch[0], true, argNames);
+        char* one = treeToString(tree.branch[0], true, argNames, localVars);
         char* two = "";
-        if(tree.op != op_neg) two = treeToString(tree.branch[1], true, argNames);
+        if(tree.op != op_neg) two = treeToString(tree.branch[1], true, argNames, localVars);
         //Allocate string
         int len = strlen(one) + strlen(two) + 2 + bracket * 2;
         char* out = calloc(len, 1);
@@ -2589,7 +2620,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
         int i, j;
         int len = 3;
         for(i = 0;i < tree.argCount;i++) {
-            values[i] = treeToString(tree.branch[i], false, argNames);
+            values[i] = treeToString(tree.branch[i], false, argNames, localVars);
             len += 1 + strlen(values[i]);
         }
         char* out = calloc(len, sizeof(char));
@@ -2621,7 +2652,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     }
     //Generate the treeToString of the branches while counting the string length
     for(i = 0; i < tree.argCount; i++) {
-        argText[i] = treeToString(tree.branch[i], false, argNames);
+        argText[i] = treeToString(tree.branch[i], false, argNames, localVars);
         strLength += strlen(argText[i]) + 1;
     }
     //Compile together the strings of the branches
@@ -2638,7 +2669,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames) {
     out[strLength - 2] = ')';
     return out;
 }
-Value computeTree(Tree tree, const Value* args, int argLen) {
+Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
     if(tree.optype == optype_builtin) {
         if(tree.op == op_val)
             return copyValue(tree.value);
@@ -2650,7 +2681,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                 int i;
                 Vector vec = newVec(width, height);
                 for(i = 0;i < vec.total;i++) {
-                    Value cell = computeTree(tree.branch[i], args, argLen);
+                    Value cell = computeTree(tree.branch[i], args, argLen, localVars);
                     if(cell.type == value_num) vec.val[i] = cell.num;
                     if(cell.type == value_vec) {
                         vec.val[i] = cell.vec.val[0];
@@ -2679,7 +2710,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                     vec = args[tree.branch[0].op];
                 }
                 else {
-                    vec = computeTree(tree.branch[0], args, argLen);
+                    vec = computeTree(tree.branch[0], args, argLen, localVars);
                     freeVec = true;
                 }
                 if(width == 0 && height == 0) {
@@ -2698,11 +2729,11 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
             if(tree.op == op_ge) {
                 int x = 0, y = 0;
                 if(tree.argCount == 3) {
-                    Value yVal = computeTree(tree.branch[2], args, argLen);
+                    Value yVal = computeTree(tree.branch[2], args, argLen, localVars);
                     y = getR(yVal);
                     freeValue(yVal);
                 }
-                Value xVal = computeTree(tree.branch[1], args, argLen);
+                Value xVal = computeTree(tree.branch[1], args, argLen, localVars);
                 x = getR(xVal);
                 freeValue(xVal);
                 if(x < 0 || y < 0) return NULLVAL;
@@ -2712,7 +2743,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                     int width = tree.branch[0].argWidth;
                     if(tree.argCount == 3)
                         if(x >= width || y >= tree.branch[0].argCount / width) return NULLVAL;
-                    return computeTree(tree.branch[0].branch[x + y * width], args, argLen);
+                    return computeTree(tree.branch[0].branch[x + y * width], args, argLen, localVars);
                 }
                 else if(tree.branch[0].optype == optype_argument) {
                     if(tree.branch[0].op >= argLen) {
@@ -2725,7 +2756,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                     vec = tree.branch[0].value;
                 }
                 else if(tree.branch[0].optype == optype_builtin && tree.branch[0].op == op_hist) {
-                    Value index = computeTree(tree.branch[0].branch[0], args, argLen);
+                    Value index = computeTree(tree.branch[0].branch[0], args, argLen, localVars);
                     int i = getR(index);
                     freeValue(index);
                     if(i < 0) {
@@ -2746,7 +2777,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                 }
                 else {
                     freeVec = true;
-                    vec = computeTree(tree.branch[0], args, argLen);
+                    vec = computeTree(tree.branch[0], args, argLen, localVars);
                 }
                 if(vec.type == value_num) {
                     if(x == 0 && y == 0) return vec;
@@ -2767,7 +2798,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
         }
         Value one, two;
         if(tree.argCount > 0) {
-            one = computeTree(tree.branch[0], args, argLen);
+            one = computeTree(tree.branch[0], args, argLen, localVars);
             if(one.type == value_func && tree.optype == optype_builtin) {
                 if(tree.op != op_run && tree.op != op_sum && tree.op != op_product && tree.op != op_fill) {
                     error("functions cannot be passed to %s", stdfunctions[tree.op].name);
@@ -2777,7 +2808,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
             }
         }
         if(tree.argCount > 1) {
-            two = computeTree(tree.branch[1], args, argLen);
+            two = computeTree(tree.branch[1], args, argLen, localVars);
             if(two.type == value_func && tree.optype == optype_builtin && tree.op != op_map) {
                 if(tree.op != op_run && tree.op != op_sum && tree.op != op_product) {
                     error("cannot run %s with a function as an argument", stdfunctions[tree.op].name);
@@ -3056,7 +3087,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
             }
             if(tree.op == op_lerp) {
                 //(1 - c) * one + c * two;
-                Value c = computeTree(tree.branch[2], args, argLen);
+                Value c = computeTree(tree.branch[2], args, argLen, localVars);
                 Value negativeC = valNegate(c);
                 Value oneSubC = valAdd(newValNum(1, 0, 0), negativeC);
                 Value cTimesTwo = valMult(c, two);
@@ -3157,9 +3188,9 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                 inputs[0] = two;
                 int i;
                 for(i = 1;i < argCount;i++) {
-                    inputs[i] = computeTree(tree.branch[i + 1], args, argLen);
+                    inputs[i] = computeTree(tree.branch[i + 1], args, argLen, localVars);
                 }
-                Value out = computeTree(*one.tree, inputs, argCount);
+                Value out = computeTree(*one.tree, inputs, argCount, localVars);
                 for(i = 0;i < argCount;i++) freeValue(inputs[i]);
                 freeValue(one);
                 return out;
@@ -3169,8 +3200,8 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
             if(args != NULL) memcpy(tempArgs, args, sizeof(Number) * argLen);
             Value loopArgValues[3];
             loopArgValues[0] = two;
-            loopArgValues[1] = computeTree(tree.branch[2], args, argLen);
-            loopArgValues[2] = computeTree(tree.branch[3], args, argLen);
+            loopArgValues[1] = computeTree(tree.branch[2], args, argLen, localVars);
+            loopArgValues[2] = computeTree(tree.branch[3], args, argLen, localVars);
             double loopArgs[3];
             loopArgs[0] = getR(loopArgValues[0]);
             loopArgs[1] = getR(loopArgValues[1]);
@@ -3187,7 +3218,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                 tempArgs[0] = newValNum(0, 0, 0);
                 for(i = loopArgs[0];i <= loopArgs[1];i += loopArgs[2]) {
                     tempArgs[0].r = i;
-                    Value current = computeTree(one.tree[0], tempArgs, 1);
+                    Value current = computeTree(one.tree[0], tempArgs, 1, localVars);
                     Value new = valAdd(out, current);
                     freeValue(out);
                     freeValue(current);
@@ -3199,7 +3230,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                 tempArgs[0] = newValNum(0, 0, 0);
                 for(i = loopArgs[0]; i <= loopArgs[1];i += loopArgs[2]) {
                     tempArgs[0].r = i;
-                    Value current = computeTree(one.tree[0], tempArgs, 1);
+                    Value current = computeTree(one.tree[0], tempArgs, 1, localVars);
                     Value new = valMult(out, current);
                     freeValue(out);
                     freeValue(current);
@@ -3215,7 +3246,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                 freeValue(two);
                 int height = 1;
                 if(tree.argCount > 2) {
-                    Value three = computeTree(tree.branch[2], args, argLen);
+                    Value three = computeTree(tree.branch[2], args, argLen, localVars);
                     height = getR(three);
                     freeValue(three);
                 }
@@ -3232,7 +3263,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                         funcArgs[0].r = i;
                         funcArgs[1].r = j;
                         funcArgs[2].r = i + j * width;
-                        Value cell = computeTree(one.tree[0], funcArgs, 3);
+                        Value cell = computeTree(one.tree[0], funcArgs, 3, localVars);
                         out.vec.val[i + j * width] = getNum(cell);
                         freeValue(cell);
                         if(globalError) return NULLVAL;
@@ -3271,7 +3302,7 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
                     funcArgs[1].r = i;
                     funcArgs[2].r = j;
                     funcArgs[3].r = i + j * one.vec.width;
-                    Value cell = computeTree(*two.tree, funcArgs, 5);
+                    Value cell = computeTree(*two.tree, funcArgs, 5, localVars);
                     out.vec.val[i + j * one.vec.width] = getNum(cell);
                     freeValue(cell);
                 }
@@ -3339,6 +3370,13 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
         if(tree.op >= argLen) error("argument error", NULL);
         return copyValue(args[tree.op]);
     }
+    if(tree.optype == optype_localvar) {
+        if(localVars == NULL) {
+            error("internal: No local variables passed to computeTree");
+            return NULLVAL;
+        }
+        return copyValue(localVars[tree.op]);
+    }
     if(tree.optype == optype_custom) {
         if(customfunctions[tree.op].tree == NULL) {
             error("this uses a nonexistent function", NULL);
@@ -3348,9 +3386,9 @@ Value computeTree(Tree tree, const Value* args, int argLen) {
         int i;
         //Crunch args
         for(i = 0; i < tree.argCount; i++)
-            funcArgs[i] = computeTree(tree.branch[i], args, argLen);
+            funcArgs[i] = computeTree(tree.branch[i], args, argLen, localVars);
         //Compute value
-        Value out = computeTree(*customfunctions[tree.op].tree, funcArgs, tree.argCount);
+        Value out = computeTree(*customfunctions[tree.op].tree, funcArgs, tree.argCount, localVars);
         //Free args
         for(i = 0;i < tree.argCount;i++) freeValue(funcArgs[i]);
         if(globalError)
@@ -3379,6 +3417,7 @@ Tree derivative(Tree tree) {
     if(tree.optype == optype_anon) {
         error("anonymous functions are not supported in dx");
     }
+    if(tree.optype == optype_localvar) return NULLOPERATION;
     //returns the derivative of tree, output must be freeTree()ed
     //Source: https://en.wikipedia.org/wiki/Differentiation_rules
     //x, variables, and i
@@ -3609,11 +3648,11 @@ Value calculate(const char* eq, double base) {
     char* cleanInput = inputClean(eq);
     if(globalError) return NULLVAL;
     //Generate tree
-    Tree tree = generateTree(base == 0 ? cleanInput : eq, NULL, base);
+    Tree tree = generateTree(base == 0 ? cleanInput : eq, NULL, globalLocalVariables, base);
     free(cleanInput);
     if(globalError) return NULLVAL;
     //Compute tree
-    Value ans = computeTree(tree, NULL, 0);
+    Value ans = computeTree(tree, NULL, 0, globalLocalVariableValues);
     freeTree(tree);
     if(globalError) return NULLVAL;
     return ans;
@@ -3624,7 +3663,9 @@ Value calculate(const char* eq, double base) {
 void freeArgList(char** argList) {
     if(argList == NULL) return;
     int i = -1;
-    while(argList[++i]) free(argList[i]);
+    while(argList[++i]) {
+        if(argList[i] != emptyArg) free(argList[i]);
+    }
     free(argList);
 }
 int argListLen(char** argList) {
@@ -3640,6 +3681,10 @@ char** argListCopy(char** argList) {
     if(out == NULL) { error(mallocError);return NULL; }
     int i;
     for(i = 0;i < len;i++) {
+        if(argList[i] == emptyArg) {
+            out[i] = emptyArg;
+            continue;
+        }
         int strLen = strlen(argList[i]);
         out[i] = calloc(strLen + 1, 1);
         if(out[i] == NULL) { error(mallocError);return NULL; }
@@ -3723,6 +3768,21 @@ char** parseArgumentList(const char* list) {
             return NULL;
         }
     }
+    return out;
+}
+char** argListAppend(char** list, char* toAppend, int* pointerToSize) {
+    //Find length
+    int i = -1;
+    while(list[++i] != NULL);
+    //Expand if meets size
+    char** out = list;
+    if(i + 2 > *pointerToSize) {
+        *pointerToSize += 5;
+        out = realloc(list, *pointerToSize);
+        memset(list + (*pointerToSize) - 5, 0, 5 * sizeof(char**));
+    }
+    //Add to append to list
+    out[i] = toAppend;
     return out;
 }
 int getArgListId(char** argList, const char* name) {
@@ -3848,7 +3908,7 @@ void generateFunction(const char* eq) {
         return;
     }
     char* cleaninput = inputClean(eq + equalPos + 1);
-    *tree = generateTree(cleaninput, argNames, 0);
+    *tree = generateTree(cleaninput, argNames, globalLocalVariables, 0);
     free(cleaninput);
     if(globalError) {
         free(name);
@@ -3955,6 +4015,22 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     {0, 0, " "}, {0, 0, " "}, {0, 0, " "},
     {0, 0, " "}, {1, 5, "width"}, {1, 6, "height"}, {1, 6, "length"}, {3, 2, "ge"}, {2, 4, "fill"}, {2, 3, "map"}, {1, 3, "det"}, {1, 9, "transpose"}, {2, 8, "mat_mult"}, {1, 7, "mat_inv"}
 };
+void appendGlobalLocalVariable(char* name, Value value) {
+    int place = 0;
+    for(place = 0;true;place++) {
+        if(globalLocalVariables[place] == NULL) break;
+        if(globalLocalVariables[place] == emptyArg) break;
+        if(strcmp(globalLocalVariables[place], name) == 0) break;
+    }
+    //Resize if necessary
+    if(place + 2 == globalLocalVariableSize) {
+        globalLocalVariableSize += 5;
+        globalLocalVariables = realloc(globalLocalVariables, globalLocalVariableSize * sizeof(char*));
+        globalLocalVariableValues = realloc(globalLocalVariableValues, globalLocalVariableSize * sizeof(char*));
+    }
+    globalLocalVariables[place] = name;
+    globalLocalVariableValues[place] = value;
+}
 int* sortedBuiltin;
 int sortedBuiltinLen;
 #pragma endregion
@@ -3988,6 +4064,9 @@ void startup() {
     //Allocate history
     history = calloc(10, sizeof(Value));
     historySize = 10;
+    //Allocate local variables
+    globalLocalVariables = calloc(5, sizeof(char*));
+    globalLocalVariableValues = calloc(5, sizeof(Value));
     //Allocate functions
     customfunctions = calloc(functionArrayLength, sizeof(Function));
     if(history == NULL || customfunctions == NULL) error(mallocError);
@@ -4023,7 +4102,7 @@ char* runCommand(char* input) {
             for(int i = 0;i < numFunctions;i++) {
                 outLen += 8;
                 outLen += customfunctions[i].nameLen;
-                functionContents[i] = treeToString(*customfunctions[i].tree, false, customfunctions[i].argNames);
+                functionContents[i] = treeToString(*customfunctions[i].tree, false, customfunctions[i].argNames, NULL);
                 outLen += strlen(functionContents[i]);
                 functionInputs[i] = argListToString(customfunctions[i].argNames);
                 outLen += strlen(functionInputs[i]);
@@ -4071,6 +4150,46 @@ char* runCommand(char* input) {
             free(message);
             return out;
         }
+        if(startsWith(type, "local")) {
+            int outLen = 60;
+            int i = -1, totalVars = 0;
+            //Calculate string length and cache value to string returns
+            char* equations[globalLocalVariableSize];
+            char* name;
+            while((name = globalLocalVariables[++i]) != NULL) {
+                if(name == emptyArg) {
+                    totalVars--;
+                    equations[i] = NULL;
+                    continue;
+                }
+                outLen += strlen(name) + 3;
+                equations[i] = valueToString(globalLocalVariableValues[i], 10);
+                outLen += strlen(equations[i]);
+            }
+            int numVars = i;
+            totalVars += i;
+            //Compile names and equations into a string list
+            char* out = calloc(outLen, 1);
+            int outPos = 0;
+            for(i = 0;i < numVars;i++) {
+                char* name = globalLocalVariables[i];
+                if(name == emptyArg) continue;
+                //Print name
+                memcpy(out + outPos, name, strlen(name));
+                outPos += strlen(name);
+                //Print =
+                out[outPos++] = '=';
+                //Print equation and free it
+                memcpy(out + outPos, equations[i], strlen(equations[i]));
+                outPos += strlen(equations[i]);
+                free(equations[i]);
+                //Print new line
+                out[outPos++] = '\n';
+            }
+            //Print quantity of local variables
+            snprintf(out + outPos, 50, "There %s %d local variable%s", totalVars == 1 ? "is" : "are", totalVars, totalVars == 1 ? "" : "s");
+            return out;
+        }
         else {
             error("ls type '%s' not recognized", type);
             return NULL;
@@ -4083,14 +4202,27 @@ char* runCommand(char* input) {
         return out;
     }
     else if(startsWith(input, "-del")) {
-        int nameLen = strlen(input + 5);
-        for(int i = 0;i < numFunctions;i++) {
-            if(customfunctions[i].nameLen != nameLen) continue;
-            if(strcmp(input + 5, customfunctions[i].name) != 0) continue;
+        char* name = input + 5;
+        int nameLen = strlen(name);
+        Tree func = findFunction(name, false, NULL, globalLocalVariables);
+        if(func.optype == optype_custom) {
             char* out = calloc(nameLen + 33, 1);
-            snprintf(out, nameLen + 33, "Function '%s' has been deleted.", customfunctions[i].name);
-            deleteCustomFunction(i);
+            snprintf(out, nameLen + 33, "Function '%s' has been deleted.", customfunctions[func.op].name);
+            deleteCustomFunction(func.op);
             return out;
+        }
+        else if(func.optype == optype_localvar) {
+            char* out = calloc(nameLen + 38, 1);
+            snprintf(out, nameLen + 38, "Local Variable '%s' has been deleted.", globalLocalVariables[func.op]);
+            freeValue(globalLocalVariableValues[func.op]);
+            globalLocalVariableValues[func.op] = NULLVAL;
+            free(globalLocalVariables[func.op]);
+            globalLocalVariables[func.op] = emptyArg;
+            return out;
+        }
+        else if(func.optype == optype_custom) {
+            error("Function '%s' is immutable", name);
+            return calloc(1, 1);
         }
         error("Function '%s' does not exist", input + 5);
         return calloc(1, 1);
@@ -4111,7 +4243,7 @@ char* runCommand(char* input) {
         if(x[0] == NULL) { error(mallocError);return NULL; }
         x[0][0] = 'x';
         //Get tree
-        Tree ops = generateTree(cleanInput, x, 0);
+        Tree ops = generateTree(cleanInput, x, globalLocalVariables, 0);
         free(cleanInput);
         //Clean tree
         Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
@@ -4150,11 +4282,11 @@ char* runCommand(char* input) {
     else if(startsWith(input, "-parse")) {
         //Clean and generate tree
         char* clean = inputClean(input + 7);
-        Tree tree = generateTree(clean, NULL, 0);
+        Tree tree = generateTree(clean, NULL, globalLocalVariables, 0);
         free(clean);
         if(globalError) return NULL;
         //Convert to string, free, and return
-        char* out = treeToString(tree, false, NULL);
+        char* out = treeToString(tree, false, NULL, globalLocalVariables);
         freeTree(tree);
         return out;
     }
@@ -4524,6 +4656,7 @@ char* highlightSyntax(const char* eq) {
     char* out = calloc(eqLen, 1);
     bool isComment = false;
     int i = -1;
+    //Comments
     if(eq[0] == '/' && eq[1] == '/') {
         out[0] = out[1] = 3;
         isComment = true;
@@ -4539,6 +4672,7 @@ char* highlightSyntax(const char* eq) {
         out[0] = 8;
     }
     int bracket = 0;
+    //Commands
     if(eq[0] == '-') {
         int j = 0;
         while(eq[j] != ' ' && eq[j] != '\0') {
@@ -4547,8 +4681,16 @@ char* highlightSyntax(const char* eq) {
         }
         i = j - 1;
     }
+    //Is local variable
+    int eqPos = isLocalVariableStatement(eq);
+    if(eqPos) {
+        i = eqPos;
+        memset(out, 2, i);
+        out[i] = 8;
+    }
     int state = 0;
     int base = 10;
+    //Main loop
     while(eq[++i] != '\0') {
         char ch = eq[i];
         if(ch == ' ' || ch == '\t') out[i] = 9;
@@ -4834,14 +4976,18 @@ char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, cha
             }
             //Variables
             if(prev == 2) {
-                //Copy name
-                char name[i - prevPos + 1];
-                memcpy(name, eq + prevPos, i - prevPos);
-                name[i - prevPos] = '\0';
-                //Get name type
-                int type = getVariableType(name, useUnits, arguments, localVariables);
-                //Set type to out
-                memset(out + prevPos, type, i - prevPos);
+                //Local Variables
+                if(eq[i] == '=' && syntax[i] == 8) memset(out, 18, i);
+                else {
+                    //Copy name
+                    char name[i - prevPos + 1];
+                    memcpy(name, eq + prevPos, i - prevPos);
+                    name[i - prevPos] = '\0';
+                    //Get name type
+                    int type = getVariableType(name, useUnits, arguments, localVariables);
+                    //Set type to out
+                    memset(out + prevPos, type, i - prevPos);
+                }
             }
             prev = out[i];
             prevPos = i;

@@ -232,6 +232,12 @@ extern int functionArrayLength;
 extern Function* customfunctions;
 //List of all standard functions (optype_builtin)
 extern const struct stdFunction stdfunctions[immutableFunctions];
+//List of local variables in the global scope
+extern char** globalLocalVariables;
+//Size of globalLocalVariables that is allocate
+extern int globalLocalVariableSize;
+//List of the values of global local variables
+extern Value* globalLocalVariableValues;
 //Sorted list of stdfunctions (sorted in startup)
 extern int* sortedBuiltin;
 //Length of sortedBuiltin
@@ -539,13 +545,13 @@ Tree treeCopy(Tree op, const Tree* args, bool unfold, int replaceArgs, bool opti
  * @param args names of the arguments
  * @return string form of op, must be free()d
  */
-char* treeToString(Tree op, bool bracket, char** argNames);
+char* treeToString(Tree op, bool bracket, char** argNames, char** localVars);
 /**
  * Computes the operation tree
  * @param op Tree to compute
  * @param args Arguments (only used for functions)
  */
-Value computeTree(Tree op, const Value* args, int argLen);
+Value computeTree(Tree op, const Value* args, int argLen, Value* localVars);
 /**
  * Returns the type of character in is.
  * @param in The character to determine the type of
@@ -560,6 +566,8 @@ Value computeTree(Tree op, const Value* args, int argLen);
      }
  */
 int getCharType(char in, int curType, int base, bool useUnits);
+//Takes an equation as an argument and states the position of the equal sign if it is a local variable assignment
+int isLocalVariableStatement(const char* eq);
 /**
  * Generates an operation tree from an equation
  * @param eq Equation
@@ -567,7 +575,7 @@ int getCharType(char in, int curType, int base, bool useUnits);
  * @param base base to compute in, defaults to 10, if base is not 0, eq will be treated as inside square brackets
  * @return Tree, must be freeTree()ed
  */
-Tree generateTree(const char* eq, char** argNames, double base);
+Tree generateTree(const char* eq, char** argNames, char** localVars, double base);
 /**
  * Returns the derivative of operation
  * @param op Tree to take the derivative of must be copied before passing
@@ -603,6 +611,12 @@ char* argListToString(char** argList);
  * Returns an argument list from a string
  */
 char** parseArgumentList(const char* list);
+/*
+ *  Appends toAppend to list, expands size of necessary
+ *  Usage: int size=5;char** list=calloc(5,sizeof(char**));
+ *  argListAppend(list,{somestring},&size);
+ */
+char** argListAppend(char** list, char* toAppend, int* pointerToSize);
 /**
  * Function constructor
  * @param name name of the function
@@ -626,6 +640,10 @@ void generateFunction(const char* eq);
  * Deletes the custom function with id
  */
 void deleteCustomFunction(int id);
+/*
+ * Add a global local variable
+ */
+void appendGlobalLocalVariable(char* name, Value value);
 #pragma endregion
 /**
  * Prints graph of equation to stdout

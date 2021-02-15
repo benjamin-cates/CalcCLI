@@ -97,7 +97,7 @@ void printWithHighlighting(char* str) {
     };
     int strLen = strlen(str);
     char* simpleSyntax = highlightSyntax(str);
-    char* colors = advancedHighlight(str, simpleSyntax, false, NULL, NULL);
+    char* colors = advancedHighlight(str, simpleSyntax, false, NULL, globalLocalVariables);
     int prevColor = 0;
     printf("\033[0m");
     for(int i = 0;i < strLen;i++) {
@@ -308,14 +308,14 @@ void graphEquation(const char* equation, double left, double right, double top, 
     xArgName[0] = calloc(2, 1);
     if(xArgName[0] == NULL) { error(mallocError);return; }
     xArgName[0][0] = 'x';
-    Tree tree = generateTree(equation, xArgName, 0);
+    Tree tree = generateTree(equation, xArgName, globalLocalVariables, 0);
     int i;
     Value x = NULLVAL;
     //Compute columns number of values
     double yvalues[columns + 1];
     for(i = 0; i <= columns; i++) {
         x.r = left + columnWidth * i;
-        double out = computeTree(tree, &x, 1).r;
+        double out = computeTree(tree, &x, 1, globalLocalVariableValues).r;
         if(verbose)
             printf("Graph(%g)\t= %g\n", x.r, out);
         yvalues[i] = (out - bottom) / rowHeight;
@@ -544,7 +544,7 @@ void runLine(char* input) {
                     char* in = inputClean(runType + 6);
                     clock_t t = clock();
                     for(int i = 0;i < runCount;i++) {
-                        Tree out = generateTree(in, NULL, 0);
+                        Tree out = generateTree(in, NULL, globalLocalVariables, 0);
                         freeTree(out);
                     }
                     t = clock() - t;
@@ -554,11 +554,11 @@ void runLine(char* input) {
                 }
                 else if(startsWith(runType, "calc")) {
                     char* in = inputClean(runType + 5);
-                    Tree tr = generateTree(in, NULL, 0);
+                    Tree tr = generateTree(in, NULL, globalLocalVariables, 0);
                     free(in);
                     clock_t t = clock();
                     for(int i = 0;i < runCount;i++) {
-                        Value val = computeTree(tr, NULL, 0);
+                        Value val = computeTree(tr, NULL, 0, globalLocalVariableValues);
                         freeValue(val);
                     }
                     t = clock() - t;
@@ -664,6 +664,24 @@ void runLine(char* input) {
     }
     //Else compute it as a value
     else {
+        int locVarPos = isLocalVariableStatement(input);
+        if(locVarPos != 0) {
+            Value out = calculate(input + locVarPos + 1, 0);
+            if(globalError) return;
+            char* name = calloc(locVarPos + 1, 1);
+            memcpy(name, input, locVarPos);
+            appendGlobalLocalVariable(name, out);
+            char* output = valueToString(out, 10);
+            char outStr[strlen(output) + locVarPos + 3];
+            strcpy(outStr, name);
+            outStr[locVarPos] = '=';
+            strcpy(outStr + locVarPos + 1, output);
+            outStr[locVarPos + 1 + strlen(output) + 1] = '\0';
+            printWithHighlighting(outStr);
+            putchar('\n');
+            free(output);
+            return;
+        }
         if(input[0] == '\0') {
             error("no input", NULL);
             return;
