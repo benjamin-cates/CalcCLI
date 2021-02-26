@@ -4520,16 +4520,22 @@ char* runCommand(char* input) {
             char* functionInputs[functionArrayLength];
             int outLen = 50;
             for(int i = 0;i < numFunctions;i++) {
+                Function func=customfunctions[i];
+                if(func.code.list==NULL) continue;
                 outLen += 8;
                 outLen += customfunctions[i].nameLen;
-                functionContents[i] = codeBlockToString(customfunctions[i].code, NULL, customfunctions[i].args);
+                if(func.code.list[0].id==action_return) functionContents[i]=treeToString(func.code.list[0].tree[0],false,func.args,NULL);
+                else functionContents[i] = codeBlockToString(customfunctions[i].code, NULL, customfunctions[i].args);
                 outLen += strlen(functionContents[i]);
                 functionInputs[i] = argListToString(customfunctions[i].args);
                 outLen += strlen(functionInputs[i]);
             }
             char* out = calloc(outLen, 1);
             int outPos = 0;
+            int totalCount=0;
             for(int i = 0;i < numFunctions;i++) {
+                if(customfunctions[i].code.list==NULL) continue;
+                totalCount++;
                 strcpy(out + outPos, customfunctions[i].name);
                 outPos += customfunctions[i].nameLen;
                 bool addBrackets = functionInputs[i][0] != '(' && functionInputs[i][0] != '\0';
@@ -4545,7 +4551,7 @@ char* runCommand(char* input) {
                 free(functionContents[i]);
                 out[outPos++] = '\n';
             }
-            snprintf(out + outPos, outLen - outPos, "There are %d custom functions.", numFunctions);
+            snprintf(out + outPos, outLen - outPos, "There are %d custom functions.", totalCount);
             return out;
         }
         if(startsWith(type, "include")) {
