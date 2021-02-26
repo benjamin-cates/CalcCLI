@@ -116,7 +116,7 @@ typedef struct ValueStruct {
         };
         Vector vec;
         struct {
-            struct TreeStruct* tree;
+            struct CodeBlock* code;
             char** argNames;
         };
         ArbNum* numArb;
@@ -134,12 +134,14 @@ typedef struct UnitStandardStuct {
     unit_t baseUnits;
     //Multiplier is negative when it supports metric prefixes
 } unitStandard;
+typedef struct CodeBlock CodeBlock;
 /**
  * Operation tree. Value and args are in a union, so changing one with change the other.
  * @param op Operation ID
  * @param optype Type of operation ID, 0 for builtin, 1 for custom functions, 2 for function arguments
  * @param value Numeric value, if op==op_val && optype==optype_builtin
  * @param branch Branches of the operation tree (only for functions)
+ * @param code CodeBlock for optype==optype_anon
  * @param argCount Number of arguments, if op!=0
  * @param argWidth Width of argument vector (internal, only for vector constructor)
  */
@@ -149,7 +151,10 @@ typedef struct TreeStruct {
     union {
         Value value;
         struct {
-            struct TreeStruct* branch;
+            union {
+                struct CodeBlock* code;
+                struct TreeStruct* branch;
+            };
             short argCount;
             //Only for op_vector
             short argWidth;
@@ -166,12 +171,59 @@ typedef struct TreeStruct {
  * @param argCount Number of arguments
  * @param nameLen length of name (used to make searching faster)
  */
-typedef struct FunctionStruct {
+/**
+ * This describes a line of code in a code block
+ * @param id Type of action, see #define action_xxx for types
+ * @param localVarID Only for id==2 describes the local variable id
+ * @param tree Returns a conditional for: if, while, and for blocks. Returns a value for: return, setVariable, and statement.
+ * @param code Code block for: if, else, while, and for.
+ */
+typedef struct FunctionAction {
+    int id;
+    int localVarID;
     Tree* tree;
+    CodeBlock* code;
+} FunctionAction;
+/**
+ * Describes a return value from a function, only used internally.
+ * @param type Type of return: 0: no return, 1: return val, 2: break, 3: continue
+ * @param val return value for type==1
+ */
+typedef struct FunctionReturn {
+    int type;
+    Value val;
+} FunctionReturn;
+extern const FunctionReturn return_null;
+extern const FunctionReturn return_break;
+extern const FunctionReturn return_continue;
+/**
+ * Describes a grouping of code lines
+ * Note: While sub-blocks are defined in the lines of code, they cannot be simply extracted because the sub-lines may reference a local variable in a higher scope. This is why codeBlocks are packaged into Functions.
+ * @param list List of lines
+ * @param listLen Length of list
+ * @param localVariables Names of the local variables that are defined in this scope
+ * @param localVarCount Number of local variables defined in this scope
+ */
+typedef struct CodeBlock {
+    FunctionAction* list;
+    int listLen;
+    int localVarCount;
+    char** localVariables;
+} CodeBlock;
+/**
+ * This describes a multiline function
+ * @param name Name of the function
+ * @param nameLen length of the name, this is to prevent repeated strcmp calls when searching for a function
+ * @param args List of the argument names of the function
+ * @param argCount Number of arguments required
+ * @param code The actual code that composes the function
+ */
+typedef struct Function {
     char* name;
-    char** argNames;
-    char argCount;
-    char nameLen;
+    char** args;
+    int nameLen;
+    int argCount;
+    CodeBlock code;
 } Function;
 /**
  * Holds information about a builtin function
@@ -218,12 +270,14 @@ extern bool ignoreError;
 extern Number NULLNUM;
 //Value with number 0
 extern Value NULLVAL;
+//Tree with op=0 and value=0
+extern Tree NULLOPERATION;
+//Code block that returns zero
+extern CodeBlock NULLCODE;
 //History array
 extern Value* history;
 //All predefined units
 extern const unitStandard unitList[];
-//Tree with op=0 and value=0
-extern Tree NULLOPERATION;
 //Number of custom functions
 extern int numFunctions;
 //Array length of functions
@@ -505,7 +559,7 @@ Tree* allocArgs(Tree one, Tree two, bool copyone, bool copytwo);
 /**
  * Mallocs one argument and returns the pointer, copies if true
  * @param one operation to malloc
- * @param copy whether to treeCopy(one)
+ * @param copy whether to copyTree(one)
  */
 Tree* allocArg(Tree one, bool copy);
 //Operation Tests
@@ -537,7 +591,7 @@ void freeTree(Tree op);
  * @param optimize whether to precalculate non-variable branches
  * @return return value must be freeTree()ed
  */
-Tree treeCopy(Tree op, const Tree* args, bool unfold, int replaceArgs, bool optimize);
+Tree copyTree(Tree tree, const Tree* replaceArgs, int replaceCount,bool unfold);
 /**
  * Returns the string form of operation op, output must be free()d
  * @param op operation to print
@@ -612,11 +666,21 @@ char* argListToString(char** argList);
  */
 char** parseArgumentList(const char* list);
 /*
- *  Appends toAppend to list, expands size of necessary
+ *  Appends toAppend to list, expands size of necessary returns the position of toAppend
+ * If it encounters an arg that is identical to toAppend, it will return the position of that arg
  *  Usage: int size=5;char** list=calloc(5,sizeof(char**));
- *  argListAppend(list,{somestring},&size);
+ *  int appendPos = argListAppend(&list,{somestring},&size);
  */
-char** argListAppend(char** list, char* toAppend, int* pointerToSize);
+int argListAppend(char*** pointerToList, char* toAppend, int* pointerToSize);
+/**
+ * Runs an anonymous function with the args
+ * returns a value
+ */
+Value runAnonymousFunction(Value val, Value* args);
+/**
+ * Runs a function with the args and returns a value
+ */
+Value runFunction(Function func, Value* args);
 /**
  * Function constructor
  * @param name name of the function
@@ -624,7 +688,7 @@ char** argListAppend(char** list, char* toAppend, int* pointerToSize);
  * @param argCount number of arguments the function recieves
  * @param argNames list of argument names (null terminated char* array)
  */
-Function newFunction(char* name, Tree* tree, char argCount, char** argNames);
+Function newFunction(char* name, CodeBlock code, char argCount, char** argNames);
 /**
  * Returns the function ID
  * @param name name of the function
@@ -644,6 +708,50 @@ void deleteCustomFunction(int id);
  * Add a global local variable
  */
 void appendGlobalLocalVariable(char* name, Value value);
+#pragma region CodeBlocks
+/**
+ * Parses a code block from an equation and arguments, the final three inputs should be null
+ * @param eq expression to parse. The expession should not include the wrapping brackets ("{" and "}")
+ * @param args function argument to use
+ * The final three inputs keep track of the stack, leave them at NULL
+ */
+CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* localVarSize, int* localVarCount);
+/**
+ * Runs a code block, this function needs to be used carefully
+ * Calling:
+ *     int localVarCount=0;
+ *     int localVarSize=1;
+ *     Value* localVars=calloc(1,sizeof(Value));
+ *     runCodeBlock(block,args,argsCount,&localVars,&localVarCount,&localVarSize);
+ */
+FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int* localVarCount, int* localVarSize);
+/**
+ * Copies a code block, replacing the first replaceCount arguments with replace args
+ * Arg replace example: copyCodeBlock(arg1=>{return arg1+arg0;},[2],1,false) = arg0=>{return arg0+2;}
+ * @param code code to copy
+ * @param replaceArgs what to replace the arguments with
+ * @param replaceCount number of arguments to replace
+ * @param unfold whether to remove references to custom functions
+ */
+CodeBlock copyCodeBlock(CodeBlock code, const Tree* replaceArgs, int replaceCount, bool unfold);
+/**
+ * Frees a codeblock, including all of the trees and code blocks within the function actions
+ */
+void freeCodeBlock(CodeBlock code);
+/**
+ * Returns a code in the form of a string, using localVariables and arguments because they are not builtin to the codeBlock struct
+ */
+char* codeBlockToString(CodeBlock code, char** localVariables, char** arguments);
+#pragma endregion
+#define action_statement 0
+#define action_return 1
+#define action_localvar 2
+#define action_if 3
+#define action_else 4
+#define action_while 5
+#define action_for 6
+#define action_break 7
+#define action_continue 8
 #pragma endregion
 /**
  * Prints graph of equation to stdout
@@ -685,7 +793,7 @@ char* inputClean(const char* input);
 /**
  * Returns whether string starts with sw
  */
-bool startsWith(char* string, char* sw);
+bool startsWith(const char* string, const char* sw);
 /**
  * Basic command running, returns a string with the command output
  * Returns NULL if the command is not recognized

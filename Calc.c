@@ -18,10 +18,10 @@ int globalAccuracy = 0;
 int digitAccuracy = 0;
 bool useArb = false;
 Number NULLNUM;
-Value* history;
-Value NULLVAL;
 Tree NULLOPERATION;
-Function* customfunctions;
+Value NULLVAL;
+CodeBlock NULLCODE;
+Value* history;
 int functionArrayLength = 10;
 int numFunctions = 0;
 const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -95,6 +95,39 @@ int getUnitId(const char* name, int pos, int count) {
 }
 int cmpFunctionNames(int id1, int id2) {
     return strcmp(stdfunctions[id1].name, stdfunctions[id2].name);
+}
+int findNext(const char* str, int start, char find) {
+    int bracket = 0;
+    char ch;
+    for(int i = start;(ch = str[i]) != 0; i++) {
+        if(bracket == 0 && ch == find) return i;
+        if(ch == '(' || ch == '[' || ch == '<' || ch == '{') bracket++;
+        if(ch == ')' || ch == ']' || (ch == '>' && (i != 0 && str[i - 1] != '=')) || ch == '}') bracket--;
+        if(bracket == 0 && ch == find) return i;
+    }
+    return -1;
+}
+int findPrev(const char* str, int start, char find) {
+    int i = start;
+    int bracket = 0;
+    while(i != 0) {
+        char ch = str[--i];
+        if(ch == '(' || ch == '[' || ch == '<' || ch == '{') bracket++;
+        if(ch == ')' || ch == ']' || (ch == '>' && str[i - 1] != '=') || ch == '}') bracket--;
+        if(bracket == 0 && str[i] == find) return i;
+    }
+    return -1;
+}
+void* recalloc(void* ptr, int* sizePtr, int sizeIncrease, int elSize) {
+    int oldSize = *sizePtr;
+    (*sizePtr) += sizeIncrease;
+    void* out = realloc(ptr, (*sizePtr) * elSize);
+    if(out == NULL) {
+        error(mallocError);
+        return NULL;
+    }
+    memset(((char*)out) + oldSize * elSize, 0, sizeIncrease * elSize);
+    return out;
 }
 #pragma endregion
 #pragma region Units
@@ -1068,11 +1101,8 @@ char* doubleToString(double num, double base) {
     return out;
 }
 char* appendToHistory(Value num, double base, bool print) {
-    if(historySize - 1 == historyCount) {
-        history = realloc(history, (historySize + 25) * sizeof(Value));
-        if(history == NULL) { error(mallocError);return NULL; }
-        historySize += 25;
-    }
+    if(historySize - 1 == historyCount) history = recalloc(history, &historySize, 25, sizeof(Value));
+    if(globalError) return NULL;
     history[historyCount] = num;
     historyCount++;
     char* ansString = valueToString(num, base);
@@ -1486,9 +1516,9 @@ Value copyValue(Value val) {
         for(i = 0;i < out.vec.total;i++) out.vec.val[i] = val.vec.val[i];
     }
     if(val.type == value_func) {
-        out.tree = malloc(sizeof(Tree));
-        if(out.tree == NULL) error(mallocError);
-        *out.tree = treeCopy(*val.tree, NULL, false, false, false);
+        out.code = malloc(sizeof(CodeBlock));
+        if(out.code == NULL) error(mallocError);
+        *out.code = copyCodeBlock(*val.code, NULL, 0, false);
         out.argNames = argListCopy(val.argNames);
     }
     if(val.type == value_arb) {
@@ -1532,8 +1562,8 @@ void freeValue(Value val) {
     if(val.type == value_vec) free(val.vec.val);
     if(val.type == value_func) {
         freeArgList(val.argNames);
-        freeTree(*val.tree);
-        free(val.tree);
+        freeCodeBlock(*val.code);
+        free(val.code);
     }
     if(val.type == value_arb) {
         if(val.numArb != NULL) {
@@ -1570,7 +1600,7 @@ char* valueToString(Value val, double base) {
     }
     if(val.type == value_func) {
         Tree outTree;
-        outTree.branch = val.tree;
+        outTree.code = val.code;
         outTree.argNames = val.argNames;
         outTree.argCount = argListLen(val.argNames);
         outTree.optype = optype_anon;
@@ -1920,11 +1950,11 @@ Tree* allocArgs(Tree one, Tree two, bool copyOne, bool copyTwo) {
     Tree* out = malloc(2 * sizeof(Tree));
     if(out == NULL) { error(mallocError);return NULL; }
     if(copyOne)
-        out[0] = treeCopy(one, NULL, 0, 0, 0);
+        out[0] = copyTree(one, NULL, 0, false);
     else
         out[0] = one;
     if(copyTwo)
-        out[1] = treeCopy(two, NULL, 0, 0, 0);
+        out[1] = copyTree(two, NULL, 0, false);
     else
         out[1] = two;
     return out;
@@ -1933,7 +1963,7 @@ Tree* allocArg(Tree one, bool copy) {
     Tree* out = malloc(sizeof(Tree));
     if(out == NULL) { error(mallocError);return NULL; }
     if(copy)
-        out[0] = treeCopy(one, NULL, 0, 0, 0);
+        out[0] = copyTree(one, NULL, 0, false);
     else
         out[0] = one;
     return out;
@@ -1942,8 +1972,8 @@ Tree* allocArg(Tree one, bool copy) {
 #pragma region Tree Management
 void freeTree(Tree tree) {
     if(tree.optype == optype_anon) {
-        freeTree(tree.branch[0]);
-        free(tree.branch);
+        freeCodeBlock(*tree.code);
+        free(tree.code);
         freeArgList(tree.argNames);
         return;
     }
@@ -1956,26 +1986,33 @@ void freeTree(Tree tree) {
     }
     if(tree.op == op_val && tree.optype == optype_builtin) freeValue(tree.value);
 }
-Tree treeCopy(Tree tree, const Tree* args, bool unfold, int replaceArgs, bool optimize) {
+Tree copyTree(Tree tree, const Tree* replaceArgs, int replaceCount, bool unfold) {
     Tree out = tree;
+    if(unfold && tree.optype == optype_custom) {
+        //Todo reference to unfold code block
+        out.branch = NULL;
+
+        //(*customfunctions[tree.op]., out.branch, out.argCount)
+        //return ret;
+        return NULLOPERATION;
+    }
     if(tree.optype == optype_anon) {
         out.argNames = argListCopy(tree.argNames);
-        out.branch = malloc(sizeof(Tree));
+        out.code = malloc(sizeof(CodeBlock));
         if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
-        *out.branch = treeCopy(tree.branch[0], args, unfold, replaceArgs, optimize);
-        out.argWidth -= replaceArgs;
+        *out.code = copyCodeBlock(*tree.code, replaceArgs, replaceCount, unfold);
+        out.argWidth -= replaceCount;
         return out;
     }
     if(tree.optype == optype_builtin && tree.op == op_val) {
         out.value = copyValue(tree.value);
         return out;
     }
-    //Example: if f(x)=x^2, copyTree(f(2x),NULL,true,false,false) will return (2x)^2
-    //Replace arguments
     if(tree.optype == optype_argument) {
-        if(replaceArgs > tree.op)
-            return treeCopy(args[tree.op], NULL, unfold, 0, optimize);
-        else out.op -= replaceArgs;
+        if(replaceCount > tree.op) {
+            return copyTree(replaceArgs[tree.op], NULL, 0, false);
+        }
+        else out.op -= replaceCount;
     }
     //Copy tree branches
     if(tree.argCount != 0) {
@@ -1983,25 +2020,10 @@ Tree treeCopy(Tree tree, const Tree* args, bool unfold, int replaceArgs, bool op
         if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
     }
     int i;
-    bool crunch = true;
     for(i = 0; i < tree.argCount; i++) {
         Tree* branch = out.branch + i;
-        *branch = treeCopy(tree.branch[i], args, unfold, replaceArgs, optimize);
-        if(branch->optype == optype_argument || branch->optype == optype_anon || (branch->argCount != 0 && !(branch->op == op_val && branch->optype == 0)))
-            crunch = false;
+        *branch = copyTree(tree.branch[i], replaceArgs, replaceCount, unfold);
     }
-    if(crunch && optimize && tree.argCount != 0) {
-        Tree ret = newOpValue(computeTree(tree, NULL, 0, NULL));
-        freeTree(out);
-        return ret;
-    }
-    //Unfold custom functions
-    if(unfold)
-        if(tree.optype == optype_custom) {
-            Tree ret = treeCopy(*customfunctions[tree.op].tree, out.branch, true, true, optimize);
-            free(out.branch);
-            return ret;
-        }
     //Return
     return out;
 }
@@ -2045,6 +2067,7 @@ char* inputClean(const char* input) {
             out[outPos++] = in + 32;
             continue;
         }
+        if(in == '{' || in == '}') { out[outPos++] = in;continue; }
         //Check for invalid character
         if((in > '9' && in < 'A' && in != '>' && in != '<' && in != ';' && in != '=') || (in < '$' && in > ' ') || in == '&' || in == '\'' || in == '\\' || in == '`' || in > 'z' || (in == '$' && insideSquare == false)) {
             error("invalid character '%c'", in);
@@ -2242,21 +2265,15 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         }
         else if(sectionTypes[i] == 2) {
             //Function
-            int j;
+            //Find commas
+            int commaCount;
             int commas[sectionLength];
-            int commaCount = 1;
-            int openBracket = 0;
-            int brackets = 0;
-            //Iterate through all characters to find ','
-            for(j = 0; j < sectionLength; j++) {
-                if(openBracket == 0 && section[j] == '(')
-                    openBracket = j;
-                if(section[j] == '(' || section[j] == '<')
-                    brackets++;
-                else if(section[j] == ')' || (section[j - 1] != '=' && section[j] == '>'))
-                    brackets--;
-                if(section[j] == ',' && brackets == 1)
-                    commas[commaCount++] = j;
+            int openBracket = findNext(section, 0, '(');
+            int prevComma = openBracket;
+            for(commaCount = 1;true;commaCount++) {
+                commas[commaCount] = findNext(section, prevComma + 1, ',');
+                if(commas[commaCount] == -1) break;
+                prevComma = commas[commaCount];
             }
             commas[0] = openBracket;
             commas[commaCount] = sectionLength - 1;
@@ -2291,7 +2308,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             }
             Tree* args = calloc(commaCount, sizeof(Tree));
             if(args == NULL) { error(mallocError);return NULLOPERATION; }
-            for(j = 0; j < commaCount; j++) {
+            for(int j = 0; j < commaCount; j++) {
                 char argText[commas[j + 1] - commas[j] + 1];
                 memset(argText, 0, sizeof(argText));
                 memcpy(argText, section + commas[j] + 1, commas[j + 1] - commas[j] - 1);
@@ -2368,13 +2385,26 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             int eqPos = 0;
             while(section[++eqPos] != '=');
             //Generate tree
-            Tree tree = generateTree(section + eqPos + 2, appendedArgList, localVars, base);
+            if(section[eqPos + 2] == '{') {
+                eqPos++;
+                if(section[sectionLength - 1] != '}') {
+                    error("curly bracket error");
+                    return NULLOPERATION;
+                }
+                section[sectionLength - 1] = '\0';
+            }
+            CodeBlock code = parseToCodeBlock(section + eqPos + 2, appendedArgList, NULL, NULL, NULL);
+            if(globalError) return NULLOPERATION;
+            //Set to return statement if it is only one statement
+            if(code.listLen == 1 && code.list[0].id == action_statement) {
+                code.list[0].id = action_return;
+            }
             free(appendedArgList);
             //Return tree
             Tree out;
-            out.branch = malloc(sizeof(Tree));
-            if(out.branch == NULL) { error(mallocError);return NULLOPERATION; }
-            *(out.branch) = tree;
+            out.code = malloc(sizeof(CodeBlock));
+            if(out.code == NULL) { error(mallocError);return NULLOPERATION; }
+            *(out.code) = code;
             out.optype = optype_anon;
             out.argNames = argList;
             out.argCount = argListLen(argList);
@@ -2394,18 +2424,10 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             double base = 10;
             if(sectionTypes[i] == 5) {
                 //use alternate base
-                int j, brackets = 0;
-                for(j = sectionLength - 1; j >= 0; j--) {
-                    if(section[j] == ')')
-                        brackets++;
-                    if(section[j] == '(')
-                        brackets--;
-                    if(brackets == 0 && section[j] == '_')
-                        break;
-                }
-                if(j == 0)
+                int underscore = findNext(section, 0, '_');
+                if(underscore == 0)
                     error("could not find underscore", NULL);
-                Tree tree = generateTree(section + j + 1, NULL, localVars, 0);
+                Tree tree = generateTree(section + underscore + 1, NULL, localVars, 0);
                 if(globalError) {
                     error("Base type must be a runtime constant", NULL);
                     return NULLOPERATION;
@@ -2415,7 +2437,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                     return NULLOPERATION;
                 freeTree(tree);
                 if(baseNum.type == value_num) base = baseNum.r;
-                section[j - 1] = '\0';
+                section[underscore - 1] = '\0';
             }
             else
                 section[sectionLength - 1] = '\0';
@@ -2546,15 +2568,19 @@ char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
     if(tree.optype == optype_anon) {
         char* argListString = argListToString(tree.argNames);
         char** newArgNames = mergeArgList(argNames, tree.argNames);
-        char* treeString = treeToString(tree.branch[0], true, newArgNames, localVars);
+        char* code;
+        if((*tree.code).list[0].id == action_return) {
+            code = treeToString(*(*tree.code).list[0].tree, true, newArgNames, localVars);
+        }
+        else code = codeBlockToString(*tree.code, newArgNames, localVars);
         int argListLen = strlen(argListString);
-        char* out = calloc(argListLen + 2 + strlen(treeString) + 1, 1);
+        char* out = calloc(argListLen + 2 + strlen(code) + 1, 1);
         if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argListString);
         strcpy(out + argListLen, "=>");
-        strcpy(out + argListLen + 2, treeString);
+        strcpy(out + argListLen + 2, code);
         free(argListString);
-        free(treeString);
+        free(code);
         free(newArgNames);
         return out;
     }
@@ -3182,6 +3208,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     error("not enough args in run function");
                     freeValue(one);
                     if(tree.argCount > 1) freeValue(two);
+                    return NULLVAL;
                 }
                 Value* inputs = calloc(tree.argCount, sizeof(Value));
                 if(inputs == NULL) { error(mallocError);return NULLVAL; }
@@ -3190,7 +3217,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 for(i = 1;i < argCount;i++) {
                     inputs[i] = computeTree(tree.branch[i + 1], args, argLen, localVars);
                 }
-                Value out = computeTree(*one.tree, inputs, argCount, localVars);
+                Value out = runAnonymousFunction(one, inputs);
                 for(i = 0;i < argCount;i++) freeValue(inputs[i]);
                 freeValue(one);
                 return out;
@@ -3218,7 +3245,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 tempArgs[0] = newValNum(0, 0, 0);
                 for(i = loopArgs[0];i <= loopArgs[1];i += loopArgs[2]) {
                     tempArgs[0].r = i;
-                    Value current = computeTree(one.tree[0], tempArgs, 1, localVars);
+                    Value current = runAnonymousFunction(one, tempArgs);
                     Value new = valAdd(out, current);
                     freeValue(out);
                     freeValue(current);
@@ -3230,7 +3257,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 tempArgs[0] = newValNum(0, 0, 0);
                 for(i = loopArgs[0]; i <= loopArgs[1];i += loopArgs[2]) {
                     tempArgs[0].r = i;
-                    Value current = computeTree(one.tree[0], tempArgs, 1, localVars);
+                    Value current = runAnonymousFunction(one, tempArgs);
                     Value new = valMult(out, current);
                     freeValue(out);
                     freeValue(current);
@@ -3263,7 +3290,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                         funcArgs[0].r = i;
                         funcArgs[1].r = j;
                         funcArgs[2].r = i + j * width;
-                        Value cell = computeTree(one.tree[0], funcArgs, 3, localVars);
+                        Value cell = runAnonymousFunction(one, funcArgs);
                         out.vec.val[i + j * width] = getNum(cell);
                         freeValue(cell);
                         if(globalError) return NULLVAL;
@@ -3302,7 +3329,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     funcArgs[1].r = i;
                     funcArgs[2].r = j;
                     funcArgs[3].r = i + j * one.vec.width;
-                    Value cell = computeTree(*two.tree, funcArgs, 5, localVars);
+                    Value cell = runAnonymousFunction(two, funcArgs);
                     out.vec.val[i + j * one.vec.width] = getNum(cell);
                     freeValue(cell);
                 }
@@ -3378,7 +3405,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         return copyValue(localVars[tree.op]);
     }
     if(tree.optype == optype_custom) {
-        if(customfunctions[tree.op].tree == NULL) {
+        if(customfunctions[tree.op].code.list == NULL) {
             error("this uses a nonexistent function", NULL);
             return NULLVAL;
         }
@@ -3388,7 +3415,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         for(i = 0; i < tree.argCount; i++)
             funcArgs[i] = computeTree(tree.branch[i], args, argLen, localVars);
         //Compute value
-        Value out = computeTree(*customfunctions[tree.op].tree, funcArgs, tree.argCount, localVars);
+        Value out = runFunction(customfunctions[tree.op], funcArgs);
         //Free args
         for(i = 0;i < tree.argCount;i++) freeValue(funcArgs[i]);
         if(globalError)
@@ -3399,15 +3426,15 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         Value out;
         out.argNames = argListCopy(tree.argNames);
         out.type = value_func;
-        out.tree = malloc(sizeof(Tree));
+        out.code = malloc(sizeof(CodeBlock));
         Tree* replaceArgs = calloc(argLen, sizeof(Tree));
         if(replaceArgs == NULL) { error(mallocError);return NULLVAL; }
-        if(out.tree == NULL || replaceArgs == NULL) { error(mallocError);return NULLVAL; }
+        if(out.code == NULL || replaceArgs == NULL) { error(mallocError);return NULLVAL; }
         int i;
         for(i = 0;i < argLen;i++) {
             replaceArgs[i] = newOpValue(args[i]);
         }
-        *out.tree = treeCopy(tree.branch[0], replaceArgs, false, tree.argWidth, false);
+        *out.code = copyCodeBlock(*tree.code, replaceArgs, tree.argWidth, false);
         free(replaceArgs);
         return out;
     }
@@ -3770,20 +3797,16 @@ char** parseArgumentList(const char* list) {
     }
     return out;
 }
-char** argListAppend(char** list, char* toAppend, int* pointerToSize) {
+int argListAppend(char*** pointerToList, char* toAppend, int* pointerToSize) {
     //Find length
     int i = -1;
-    while(list[++i] != NULL);
+    while((*pointerToList)[++i] != NULL) if(strcmp(toAppend, pointerToList[0][i]) == 0) break;
     //Expand if meets size
-    char** out = list;
-    if(i + 2 > *pointerToSize) {
-        *pointerToSize += 5;
-        out = realloc(list, *pointerToSize);
-        memset(list + (*pointerToSize) - 5, 0, 5 * sizeof(char**));
-    }
+    if(i + 2 > *pointerToSize) *pointerToList = recalloc(*pointerToList, pointerToSize, 5, sizeof(char*));
+    if(globalError) return -1;
     //Add to append to list
-    out[i] = toAppend;
-    return out;
+    pointerToList[0][i] = toAppend;
+    return i;
 }
 int getArgListId(char** argList, const char* name) {
     if(argList == NULL) return -1;
@@ -3839,14 +3862,51 @@ struct LibraryFunction includeFuncs[includeFuncsLen] = {
     {"pythag","(a,b)","sqrt(a^2+b^2)",4},
 };
 #pragma endregion
-Function newFunction(char* name, Tree* tree, char argCount, char** argNames) {
+#pragma region Function Parser
+int i = sizeof(Function);
+/*
+    Function Actions
+        0 - Statement (print, error...)
+        1 - return (tree)
+        2 - setLocalVariable (localVarId, tree)
+        3 - if (tree, next)
+        4 - else (tree, next)
+        5 - while (tree,next)
+        6 - for (tree.branch, next)
+        7 - break;
+        8 - continue;
+        9 -
+}
+*/
+#pragma endregion
+Function* customfunctions;
+Value runAnonymousFunction(Value val, Value* args) {
+    int argCount = argListLen(val.argNames);
+    int size = 1;
+    int count = 0;
+    if(val.code == NULL) {
+        error("Anonymous function code missing");
+        return NULLVAL;
+    }
+    Value* localVars = calloc(1, sizeof(Value));
+    FunctionReturn out = runCodeBlock(*val.code, args, argCount, &localVars, &count, &size);
+    if(globalError) return NULLVAL;
+    free(localVars);
+    if(out.type > 1) {
+        error("Reached unexpected %s", out.type == 2 ? "break" : "continue");
+        return NULLVAL;
+    }
+    if(out.type == 0) return NULLVAL;
+    return out.val;
+}
+Function newFunction(char* name, CodeBlock code, char argCount, char** argNames) {
     Function out;
     out.name = name;
     if(name == NULL) out.nameLen = 0;
     else out.nameLen = strlen(name);
-    out.argNames = argNames;
+    out.args = argNames;
     out.argCount = argCount;
-    out.tree = tree;
+    out.code = code;
     return out;
 }
 void generateFunction(const char* eq) {
@@ -3901,14 +3961,21 @@ void generateFunction(const char* eq) {
     }
     //Get argument names
     char** argNames = parseArgumentList(eq + openBracket);
-    //Compute tree
-    Tree* tree = malloc(sizeof(Tree));
-    if(argNames == NULL || tree == NULL) {
+    if(argNames == NULL) {
         free(name);
         return;
     }
+    //Compute parse code block
     char* cleaninput = inputClean(eq + equalPos + 1);
-    *tree = generateTree(cleaninput, argNames, globalLocalVariables, 0);
+    //If it is a block
+    bool isBlock = cleaninput[0] == '{';
+    if(isBlock) {
+        isBlock = true;
+        cleaninput++;
+        cleaninput[strlen(cleaninput) - 1] = '\0';
+    }
+    CodeBlock code = parseToCodeBlock(cleaninput, argNames, NULL, NULL, NULL);
+    if(isBlock) cleaninput--;
     free(cleaninput);
     if(globalError) {
         free(name);
@@ -3917,27 +3984,22 @@ void generateFunction(const char* eq) {
         free(argNames);
         return;
     }
-    //Append to functions
-    if(functionArrayLength == numFunctions) {
-        customfunctions = realloc(customfunctions, (functionArrayLength + 10) * sizeof(Function));
-        if(customfunctions == NULL) { error(mallocError);return; }
-        functionArrayLength += 10;
+    if(code.listLen == 1 && code.list[0].id == action_statement) {
+        code.list[0].id = action_return;
     }
-    customfunctions[numFunctions++] = newFunction(name, tree, argCount, argNames);
+    //Append to functions
+    if(functionArrayLength == numFunctions) customfunctions = recalloc(customfunctions, &functionArrayLength, 10, sizeof(Function));
+    customfunctions[numFunctions++] = newFunction(name, code, argCount, argNames);
 }
 void deleteCustomFunction(int id) {
     //Free members
     customfunctions[id].nameLen = 0;
-    freeTree(*customfunctions[id].tree);
-    free(customfunctions[id].tree);
+    freeCodeBlock(customfunctions[id].code);
     free(customfunctions[id].name);
     //Free argNames
-    int j = -1;
-    char** argNames = customfunctions[id].argNames;
-    while(argNames[++j] != NULL) free(argNames[j]);
-    free(argNames);
+    freeArgList(customfunctions[id].args);
     //Set tree to NULL
-    customfunctions[id].tree = NULL;
+    customfunctions[id].code.list = NULL;
     customfunctions[id].argCount = 0;
 }
 Tree findFunction(const char* name, bool useUnits, char** arguments, char** localVariables) {
@@ -4024,6 +4086,7 @@ void appendGlobalLocalVariable(char* name, Value value) {
     }
     //Resize if necessary
     if(place + 2 == globalLocalVariableSize) {
+
         globalLocalVariableSize += 5;
         globalLocalVariables = realloc(globalLocalVariables, globalLocalVariableSize * sizeof(char*));
         globalLocalVariableValues = realloc(globalLocalVariableValues, globalLocalVariableSize * sizeof(char*));
@@ -4031,22 +4094,378 @@ void appendGlobalLocalVariable(char* name, Value value) {
     globalLocalVariables[place] = name;
     globalLocalVariableValues[place] = value;
 }
+Value runFunction(Function func, Value* args) {
+    int size = 1;
+    int count = 0;
+    Value* localVars = calloc(size, sizeof(Value));
+    FunctionReturn out = runCodeBlock(func.code, args, func.argCount, &localVars, &count, &size);
+    if(out.type == 2 || out.type == 3) {
+        error("Reached illegal %s statement", out.type == 2 ? "break" : "continue");
+        return NULLVAL;
+    }
+    if(out.type == 0) return NULLVAL;
+    if(out.type == 1) return out.val;
+}
 int* sortedBuiltin;
 int sortedBuiltinLen;
+#pragma endregion
+#pragma region Code Blocks
+CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* localVarSize, int* localVarCount) {
+    int zero = 0, two = 2;
+    if(localVars == NULL) {
+        localVars = calloc(1, sizeof(char**));
+        *localVars = calloc(2, sizeof(char*));
+        localVarSize = &two;
+        localVarCount = &zero;
+    }
+    int localVarStackStart = *localVarCount;
+    int eqLen = strlen(eq);
+    int semicolons[eqLen + 1];
+    memset(semicolons, 0, sizeof(int) * (eqLen + 1));
+    semicolons[0] = -1;
+    semicolons[1] = 0;
+    int semicolonId = 1;
+    for(;true;semicolonId++) {
+        semicolons[semicolonId] = findNext(eq, semicolons[semicolonId - 1] + 1, ';');
+        if(semicolons[semicolonId] == -1) break;
+    }
+    if(semicolons[semicolonId - 1] != eqLen - 1) semicolons[semicolonId] = eqLen;
+    else semicolonId--;
+    FunctionAction* list = calloc(semicolonId, sizeof(FunctionAction));
+    bool prevIf = false;
+    for(int i = 0;i < semicolonId;i++) {
+        if(globalError) break;
+        int len = semicolons[i + 1] - semicolons[i] - 1;
+        char section[len + 1];
+        memcpy(section, eq + semicolons[i] + 1, len);
+        section[len] = 0;
+        int eqPos = isLocalVariableStatement(section);
+        if(eqPos != 0) {
+            char* name = calloc(eqPos + 1, 1);
+            memcpy(name, section, eqPos);
+            if(*localVarSize == (*localVarCount) - 1) {
+                *localVars = recalloc(*localVars, localVarSize, 5, sizeof(char*));
+            }
+            list[i].tree = malloc(sizeof(Tree));
+            list[i].tree[0] = generateTree(section + eqPos + 1, args, *localVars, 0);
+            list[i].localVarID = argListAppend(localVars, name, localVarSize);
+            if(globalError) break;
+            if(localVars[0][(*localVarCount)] == name) (*localVarCount)++;
+            list[i].id = action_localvar;
+            continue;
+        }
+        if(startsWith(section, "return")) {
+            list[i].tree = malloc(sizeof(Tree));
+            list[i].tree[0] = generateTree(section + 6, args, *localVars, 0);
+            if(i != semicolonId - 1) error("illegal statements after return");
+            list[i].id = action_return;
+            break;
+        }
+        int parseBlockPos = 0;
+        if(startsWith(section, "else")) {
+            if(!prevIf) {
+                error("unexpected else statement");
+                break;
+            }
+            list[i].id = action_else;
+            parseBlockPos = 4;
+        }
+        prevIf = false;
+        bool isWhile = startsWith(section, "while");
+        if(startsWith(section, "if") || isWhile) {
+            int endParenthesis = findNext(section, 0, ')');
+            if(endParenthesis == -1 || section[isWhile ? 5 : 2] != '(') {
+                error("missing parenthesis in if statement");
+                break;
+            }
+            list[i].id = isWhile ? action_while : action_if;
+            //Parse conditional
+            int len = endParenthesis - (isWhile ? 6 : 3);
+            char conditional[len];
+            memcpy(conditional, section + (isWhile ? 6 : 3), len);
+            conditional[len] = 0;
+            list[i].tree = malloc(sizeof(Tree));
+            list[i].tree[0] = generateTree(conditional, args, *localVars, 0);
+            if(globalError) break;
+            parseBlockPos = endParenthesis + 1;
+            if(!isWhile) prevIf = true;
+        }
+        if(parseBlockPos) {
+            //Inclusive start, exclusive end
+            int start, end;
+            //Parse as code block
+            if(section[parseBlockPos] == '{') {
+                start = parseBlockPos + 1;
+                end = findNext(section, parseBlockPos, '}');
+            }
+            //Parse as statement
+            else {
+                start = parseBlockPos;
+                end = semicolons[i + 1];
+            }
+            char block[end - start + 1];
+            memcpy(block, section + start, end - start);
+            block[end - start] = 0;
+            int oldVarCount = *localVarCount;
+            list[i].code = malloc(sizeof(CodeBlock));
+            list[i].code[0] = parseToCodeBlock(block, args, localVars, localVarSize, localVarCount);
+            if(globalError) break;
+            int newVarCount = *localVarCount;
+            *localVarCount = oldVarCount;
+            memset((*localVars) + oldVarCount, 0, sizeof(char*) * (newVarCount - oldVarCount));
+            continue;
+        }
+        if(startsWith(section, "break")) {
+            if(semicolons[i + 1] != 5) error("unexpected '%s' after break", section + 5);
+            if(i != semicolonId - 1) error("illegal statements after break");
+            if(globalError) break;
+            list[i].id = action_break;
+        }
+        else if(startsWith(section, "continue")) {
+            if(semicolons[i + 1] != 8) error("unexpected '%s' after continue", section + 8);
+            if(i != semicolonId - 1) error("illegal statements after continue");
+            if(globalError) break;
+            list[i].id = action_continue;
+        }
+        else {
+            list[i].id = 0;
+            list[i].tree = malloc(sizeof(Tree));
+            list[i].tree[0] = generateTree(section, args, *localVars, 0);
+        }
+    }
+    CodeBlock out;
+    out.list = list;
+    out.listLen = semicolonId;
+    out.localVarCount = *localVarCount - localVarStackStart;
+    if(out.localVarCount != 0) out.localVariables = calloc(out.localVarCount + 1, sizeof(char*));
+    else out.localVariables = NULL;
+    memcpy(out.localVariables, (*localVars) + localVarStackStart, out.localVarCount * sizeof(char*));
+    if(globalError) {
+        freeCodeBlock(out);
+        return NULLCODE;
+    }
+    return out;
+}
+const FunctionReturn return_null = { 0,0 };
+const FunctionReturn return_break = { 2,0 };
+const FunctionReturn return_continue = { 3,0 };
+FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int* localVarCount, int* localVarSize) {
+    if(func.localVarCount != 0) *localVars = recalloc(*localVars, localVarSize, func.localVarCount, sizeof(Value));
+    bool prevIf = false;
+    FunctionReturn toReturn = return_null;
+    for(int i = 0;i < func.listLen;i++) {
+        FunctionAction action = func.list[i];
+        //Statement
+        if(action.id == action_statement) {
+            freeValue(computeTree(*action.tree, arguments, argCount, *localVars));
+        }
+        //Return
+        else if(action.id == action_return) {
+            toReturn.val = computeTree(*action.tree, arguments, argCount, *localVars);
+            toReturn.type = 1;
+            break;
+        }
+        //Set local variable
+        else if(action.id == action_localvar) {
+            (*localVars)[action.localVarID] = computeTree(*action.tree, arguments, argCount, *localVars);
+        }
+        //If statement
+        else if(action.id == action_if) {
+            Value val = computeTree(*action.tree, arguments, argCount, *localVars);
+            bool branch = getR(val) == 0 ? false : true;
+            prevIf = !branch;
+            if(branch) {
+                if(action.code == NULL) {
+                    error("Missing code block");
+                    toReturn = return_null;
+                    break;
+                }
+                FunctionReturn out = runCodeBlock(*action.code, arguments, argCount, localVars, localVarCount, localVarSize);
+                if(out.type != 0) {
+                    toReturn = out;
+                    break;
+                }
+            }
+            continue;
+        }
+        //Else statemnt
+        else if(action.id == action_else) {
+            if(prevIf) {
+                if(action.code == NULL) {
+                    error("Missing code block");
+                    toReturn = return_null;
+                    break;
+                }
+                FunctionReturn out = runCodeBlock(*action.code, arguments, argCount, localVars, localVarCount, localVarSize);
+                if(out.type != 0) {
+                    toReturn = out;
+                    break;
+                }
+            }
+            continue;
+        }
+        else if(action.id == action_while) {
+            if(action.code == NULL || action.tree == NULL) {
+                error("Missing %s", action.code == NULL ? "code block" : "tree");
+                toReturn = return_null;
+                break;
+            }
+            Value conditional = computeTree(*action.tree, arguments, argCount, *localVars);
+            bool loop = getR(conditional) == 0 ? false : true;
+            freeValue(conditional);
+            int loopCount = 0;
+            while(loop) {
+                FunctionReturn ret = runCodeBlock(*action.code, arguments, argCount, localVars, localVarCount, localVarSize);
+                //Exit if return or break reached
+                if(ret.type == 1) {
+                    toReturn = ret;
+                    break;
+                }
+                if(ret.type == 2) break;
+                //Generate conditional for next loop
+                conditional = computeTree(*action.tree, arguments, argCount, *localVars);
+                loop = getR(conditional) == 0 ? false : true;
+                freeValue(conditional);
+                //Return if loop count maxed
+                loopCount++;
+                if(loopCount > 100000) {
+                    error("Infinite loop detected");
+                    toReturn.type = 1;
+                    break;
+                }
+            }
+            if(toReturn.type == 1) break;
+        }
+        else if(action.id == action_for) {
+
+        }
+        else if(action.id == action_break) {
+            toReturn = return_break;
+            break;
+        }
+        else if(action.id == action_continue) {
+            toReturn = return_continue;
+            break;
+        }
+    }
+    //Free localvariables
+    return toReturn;
+}
+CodeBlock copyCodeBlock(CodeBlock code, const Tree* replaceArgs, int replaceCount, bool unfold) {
+    CodeBlock out = code;
+    out.list = calloc(code.listLen, sizeof(FunctionAction));
+    for(int i = 0;i < code.listLen;i++) {
+        FunctionAction action = code.list[i];
+        FunctionAction outAction = action;
+        if(action.tree != NULL) {
+            outAction.tree = malloc(sizeof(Tree));
+            *outAction.tree = copyTree(*action.tree, replaceArgs, replaceCount, unfold);
+        }
+        if(action.code != NULL) {
+            outAction.code = malloc(sizeof(CodeBlock));
+            *outAction.code = copyCodeBlock(*action.code, replaceArgs, replaceCount, unfold);
+        }
+        out.list[i] = outAction;
+    }
+    out.localVariables = argListCopy(code.localVariables);
+    return out;
+}
+void freeCodeBlock(CodeBlock code) {
+    freeArgList(code.localVariables);
+    for(int i = 0;i < code.listLen;i++) {
+        FunctionAction action = code.list[i];
+        if(action.tree != NULL) {
+            freeTree(*action.tree);
+            free(action.tree);
+        }
+        if(action.code != NULL) {
+            freeCodeBlock(*action.code);
+            free(action.code);
+        }
+    }
+    free(code.list);
+}
+char* codeBlockToString(CodeBlock code, char** localVariables, char** arguments) {
+    char** localVars = mergeArgList(localVariables, code.localVariables);
+    //Get lines
+    char* lines[code.listLen];
+    int cumulativeLength = 0;
+    for(int i = 0;i < code.listLen;i++) {
+        FunctionAction action = code.list[i];
+        if(action.id == action_statement) {
+            lines[i] = treeToString(*action.tree, false, arguments, localVars);
+        }
+        else if(action.id == action_return) {
+            char* statement = treeToString(*action.tree, false, arguments, localVars);
+            lines[i] = calloc(strlen(statement) + 9, 1);
+            strcpy(lines[i], "return ");
+            strcat(lines[i], statement);
+            free(statement);
+        }
+        else if(action.id == action_localvar) {
+            char* var = localVars[action.localVarID];
+            char* statement = treeToString(*action.tree, false, arguments, localVars);
+            lines[i] = calloc(strlen(var) + strlen(statement) + 3, 1);
+            strcpy(lines[i], var);
+            strcat(lines[i], "=");
+            strcat(lines[i], statement);
+            free(statement);
+        }
+        else if(action.id == action_if || action.id == action_while) {
+            char* statement = treeToString(*action.tree, false, arguments, localVars);
+            char* code = codeBlockToString(*action.code, localVars, arguments);
+            lines[i] = calloc(strlen(statement) + strlen(code) + 9, 1);
+            if(action.id == action_if) strcpy(lines[i], "if(");
+            else strcpy(lines[i], "while(");
+            strcat(lines[i], statement);
+            free(statement);
+            strcat(lines[i], ") ");
+            strcat(lines[i], code);
+            free(code);
+        }
+        else if(action.id == action_else) {
+            char* code = codeBlockToString(*action.code, localVars, arguments);
+            lines[i] = calloc(strlen(code) + 6, 1);
+            strcpy(lines[i], "else ");
+            strcat(lines[i], code);
+            free(code);
+        }
+        else if(action.id == action_for) {
+            //TODO: Not sure what to do
+        }
+        else if(action.id == action_break || action.id == action_continue) {
+            lines[i] = calloc(10, 1);
+            if(action.id == action_break) strcpy(lines[i], "break");
+            else strcpy(lines[i], "continue");
+        }
+        else {
+            lines[i] = calloc(1, 1);
+        }
+        cumulativeLength += strlen(lines[i]);
+    }
+    //Compile lines
+    bool useBrackets = code.listLen == 1;
+    char* out = calloc(cumulativeLength + code.listLen + (useBrackets ? 3 : 0) + 2, 1);
+    if(useBrackets)out[0] = '{';
+    for(int i = 0;i < code.listLen;i++) {
+        strcat(out, lines[i]);
+        strcat(out, ";");
+        free(lines[i]);
+    }
+    if(useBrackets) strcat(out, "}");
+    free(localVars);
+    return out;
+}
 #pragma endregion
 #pragma region Main Program
 void cleanup() {
     int i;
     //Free functions
     for(i = 0; i < numFunctions; i++) {
-        if(customfunctions[i].tree == NULL) continue;
+        if(customfunctions[i].code.list == NULL) continue;
         free(customfunctions[i].name);
-        freeTree(*customfunctions[i].tree);
-        free(customfunctions[i].tree);
-        char** argNames = customfunctions[i].argNames;
-        int j = -1;
-        while(argNames[++j] != NULL) free(argNames[j]);
-        free(argNames);
+        freeCodeBlock(customfunctions[i].code);
+        freeArgList(customfunctions[i].args);
     }
     //Free history
     for(i = 0;i < historyCount;i++) {
@@ -4061,6 +4480,7 @@ void startup() {
     NULLNUM = newNum(0, 0, 0);
     NULLOPERATION = newOpVal(0, 0, 0);
     NULLVAL = newValNum(0, 0, 0);
+    memset(&NULLCODE, 0, sizeof(CodeBlock));
     //Allocate history
     history = calloc(10, sizeof(Value));
     historySize = 10;
@@ -4081,7 +4501,7 @@ void startup() {
     }
     mergeSort(sortedBuiltin, sortedBuiltinLen, &cmpFunctionNames);
 }
-bool startsWith(char* string, char* sw) {
+bool startsWith(const char* string, const char* sw) {
     int compareLength = strlen(sw);
     return memcmp(string, sw, compareLength) == 0 ? true : false;
 }
@@ -4102,9 +4522,9 @@ char* runCommand(char* input) {
             for(int i = 0;i < numFunctions;i++) {
                 outLen += 8;
                 outLen += customfunctions[i].nameLen;
-                functionContents[i] = treeToString(*customfunctions[i].tree, false, customfunctions[i].argNames, NULL);
+                functionContents[i] = codeBlockToString(customfunctions[i].code, NULL, customfunctions[i].args);
                 outLen += strlen(functionContents[i]);
-                functionInputs[i] = argListToString(customfunctions[i].argNames);
+                functionInputs[i] = argListToString(customfunctions[i].args);
                 outLen += strlen(functionInputs[i]);
             }
             char* out = calloc(outLen, 1);
@@ -4246,18 +4666,22 @@ char* runCommand(char* input) {
         Tree ops = generateTree(cleanInput, x, globalLocalVariables, 0);
         free(cleanInput);
         //Clean tree
-        Tree cleanedOps = treeCopy(ops, NULL, true, false, true);
+        Tree cleanedOps = copyTree(ops, NULL, true, false);
         freeTree(ops);
         //Get derivative and clean it
         Tree dx = derivative(cleanedOps);
         freeTree(cleanedOps);
-        Tree dxClean = treeCopy(dx, NULL, false, false, true);
+        Tree dxClean = copyTree(dx, NULL, false, false);
         freeTree(dx);
         //Print output
         Value ret;
         ret.type = value_func;
-        ret.tree = malloc(sizeof(Tree));
-        *ret.tree = dxClean;
+        ret.code = calloc(1, sizeof(CodeBlock));
+        ret.code->listLen = 1;
+        ret.code->list = calloc(1, sizeof(FunctionAction));
+        ret.code->list[0].tree = malloc(sizeof(Tree));
+        ret.code->list[0].id = 1;
+        *(ret.code->list[0].tree) = dxClean;
         ret.argNames = x;
         return appendToHistory(ret, 10, false);
     }
@@ -4372,11 +4796,7 @@ char* runCommand(char* input) {
                     if(count != 1) snprintf(temp, 49, " %d^%d *", prev, count);
                     else snprintf(temp, 49, " %d *", prev);
                     int tempLen = strlen(temp);
-                    if(tempLen + outPos >= outSize - 50) {
-                        outSize += 200;
-                        out = realloc(out, outSize);
-                        memset(out + outSize - 200, 0, 200);
-                    }
+                    if(tempLen + outPos >= outSize - 50) out = recalloc(out, &outSize, 200, 1);
                     strcpy(out + outPos, temp);
                     outPos += tempLen;
                     count = 1;
@@ -4420,11 +4840,7 @@ char* runCommand(char* input) {
                 //Append ratio
                 char* ratio = toStringAsRatio(num);
                 int ratioLen = strlen(ratio);
-                if(ratioLen + outPos > outSize - 10) {
-                    outSize += 100;
-                    out = realloc(out, outSize);
-                    memset(out + outSize - 100, 0, 100);
-                }
+                if(ratioLen + outPos > outSize - 10) out = recalloc(out, &outSize, 100, 1);
                 strcpy(out + outPos, ratio);
                 outPos += ratioLen;
             }
@@ -4515,24 +4931,16 @@ int* primeFactors(int num) {
     while(num % 2 == 0) {
         out[outPos++] = 2;
         num = num / 2;
-        if(outPos == outSize) {
-            out = realloc(out, (outSize + 11) * sizeof(int));
-            if(out == NULL) { error(mallocError);return NULL; }
-            memset(out + outSize, 0, 11 * sizeof(int));
-            outSize += 10;
-        }
+        if(outPos == outSize - 1) out = recalloc(out, &outSize, 10, sizeof(int));
+        if(globalError) return NULL;
     }
     int i;
     for(i = 3;i <= max;i += 2) {
         while(num % i == 0) {
             out[outPos++] = i;
             num = num / i;
-            if(outPos == outSize) {
-                out = realloc(out, (outSize + 11) * sizeof(int));
-                if(out == NULL) { error(mallocError);return NULL; }
-                memset(out + outSize, 0, 11 * sizeof(int));
-                outSize += 10;
-            }
+            if(outPos == outSize - 1) out = recalloc(out, &outSize, 10, sizeof(int));
+            if(globalError) return NULL;
         }
     }
     return out;
@@ -4628,7 +5036,7 @@ int getVariableType(const char* name, bool useUnits, char** argNames, char** loc
     if(tree.optype == optype_localvar) return 18;
     return 13;
 }
-const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Null11","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable" };
+const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Null11","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable","Control Flow" };
 char* highlightSyntax(const char* eq) {
     /*
         0 - Null (white)
@@ -4640,18 +5048,19 @@ char* highlightSyntax(const char* eq) {
         6 - Operator (bright black)
         7 - String (yellow)
         8 - Command (blue)
-        9 - Space (white)
-        10 - Escape sequence (for strings)
-        Advanced only
-        11 -
-        12 - Invalid operator
-        13 - Invalid varible name
-        14 - Builtin variable
-        15 - Custom functions
-        16 - Arguments
-        17 - Unit
-        18 - Local Variable
-    */
+    9 - Space(white)
+    10 - Escape sequence(for strings)
+    Advanced only
+    11 -
+    12 - Invalid operator
+    13 - Invalid varible name
+    14 - Builtin variable
+    15 - Custom functions
+    16 - Arguments
+    17 - Unit
+    18 - Local Variable
+    19 - Control Flow
+    * */
     int eqLen = strlen(eq);
     char* out = calloc(eqLen, 1);
     bool isComment = false;
@@ -5012,6 +5421,116 @@ char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, cha
     }
     if(arguments != oldArgs) free(arguments);
     if(freeArgs != NULL) freeArgList(freeArgs);
+    return out;
+}
+char* syntaxHighlightFunction(const char* eq, char** arguments, char** localVariables) {
+    char** localVars = argListCopy(localVariables);
+    int localVarSize = argListLen(localVars);
+    int bracket = 0;
+    int eqLen = strlen(eq);
+    char* out = calloc(eqLen + 1, 0);
+    int prevLineIsIf = false;
+    for(int i = 0;i < eqLen;i++) {
+        //This loop parses each statement separated by ;
+        if(i != 0) out[i] = 19;
+        i++;
+        const char* type = eq + i;
+        int isEqual = isLocalVariableStatement(eq + i);
+        char name[isEqual + 1];
+        bool isCodeBlock = false, takesStatement = true;
+        prevLineIsIf = false;
+        if(isEqual) {
+            memset(out + i, 18, isEqual);
+            out[i + isEqual] = 8;
+            memcpy(name, out + i, isEqual);
+            name[isEqual] = 0;
+            i = isEqual + 1;
+            //Parse rest
+        }
+        else if(startsWith(type, "return")) {
+            memset(out + i + 1, 6, 19);
+            i += 6;
+        }
+        else if(startsWith(type, "if")) {
+            memset(out + i + 1, 2, 19);
+            isCodeBlock = true;
+            i += 2;
+            prevLineIsIf = true;
+            //Todo: highlight inside ()
+        }
+        else if(startsWith(type, "else")) {
+            if(prevLineIsIf) memset(out + i + 1, 19, 4);
+            else memset(out + i + 1, 13, 4);
+            i += 4;
+            isCodeBlock = true;
+        }
+        else if(startsWith(type, "while")) {
+            memset(out + i + 1, 5, 19);
+            //TODO: Highligh the innards then place i at the end of the block
+            isCodeBlock = true;
+        }
+        else if(startsWith(type, "for")) {
+            memset(out + i + 1, 3, 19);
+            //TODO: Highlight the three statements
+            isCodeBlock = true;
+            i += 3;
+        }
+        else if(startsWith(type, "break") || startsWith(type, "continue")) {
+            if(type[0] == 'b') {
+                memset(out + i + 1, 5, 19);
+                i += 5;
+            }
+            else {
+                memset(out + i + 1, 7, 19);
+                i += 6;
+            }
+            takesStatement = false;
+        }
+        //Highlight rest of the statement
+        int nextSemicolon = findNext(out, i, ';');
+        if(nextSemicolon == -1) nextSemicolon = eqLen;
+        if(isCodeBlock) {
+            //Find { and } (if they exist)
+            int openBracket = findNext(out, i, '{');
+            int closeBracket = nextSemicolon;
+            while(eq[--closeBracket] != '}' && closeBracket != 0);
+            //Find start and end
+            int end = closeBracket;
+            int start = openBracket;
+            if(end == 0) end = nextSemicolon;
+            if(start == -1) start = i;
+            //Copy equation
+            char equation[end - start];
+            memcpy(equation, eq + start + 1, end - start - 1);
+            equation[end - start - 1] = 0;
+            //Highlight equation
+            char* highlighted = syntaxHighlightFunction(equation, arguments, localVars);
+            memcpy(out + start + 1, highlighted, end - start - 1);
+            free(highlighted);
+        }
+        else if(takesStatement) {
+            //Copy equation and highlight it
+            char equation[nextSemicolon - i + 2];
+            memcpy(equation, eq + i, nextSemicolon - i);
+            equation[nextSemicolon - i] = 0;
+            //Highlight it
+            //TODO: ignore commands
+            char* highlight = highlightSyntax(equation);
+            char* advanced = advancedHighlight(equation, highlight, false, arguments, localVars);
+            free(highlight);
+            memcpy(out + i, advanced, nextSemicolon - i);
+            free(advanced);
+            //Set semicolon to control flow
+            if(nextSemicolon != eqLen) out[nextSemicolon] = 19;
+        }
+        else {
+            //Set invalid characters to error
+            memset(out + i, 4, nextSemicolon - i);
+        }
+        i = nextSemicolon - 1;
+        //Append arg list after variable and it has been parsed
+        if(isEqual) argListAppend(&localVars, name, &localVarSize);
+    }
     return out;
 }
 #pragma endregion

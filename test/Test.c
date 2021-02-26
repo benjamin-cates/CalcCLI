@@ -45,6 +45,12 @@ const char* regularTestText[] = {
     "1e1",
     "[10e3]_4",
     "0e5",
+    "run(n=>{returnn+1},2)",
+    "run((a,b)=>{out=0;y=5;while(equal(equal(y,10),0)) {y=y+1;out=out+a+b+y};return out},2,3)",
+    "run(n=>{if(equal(n,5)) return 10;else return 0},5)",
+    "run(n=>{if(equal(n,5)) return 10;else return 0},2)",
+    "run(n=>{out=0;while(1) {if(1)break;out=1};return out;},1)",
+    "run(n=>{out=0;while(grthan(rand,0.3)) {if(1)continue;out=1};return out;},1)",
 };
 const Number regularTestResults[] = {
     {1.0,0.0,0},
@@ -79,10 +85,15 @@ const Number regularTestResults[] = {
     {10.0,0.0,0},
     {256.0,0.0,0},
     {0.0,0.0,0},
+    {3.0,0.0,0},
+    {65.0,0.0,0},
+    {10.0,0.0,0},
+    {0.0,0.0,0},
+    {0.0,0.0,0},
+    {0.0,0.0,0},
 };
-const int zeroTestCount = 76;
 const char* zeroTests[] = {
-    "i-i", "neg(1)+1", "-1+1", "pow(10,0)-1", "2^0-1", "mod(10,5)", "10%5", "mult(0,10)", "0*10", "div(10,10)-1", "10/10-1", "add(neg(1),1)", "sub(10.5,10.5)", "sin(0)", "cos(0)-1", "floor(tan(1.56))-92", "csc(pi/2)-1", "sec(pi)+1", "floor(1/cot(1.56))-92", "floor(sinh(10.3))-14866", "cosh(0)-1", "tanh(0)", "asin(1)-pi/2", "acos(1)", "atan(1e50)-pi/2", "acsc(-1)+pi/2", "asec(1)", "acot(1)-pi/4", "asinh(sinh(1))-1", "acosh(cosh(1))-1", "round(atanh(tanh(1)))-1", "sqrt(4)-2", "round(cbrt(8))-2", "exp(ln(2))-2", "ln(exp(2))-2", "round(logten(1000))-3", "round(log(1000,10))-3", "round(fact(3))-6", "sgn(i)-i", "abs(-i)-1", "arg(i)-pi/2", "round(0.5)-1", "floor(0.5)", "ceil(0.3)-1", "getr(i)", "geti(10.5[m])", "getu([km])/[m])", "grthan(10,4)-1", "equal(10.3,10.3)", "min(4,5)-4", "min(5,4)-4", "max(5,4)-5", "max(4,5)-5", "lerp(-1,1,0.5)", "dist(0,3+4i)-5", "not(1)+2", "and(0,5)", "or(0,5)-5", "xor(5,3)-6", "ls(5,1)-10", "rs(5,1)-4", "floor(1/(pi-3.14))-627", "floor(1/(phi-1.6))-55", "floor(1/(e-2.71))-120", "histnum", "floor(rand)", "run(x=>x+1,-1)", "sum(x=>x,0,10,1)-55", "product(x=>x,1,10,1)-362880", "width(<>)-1", "height(<10;20>)-2", "length(<1,1,1;1>)-6", "ge(<0,1>,0,0)", "abs(fill(x=>0,4,4))", "abs(map(<0,1,2,3,4,5>,(v,x)=>v-x))", "det(<0,1;0,2>)", "abs(transpose(<0,0;0>))",
+    "i-i", "neg(1)+1", "-1+1", "pow(10,0)-1", "2^0-1", "mod(10,5)", "10%5", "mult(0,10)", "0*10", "div(10,10)-1", "10/10-1", "add(neg(1),1)", "sub(10.5,10.5)", "sin(0)", "cos(0)-1", "floor(tan(1.56))-92", "csc(pi/2)-1", "sec(pi)+1", "floor(1/cot(1.56))-92", "floor(sinh(10.3))-14866", "cosh(0)-1", "tanh(0)", "asin(1)-pi/2", "acos(1)", "atan(1e50)-pi/2", "acsc(-1)+pi/2", "asec(1)", "acot(1)-pi/4", "asinh(sinh(1))-1", "acosh(cosh(1))-1", "round(atanh(tanh(1)))-1", "sqrt(4)-2", "round(cbrt(8))-2", "exp(ln(2))-2", "ln(exp(2))-2", "round(logten(1000))-3", "round(log(1000,10))-3", "round(fact(3))-6", "sgn(i)-i", "abs(-i)-1", "arg(i)-pi/2", "round(0.5)-1", "floor(0.5)", "ceil(0.3)-1", "getr(i)", "geti(10.5[m])", "getu([km])/[m]-1", "grthan(10,4)-1", "equal(10.3,10.3)-1", "min(4,5)-4", "min(5,4)-4", "max(5,4)-5", "max(4,5)-5", "lerp(-1,1,0.5)", "dist(0,3+4i)-5", "not(1)+2", "and(0,5)", "or(0,5)-5", "xor(5,3)-6", "ls(5,1)-10", "rs(5,1)-2", "floor(1/(pi-3.14))-627", "floor(1/(phi-1.6))-55", "floor(1/(e-2.71))-120", "histnum", "floor(rand)", "run(x=>x+1,-1)", "sum(x=>x,0,10,1)-55", "product(x=>x,1,10,1)-3628800", "width(<>)-1", "height(<10;20>)-2", "length(<1,1,1;1>)-6", "ge(<0,1>,0,0)", "ge(<0,1>,0)", "abs(fill(x=>0,4,4))", "abs(map(<0,1,2,3,4,5>,(v,x)=>v-x))", "det(<0,1;0,2>)", "abs(transpose(<0,0;0>))", "run(n=>{while(1) break;return 2;},0)-2",
 
 };
 int failedCount = 0;
@@ -106,15 +117,15 @@ int main() {
         //Get result and expected
         Value result = calculate(regularTestText[i], 0);
         Number expected = regularTestResults[i];
-        if(globalError) globalError = false;
         //If wrong
-        if(result.r != expected.r || result.i != expected.i || result.u != expected.u) {
+        if(result.r != expected.r || result.i != expected.i || result.u != expected.u || globalError) {
             //Print error
             char* resultString = valueToString(result, 10.0);
             char* expectedString = toStringNumber(expected, 10.0);
             failedTest(testIndex, "Regular", regularTestText[i], "expected %s, but got %s", expectedString, resultString);
             free(resultString);
             free(expectedString);
+            globalError = false;
         }
         testIndex++;
     }
@@ -145,12 +156,13 @@ int main() {
     }
     //Zero tests
     testIndex = 0;
-    for(i = 0;i < zeroTestCount;i++) {
+    for(i = 0;i < sizeof(zeroTests) / sizeof(char*);i++) {
         Value out = calculate(zeroTests[i], 0.0);
-        if(out.r != 0 || out.i != 0 || out.u != 0) {
+        if(out.r != 0 || out.i != 0 || out.u != 0 || globalError) {
             char* str = valueToString(out, 10);
             failedTest(testIndex, "zeroes", zeroTests[i], "expected 0, got %s", str);
             free(str);
+            globalError = false;
         }
         freeValue(out);
         testIndex++;
