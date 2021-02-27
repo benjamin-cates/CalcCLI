@@ -254,8 +254,6 @@ extern double degrat;
 extern int historySize;
 //Number of items in history
 extern int historyCount;
-//Use verbosity
-extern bool verbose;
 //Error has occured
 extern bool globalError;
 //Global arbitrary precision accuracy

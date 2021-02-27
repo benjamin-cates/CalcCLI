@@ -11,7 +11,6 @@
 double degrat = 1;
 int historySize;
 int historyCount = 0;
-bool verbose = false;
 bool globalError = false;
 bool ignoreError = false;
 int globalAccuracy = 0;
@@ -2084,8 +2083,6 @@ char* inputClean(const char* input) {
         //Set previous
         prev = in;
     }
-    if(verbose)
-        printf("Input cleaned to '%s'\n", out);
     return out;
 }
 int getCharType(char in, int curType, int base, bool useUnits) {
@@ -2119,12 +2116,6 @@ int isLocalVariableStatement(const char* eq) {
 Tree generateTree(const char* eq, char** argNames, char** localVars, double base) {
     bool useUnits = base != 0;
     if(base == 0) base = 10;
-    if(verbose) {
-        printf("Generating Operation Tree");
-        if(useUnits)
-            printf(" (units, base=%g)", base);
-        printf("\nInput: %s\n", eq);
-    }
     //Divide into sections
     int i, brackets = 0, sectionCount = 0, curType = -1, eqLength = strlen(eq);
     int sections[eqLength + 1];
@@ -2223,7 +2214,6 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
     }
     //Generate operations from strings
     Tree ops[sectionCount];
-    if(verbose) printf("Sections(%d): ", sectionCount);
     //set to true when it comes across *- or /- or ^- or %-
     bool nextNegative = false;
     for(i = 0; i < sectionCount; i++) {
@@ -2232,8 +2222,6 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         char section[sectionLength + 1];
         memcpy(section, eq + sections[i], sectionLength);
         section[sectionLength] = '\0';
-        if(verbose)
-            printf("%s, ", section);
         //Parse section
         char first = eq[sections[i]];
         if(sectionTypes[i] == 0) {
@@ -2506,16 +2494,6 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         }
     }
     //Compile operations into tree
-    if(verbose) {
-        printf("\nOperation List(%d): ", sectionCount);
-        for(i = 0; i < sectionCount; i++) {
-            if(i != 0)
-                printf(", ");
-            char* operationString = treeToString(ops[i], false, argNames, localVars);
-            printf("%s", operationString);
-            free(operationString);
-        }
-    }
     int offset = 0;
     //Side-by-side multiplication
     for(i = 1; i < sectionCount; i++) {
@@ -2555,11 +2533,6 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             sectionCount -= 2;
             offset += 2;
         }
-    }
-    if(verbose) {
-        char* operationString = treeToString(ops[0], false, argNames, localVars);
-        printf("\nFinal Tree(%d): %s\n", sectionCount, operationString);
-        free(operationString);
     }
     return ops[0];
 }

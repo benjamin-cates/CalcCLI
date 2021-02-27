@@ -316,8 +316,6 @@ void graphEquation(const char* equation, double left, double right, double top, 
     for(i = 0; i <= columns; i++) {
         x.r = left + columnWidth * i;
         double out = computeTree(tree, &x, 1, globalLocalVariableValues).r;
-        if(verbose)
-            printf("Graph(%g)\t= %g\n", x.r, out);
         yvalues[i] = (out - bottom) / rowHeight;
     }
     //Fill text columns
@@ -714,7 +712,6 @@ int main(int argc, char** argv) {
     for(i = 0; i < argc; i++) {
         if(argv[i][0] == '-') {
             //Verbosity
-            if(argv[i][1] == 'v') verbose = true;
             if(argv[i][1] == 'r') useFancyInput = false;
             //Help
             if(argv[i][1] == 'h') {
