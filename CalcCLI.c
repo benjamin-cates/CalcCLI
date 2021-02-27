@@ -432,12 +432,14 @@ void runLine(char* input) {
                 return;
             }
             //Initialize lines
-            unsigned long lineSize = 300;
-            char* line = malloc(300);
+            unsigned long lineSize = 1000;
+            char* line = malloc(1000);
             if(line == NULL) { error("malloc error");return; }
+            int lineCount = 0;
             //Loop through lines
             while(fgets(line, lineSize, file)) {
-                int i;
+                lineCount++;
+                int i = 0;
                 //Remove endline character
                 while(line[i++] != '\0') if(line[i] == '\n')
                     line[i] = '\0';
@@ -445,6 +447,9 @@ void runLine(char* input) {
                 printf("%s", line);
                 runLine(line);
                 globalError = false;
+            }
+            if(lineCount == 0) {
+                error("'%s' is empty or a directory", input + 3);
             }
             //Close and free line
             free(line);
@@ -695,7 +700,7 @@ void runLine(char* input) {
         while(output[++i] != '=');
         output[i + 1] = '\0';
         printf("%s", output);
-        output[i+1]=' ';
+        output[i + 1] = ' ';
         printWithHighlighting(output + i + 1);
         putchar('\n');
     }
