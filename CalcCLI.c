@@ -401,8 +401,9 @@ void runLine(char* input) {
                     int i = 1;
                     while(output[++i] != '=');
                     output[i + 1] = '\0';
-                    printf("%s ", output);
-                    printWithHighlighting(output + i + 2);
+                    printf("%s", output);
+                    output[i + 1] = ' ';
+                    printWithHighlighting(output + i + 1);
                     putchar('\n');
                 }
                 //Highlight results from parse
@@ -693,8 +694,9 @@ void runLine(char* input) {
         int i = 1;
         while(output[++i] != '=');
         output[i + 1] = '\0';
-        printf("%s ", output);
-        printWithHighlighting(output + i + 2);
+        printf("%s", output);
+        output[i+1]=' ';
+        printWithHighlighting(output + i + 1);
         putchar('\n');
     }
 }
