@@ -2481,7 +2481,8 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                     args[x + y * width] = NULLOPERATION;
                     continue;
                 }
-                args[x + y * width] = generateTree(section + pos[y][x] + 1, argNames, localVars, useUnits ? base : 0);
+                if(section[pos[y][x]+1]=='\0') args[x+y*width]=NULLOPERATION;
+                else args[x + y * width] = generateTree(section + pos[y][x] + 1, argNames, localVars, useUnits ? base : 0);
             }
             ops[i] = newOp(args, width * height, op_vector, 0);
             ops[i].argWidth = width;
@@ -3128,13 +3129,13 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         }
         //Binary Operations
         if(tree.op < 72) {
-            if(one.type != two.type && tree.op != op_not) valueConvert(op_add, &one, &two);
+            if(tree.op != op_not && one.type != two.type) valueConvert(op_add, &one, &two);
             if(one.type == value_num) {
                 Value out;
                 out.type = value_num;
                 out.num = compBinOp(tree.op, one.num, two.num);
                 freeValue(one);
-                freeValue(two);
+                if(tree.op!=op_not) freeValue(two);
                 return out;
             }
         }
