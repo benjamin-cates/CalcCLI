@@ -4235,7 +4235,10 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
         freeCodeBlock(out);
         return NULLCODE;
     }
-    if(freeVariables) free(localVars);
+    if(freeVariables) {
+        //free(*localVars);
+        free(localVars);
+    }
     return out;
 }
 const FunctionReturn return_null = { 0,0 };
