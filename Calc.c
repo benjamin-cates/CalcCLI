@@ -3779,7 +3779,10 @@ char** parseArgumentList(const char* list) {
 int argListAppend(char*** pointerToList, char* toAppend, int* pointerToSize) {
     //Find length
     int i = -1;
-    while((*pointerToList)[++i] != NULL) if(strcmp(toAppend, pointerToList[0][i]) == 0) break;
+    while((*pointerToList)[++i] != NULL) if(strcmp(toAppend, pointerToList[0][i]) == 0) {
+        free(toAppend);
+        return i;
+    }
     //Expand if meets size
     if(i + 2 > *pointerToSize) *pointerToList = recalloc(*pointerToList, pointerToSize, 5, sizeof(char*));
     if(globalError) return -1;
@@ -4061,11 +4064,14 @@ void appendGlobalLocalVariable(char* name, Value value) {
     for(place = 0;true;place++) {
         if(globalLocalVariables[place] == NULL) break;
         if(globalLocalVariables[place] == emptyArg) break;
-        if(strcmp(globalLocalVariables[place], name) == 0) break;
+        if(strcmp(globalLocalVariables[place], name) == 0) {
+            free(name);
+            globalLocalVariableValues[place] = value;
+            return;
+        }
     }
     //Resize if necessary
     if(place + 2 == globalLocalVariableSize) {
-
         globalLocalVariableSize += 5;
         globalLocalVariables = realloc(globalLocalVariables, globalLocalVariableSize * sizeof(char*));
         globalLocalVariableValues = realloc(globalLocalVariableValues, globalLocalVariableSize * sizeof(char*));
