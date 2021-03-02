@@ -2216,6 +2216,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
     Tree ops[sectionCount];
     //set to true when it comes across *- or /- or ^- or %-
     bool nextNegative = false;
+    bool firstNegative = false;
     for(i = 0; i < sectionCount; i++) {
         //Get section substring
         int sectionLength = sections[i + 1] - sections[i];
@@ -2348,9 +2349,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             }
             //If - is the first character and first section
             if(first == '-' && i == 0) {
-                //This operation is multplied by the next value, it is a place holder
-                ops[i] = newOpVal(1, 0, 0);
-                nextNegative = true;
+                firstNegative = true;
                 continue;
             }
             //Standard operation IDs
@@ -2488,10 +2487,15 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             error("unable to parse '%s'", section);
             return NULLOPERATION;
         }
-        if(nextNegative && !(first > '*' && first < '/' && first != '.') && first != '^' && first != '%') {
+        if(nextNegative && !sectionTypes[i] != 6) {
             nextNegative = false;
             ops[i] = newOp(allocArg(ops[i], false), 1, op_neg, 0);
         }
+    }
+    if(firstNegative) {
+        memmove(ops,ops+1,(sectionCount-1)*sizeof(Tree));
+        ops[0]=newOp(allocArg(ops[0],false),1,op_neg,0);
+        sectionCount-=1;
     }
     //Compile operations into tree
     int offset = 0;
@@ -4493,11 +4497,11 @@ char* runCommand(char* input) {
             char* functionInputs[functionArrayLength];
             int outLen = 50;
             for(int i = 0;i < numFunctions;i++) {
-                Function func=customfunctions[i];
-                if(func.code.list==NULL) continue;
+                Function func = customfunctions[i];
+                if(func.code.list == NULL) continue;
                 outLen += 8;
                 outLen += customfunctions[i].nameLen;
-                if(func.code.list[0].id==action_return) functionContents[i]=treeToString(func.code.list[0].tree[0],false,func.args,NULL);
+                if(func.code.list[0].id == action_return) functionContents[i] = treeToString(func.code.list[0].tree[0], false, func.args, NULL);
                 else functionContents[i] = codeBlockToString(customfunctions[i].code, NULL, customfunctions[i].args);
                 outLen += strlen(functionContents[i]);
                 functionInputs[i] = argListToString(customfunctions[i].args);
@@ -4505,9 +4509,9 @@ char* runCommand(char* input) {
             }
             char* out = calloc(outLen, 1);
             int outPos = 0;
-            int totalCount=0;
+            int totalCount = 0;
             for(int i = 0;i < numFunctions;i++) {
-                if(customfunctions[i].code.list==NULL) continue;
+                if(customfunctions[i].code.list == NULL) continue;
                 totalCount++;
                 strcpy(out + outPos, customfunctions[i].name);
                 outPos += customfunctions[i].nameLen;
