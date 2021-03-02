@@ -2519,7 +2519,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
     for(i = 0; i < 3; i++) {
         offset = 0;
         int j;
-        for(j = 0; j < sectionCount + offset; j++) {
+        for(j = 0; j < sectionCount; j++) {
             ops[j] = ops[j + offset];
             //Configure order of operations
             int op = ops[j].op;
