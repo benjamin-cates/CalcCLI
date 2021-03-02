@@ -4098,7 +4098,9 @@ int sortedBuiltinLen;
 #pragma region Code Blocks
 CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* localVarSize, int* localVarCount) {
     int zero = 0, two = 2;
+    bool freeVariables=false;
     if(localVars == NULL) {
+        freeVariables=true;
         localVars = calloc(1, sizeof(char**));
         *localVars = calloc(2, sizeof(char*));
         localVarSize = &two;
@@ -4230,6 +4232,7 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
         freeCodeBlock(out);
         return NULLCODE;
     }
+    if(freeVariables) free(localVars);
     return out;
 }
 const FunctionReturn return_null = { 0,0 };
