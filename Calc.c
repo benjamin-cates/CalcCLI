@@ -2167,7 +2167,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             continue;
         }
         //Close brackets
-        if(ch == ')' || (eq[i - 1] != '=' && ch == '>') || ch == ']') {
+        if(ch == ')' || (ch == '>' && (i != 0 && eq[i - 1] != '=')) || ch == ']') {
             if(--brackets < 0) {
                 error("bracket mismatch 1", NULL);
                 return NULLOPERATION;
@@ -2214,6 +2214,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
     }
     //Generate operations from strings
     Tree ops[sectionCount];
+    memset(ops, 0, sizeof(ops));
     //set to true when it comes across *- or /- or ^- or %-
     bool nextNegative = false;
     bool firstNegative = false;
@@ -3190,7 +3191,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     return NULLVAL;
                 }
                 Value inputs[tree.argCount];
-                memset(inputs,0,sizeof(Value)*tree.argCount);
+                memset(inputs, 0, sizeof(Value) * tree.argCount);
                 if(inputs == NULL) { error(mallocError);return NULLVAL; }
                 inputs[0] = two;
                 int i;
@@ -4099,9 +4100,9 @@ int sortedBuiltinLen;
 #pragma region Code Blocks
 CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* localVarSize, int* localVarCount) {
     int zero = 0, two = 2;
-    bool freeVariables=false;
+    bool freeVariables = false;
     if(localVars == NULL) {
-        freeVariables=true;
+        freeVariables = true;
         localVars = calloc(1, sizeof(char**));
         *localVars = calloc(2, sizeof(char*));
         localVarSize = &two;
