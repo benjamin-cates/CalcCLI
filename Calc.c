@@ -2286,9 +2286,11 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 return NULLOPERATION;
             }
             //If it is builtin and has the wrong number of arguments
-            if(op.optype == optype_builtin && stdfunctions[op.op].argCount != commaCount && op.op != op_run && (op.op != op_ge || commaCount == 2) && (op.op != op_fill || commaCount != 3)) {
-                error("wrong number of arguments for '%s'", stdfunctions[op.op].name);
-                return NULLOPERATION;
+            if(op.optype == optype_builtin && stdfunctions[op.op].argCount != commaCount) {
+                if(!(op.op == op_run || (op.op == op_fill && commaCount == 3) || (op.op == op_ge && commaCount == 2))) {
+                    error("wrong number of arguments for '%s'", stdfunctions[op.op].name);
+                    return NULLOPERATION;
+                }
             }
             //If it is custom and has the wrong number of arguments
             if(op.optype == optype_custom && customfunctions[op.op].argCount != commaCount) {
@@ -2493,9 +2495,9 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         }
     }
     if(firstNegative) {
-        memmove(ops,ops+1,(sectionCount-1)*sizeof(Tree));
-        ops[0]=newOp(allocArg(ops[0],false),1,op_neg,0);
-        sectionCount-=1;
+        memmove(ops, ops + 1, (sectionCount - 1) * sizeof(Tree));
+        ops[0] = newOp(allocArg(ops[0], false), 1, op_neg, 0);
+        sectionCount -= 1;
     }
     //Compile operations into tree
     int offset = 0;
