@@ -169,5 +169,6 @@ int main() {
     }
     //Print failed count
     printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
+    cleanup();
     return 0;
 }

@@ -2481,7 +2481,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                     args[x + y * width] = NULLOPERATION;
                     continue;
                 }
-                if(section[pos[y][x]+1]=='\0') args[x+y*width]=NULLOPERATION;
+                if(section[pos[y][x] + 1] == '\0') args[x + y * width] = NULLOPERATION;
                 else args[x + y * width] = generateTree(section + pos[y][x] + 1, argNames, localVars, useUnits ? base : 0);
             }
             ops[i] = newOp(args, width * height, op_vector, 0);
@@ -3135,7 +3135,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 out.type = value_num;
                 out.num = compBinOp(tree.op, one.num, two.num);
                 freeValue(one);
-                if(tree.op!=op_not) freeValue(two);
+                if(tree.op != op_not) freeValue(two);
                 return out;
             }
         }
@@ -4463,9 +4463,16 @@ void cleanup() {
     for(i = 0;i < historyCount;i++) {
         freeValue(history[i]);
     }
-    //Free global array
+    //Free global arrays
     free(customfunctions);
     free(history);
+    free(sortedBuiltin);
+    int localVarSize = argListLen(globalLocalVariables);
+    for(i = 0;i < localVarSize;i++) {
+        freeValue(globalLocalVariableValues[i]);
+    }
+    free(globalLocalVariableValues);
+    free(globalLocalVariables);
 }
 void startup() {
     //Constants
