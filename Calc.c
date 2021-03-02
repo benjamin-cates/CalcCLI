@@ -3189,7 +3189,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     if(tree.argCount > 1) freeValue(two);
                     return NULLVAL;
                 }
-                Value* inputs = calloc(tree.argCount, sizeof(Value));
+                Value inputs[tree.argCount];
+                memset(inputs,0,sizeof(Value)*tree.argCount);
                 if(inputs == NULL) { error(mallocError);return NULLVAL; }
                 inputs[0] = two;
                 int i;
