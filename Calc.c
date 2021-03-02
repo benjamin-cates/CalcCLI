@@ -2553,7 +2553,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
         if((*tree.code).list[0].id == action_return) {
             code = treeToString(*(*tree.code).list[0].tree, true, newArgNames, localVars);
         }
-        else code = codeBlockToString(*tree.code, newArgNames, localVars);
+        else code = codeBlockToString(*tree.code, localVars, newArgNames);
         int argListLen = strlen(argListString);
         char* out = calloc(argListLen + 2 + strlen(code) + 1, 1);
         if(out == NULL) { error(mallocError);return NULL; }
