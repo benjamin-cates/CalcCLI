@@ -3244,6 +3244,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     out = new;
                 }
             }
+            freeValue(one);
             return out;
         }
         //Matrix functions
