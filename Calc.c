@@ -2144,7 +2144,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             continue;
         }
         //Open brackets
-        if(ch == '(' || ch == '[' || ch == '<') {
+        if(ch == '(' || ch == '[' || ch == '<' || ch == '{') {
             brackets++;
             if(brackets != 1) continue;
             int type = ch == '(' ? 3 : (ch == '[' ? 4 : 7);
@@ -2167,7 +2167,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             continue;
         }
         //Close brackets
-        if(ch == ')' || (ch == '>' && (i != 0 && eq[i - 1] != '=')) || ch == ']') {
+        if(ch == ')' || (ch == '>' && (i != 0 && eq[i - 1] != '=')) || ch == ']' || ch == '}') {
             if(--brackets < 0) {
                 error("bracket mismatch 1", NULL);
                 return NULLOPERATION;
@@ -2207,6 +2207,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         }
         if(i == 0 && sectionCount == 0) sectionCount++;
     }
+    if(sectionCount == 0) return NULLOPERATION;
     sections[sectionCount] = eqLength;
     if(brackets != 0) {
         error("bracket mismatch 0", NULL);
@@ -2415,7 +2416,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             if(sectionTypes[i] == 5) {
                 //use alternate base
                 int underscore = findNext(section, 0, '_');
-                if(underscore == 0)
+                if(underscore == -1)
                     error("could not find underscore", NULL);
                 Tree tree = generateTree(section + underscore + 1, NULL, localVars, 0);
                 if(globalError) {
@@ -2501,6 +2502,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         ops[0] = newOp(allocArg(ops[0], false), 1, op_neg, 0);
         sectionCount -= 1;
     }
+    if(sectionCount == 1 && (ops[0].optype != 0 || ops[0].argCount != 0 || ops[0].op == 0)) return ops[0];
     //Compile operations into tree
     int offset = 0;
     //Side-by-side multiplication
