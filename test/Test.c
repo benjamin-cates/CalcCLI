@@ -1,6 +1,9 @@
 #include "../Calc.h"
 #include <stdarg.h>
+bool testExpectsErrors = false;
 void error(const char* format, ...) {
+    globalError = true;
+    if(testExpectsErrors) return;
     //Print error
     printf("Error: ");
     va_list argptr;
@@ -8,7 +11,6 @@ void error(const char* format, ...) {
     vprintf(format, argptr);
     va_end(argptr);
     printf("\n");
-    globalError = true;
 };
 //These tests basic parsing
 const char* regularTestText[] = {
@@ -98,6 +100,8 @@ const char* zeroTests[] = {
 };
 int failedCount = 0;
 int testIndex = 0;
+char validChars[] = "          ()$***+++,,,,--...0123456789;<==>ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^____abcdefghijklmnopqrstuvwxyz{}";
+char invalidChars[] = "!\"#%&':=?@\\`|~";
 void failedTest(int index, const char* testType, const char* equation, const char* format, ...) {
     printf("Failed test %d (%s)", index, testType);
     if(globalError) printf(" with error");
@@ -167,6 +171,28 @@ int main() {
         freeValue(out);
         testIndex++;
     }
+    //Random characters test
+    srand(0);
+    testExpectsErrors = true, testIndex = 0;
+    for(i = 0;i < 200000;i++) {
+        char test[30];
+        for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars)-1)];
+        test[9] = '\0';
+        //Test parsing and computing
+        printf("\rParsing      %s                ", test);
+        fflush(stdout);
+        Value val=calculate(test, 0);
+        freeValue(val);
+        globalError=false;
+        //Test highlighting
+        printf("\rHighlighting %s            ",test);
+        fflush(stdout);
+        char* basic=highlightSyntax(test);
+        free(advancedHighlight(test,basic,false,NULL,NULL));
+        free(basic);
+        globalError=false;
+    }
+    printf("\r                                              \r");
     //Print failed count
     printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
     cleanup();
