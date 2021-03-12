@@ -23,7 +23,7 @@ char* randomEquation(int length, int base, bool isSquare) {
     if(length == 0) {
         //Return number
         const char digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-        char* out = calloc(11, 0);
+        char* out = calloc(11, 1);
         for(int i = 0;i < 10;i++) out[i] = digits[rand() % base];
         out[rand() % 5] = '.';
         out[(rand() % 4) + 5] = 'e';
