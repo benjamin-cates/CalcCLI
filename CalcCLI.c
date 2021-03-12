@@ -416,10 +416,11 @@ void runLine(char* input) {
         }
         else if(startsWith(input, "-g ")) {
             //Graph
-            char* cleanInput = inputClean(input + 3);
+            char clean[strlen(input)];
+            strcpy(clean, input + 3);
+            inputClean(clean);
             if(globalError) return;
-            graphEquation(cleanInput, -10, 10, 10, -10, 20, 50);
-            free(cleanInput);
+            graphEquation(clean, -10, 10, 10, -10, 20, 50);
         }
         else if(startsWith(input, "-f ")) {
             int strLen = strlen(input);
@@ -545,7 +546,9 @@ void runLine(char* input) {
                     return;
                 }
                 else if(startsWith(runType, "parse")) {
-                    char* in = inputClean(runType + 6);
+                    char in[strlen(runType)];
+                    strcpy(in, runType + 6);
+                    inputClean(in);
                     clock_t t = clock();
                     for(int i = 0;i < runCount;i++) {
                         Tree out = generateTree(in, NULL, globalLocalVariables, 0);
@@ -553,13 +556,13 @@ void runLine(char* input) {
                     }
                     t = clock() - t;
                     printPerformance("Parse", t, runCount);
-                    free(in);
                     return;
                 }
                 else if(startsWith(runType, "calc")) {
-                    char* in = inputClean(runType + 5);
+                    char in[strlen(runType)];
+                    strcpy(in, runType + 5);
+                    inputClean(in);
                     Tree tr = generateTree(in, NULL, globalLocalVariables, 0);
-                    free(in);
                     clock_t t = clock();
                     for(int i = 0;i < runCount;i++) {
                         Value val = computeTree(tr, NULL, 0, globalLocalVariableValues);
