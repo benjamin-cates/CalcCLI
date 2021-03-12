@@ -12,6 +12,21 @@ void error(const char* format, ...) {
     va_end(argptr);
     printf("\n");
 };
+char* currentTest=NULL;
+#ifdef __linux__
+#include <signal.h>
+void segFaultHandler(int nSignum, siginfo_t* info,void* p) {
+    printf("seg fault on %s",currentTest);
+    fflush(stdout);
+    exit(0);
+}
+void setSegFault() {
+    struct sigaction* action=calloc(1,sizeof(struct sigaction));
+    action->sa_flags=SA_SIGINFO;
+    action->sa_sigaction=segFaultHandler;
+    sigaction(SIGSEGV,action,NULL);
+}
+#endif
 //These tests basic parsing
 const char* regularTestText[] = {
     "1",
@@ -102,6 +117,148 @@ int failedCount = 0;
 int testIndex = 0;
 char validChars[] = "          ()$***+++,,,,--...0123456789;<==>ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^____abcdefghijklmnopqrstuvwxyz{}";
 char invalidChars[] = "!\"#%&':=?@\\`|~";
+char* randomEquation(int length, int base, bool isSquare) {
+    if(length == 0) {
+        //Return number
+        const char digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        char* out = calloc(11, 0);
+        for(int i = 0;i < 10;i++) out[i] = digits[rand() % base];
+        out[rand() % 5] = '.';
+        out[(rand() % 4) + 5] = 'e';
+        return out;
+    }
+    int type = rand() % 6;
+    //Parenthesis
+    if(type == 0) {
+        //Parenthesis with same length
+        char* inside = randomEquation(length, base, isSquare);
+        char* out = calloc(strlen(inside) + 3, 1);
+        out[0] = '(';
+        memcpy(out + 1, inside, strlen(inside));
+        out[strlen(inside) + 1] = ')';
+        free(inside);
+        return out;
+    }
+    //Variables or functions
+    if(type == 1) {
+        //Variable
+        int id = sortedBuiltin[rand() % sortedBuiltinLen];
+        int argCount = stdfunctions[id].argCount;
+        if(argCount == 0) {
+            char* out = calloc(stdfunctions[id].nameLen + 1, 1);
+            memcpy(out, stdfunctions[id].name, stdfunctions[id].nameLen);
+            return out;
+        }
+        char* args[argCount];
+        int size = stdfunctions[id].nameLen + 3;
+        //Generate arguments
+        for(int i = 0;i < argCount;i++) {
+            args[i] = randomEquation(length - 1, base, isSquare);
+            size += strlen(args[i]) + 1;
+        }
+        //Generate out
+        char* out = calloc(size, 1);
+        memcpy(out, stdfunctions[id].name, stdfunctions[id].nameLen);
+        out[strlen(out)] = '(';
+        for(int i = 0;i < argCount;i++) {
+            strcat(out, args[i]);
+            free(args[i]);
+            if(i + 1 != argCount) strcat(out, ",");
+        }
+        strcat(out, ")");
+        return out;
+    }
+    //Units
+    if(type == 2) {
+        //Do an operator if it is not inside a square bracket
+        if(!isSquare) {
+            type = 3;
+        }
+        else {
+            int id = rand() % unitCount;
+            char prefix = 0;
+            if(unitList[id].multiplier < 0) prefix = metricNums[rand() % metricCount];
+            char* out = calloc(strlen(unitList[id].name) + 2, 1);
+            if(prefix != 0) out[0] = prefix;
+            strcat(out, unitList[id].name);
+            return out;
+        }
+    }
+    //Operators
+    if(type == 3) {
+        //Operator
+        char operator[4];
+        memset(operator,0, 4);
+        int op = rand();
+        operator[0] = ("+-*/^%")[op % 6];
+        if(op % 12 > 5) operator[1] = '-';
+        char* p1 = randomEquation(length - 1, base, isSquare);
+        char* p2 = randomEquation(length - 1, base, isSquare);
+        char* out = calloc(strlen(p1) + strlen(operator) + strlen(p2) + 1, 1);
+        strcat(out, p1);
+        strcat(out, operator);
+        strcat(out, p2);
+        free(p1);
+        free(p2);
+        return out;
+    }
+    //Square Brackets
+    if(type == 4) {
+        //Unit bracket
+        char* baseStr = NULL;
+        int newBase = base;
+        //Generate base
+        if(rand() % 2 == 1) {
+            baseStr = randomEquation(1, 10, false);
+            Value base = calculate(baseStr, 0);
+            newBase = getR(base);
+            //If error, set base to 10
+            if(globalError || newBase <= 1 || newBase >= 36) {
+                newBase = 10;
+                baseStr = calloc(3, 1);
+                memcpy(baseStr, "10", 2);
+                globalError = false;
+            }
+            freeValue(base);
+        }
+        char* inside = randomEquation(length - 1, newBase, true);
+        //Get length
+        int len = strlen(inside) + 4;
+        if(baseStr != NULL) len += strlen(baseStr);
+        //Compile out
+        char* out = calloc(len, 1);
+        strcat(out, "[");
+        strcat(out, inside);
+        strcat(out, "]");
+        if(baseStr != NULL) {
+            strcat(out, "_");
+            strcat(out, baseStr);
+        }
+        free(inside);
+        free(baseStr);
+        return out;
+    }
+    //Vectors
+    if(type == 5) {
+        int count = rand() % 5;
+        char* cells[count];
+        int semicolonsFlags = rand();
+        int len = 3;
+        for(int i = 0;i < count;i++) {
+            cells[i] = randomEquation(length - 1, base, isSquare);
+            len += strlen(cells[i]) + 1;
+        }
+        char* out = calloc(len, 1);
+        strcat(out, "<");
+        for(int i = 0;i < count;i++) {
+            strcat(out, cells[i]);
+            if(i + 1 != count) strcat(out, (semicolonsFlags >> i) & 1 ? ";": ",");
+            free(cells[i]);
+        }
+        strcat(out, ">");
+        return out;
+    }
+}
 void failedTest(int index, const char* testType, const char* equation, const char* format, ...) {
     printf("Failed test %d (%s)", index, testType);
     if(globalError) printf(" with error");
@@ -114,6 +271,9 @@ void failedTest(int index, const char* testType, const char* equation, const cha
     failedCount++;
 }
 int main() {
+    #ifdef __linux__
+    setSegFault();
+    #endif
     startup();
     int i;
     //Loop over regularTests
@@ -176,21 +336,47 @@ int main() {
     testExpectsErrors = true, testIndex = 0;
     for(i = 0;i < 200000;i++) {
         char test[30];
-        for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars)-1)];
+        for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
         test[9] = '\0';
         //Test parsing and computing
         printf("\rParsing      %s                ", test);
         fflush(stdout);
-        Value val=calculate(test, 0);
+        Value val = calculate(test, 0);
         freeValue(val);
-        globalError=false;
+        globalError = false;
         //Test highlighting
-        printf("\rHighlighting %s            ",test);
+        printf("\rHighlighting %s            ", test);
         fflush(stdout);
-        char* basic=highlightSyntax(test);
-        free(advancedHighlight(test,basic,false,NULL,NULL));
+        char* basic = highlightSyntax(test);
+        free(advancedHighlight(test, basic, false, NULL, NULL));
         free(basic);
+        globalError = false;
+        testIndex++;
+    }
+    printf("\r                                              \r");
+    fflush(stdout);
+    testExpectsErrors=false, testIndex=0;
+    srand(0);
+    for(i=0;i<10000;i++) {
+        char* test=randomEquation(3,10,0);
+        currentTest=test;
+        //Parse tree
+        Tree tree=generateTree(test,NULL,NULL,0);
+        if(globalError) {
+            failedTest(testIndex,"random equation",test,"experienced parsing error");
+            globalError=false;
+            failedCount++;
+        }
+        //Compute tree (only checks for crash)
+        testExpectsErrors=true;
+        Value out=computeTree(tree,NULL,0,NULL);
+        testExpectsErrors=false;
         globalError=false;
+        //Free
+        freeTree(tree);
+        freeValue(out);
+        free(test);
+        testIndex++;
     }
     printf("\r                                              \r");
     //Print failed count
