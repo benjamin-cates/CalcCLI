@@ -3,7 +3,7 @@
 #pragma region Global Variables
 const char* testType;
 bool testExpectsErrors = false;
-char* currentTest = NULL;
+const char* currentTest = NULL;
 int failedCount = 0;
 int testIndex = 0;
 #pragma endregion
