@@ -2050,7 +2050,7 @@ void inputClean(char* input) {
     input[i - offset] = 0;
 }
 int nextSection(const char* eq, int start, int* end, int base) {
-    while(eq[++start] == ' ');
+    while(eq[start] == ' ') start++;
     //Parenthesis
     if(eq[start] == '(') {
         int endPos = findNext(eq, start, ')');
@@ -2070,7 +2070,7 @@ int nextSection(const char* eq, int start, int* end, int base) {
                 else *end = endNext;
                 return 9;
             }
-            else *end = strlen(eq) - 1;
+            else *end = strlen(eq);
             return 8;
         }
         *end = endPos;
@@ -2152,11 +2152,11 @@ int nextSection(const char* eq, int start, int* end, int base) {
                 while(eq[next] == ' ') next++;
                 if(eq[next] == '{') {
                     int endPos = findNext(eq, next, '}');
-                    if(endPos == -1) *end = strlen(eq) - 1;
+                    if(endPos == -1) *end = strlen(eq);
                     else *end = endPos;
                     return 9;
                 }
-                else *end = strlen(eq) - 1;
+                else *end = strlen(eq);
                 return 8;
             }
             break;
@@ -2210,7 +2210,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
     sections[0] = -1;
     for(int i = 0;true;i++) {
         int end = -1;
-        int type = nextSection(eq, sections[i], &end, base);
+        int type = nextSection(eq, sections[i] + 1, &end, base);
         if(type == -1) {
             error("fatal parsing error (next section not found)");
             return NULLOPERATION;
@@ -2223,7 +2223,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         }
         sectionTypes[i] = type;
         sections[i + 1] = end;
-        if(eq[end + 1] == '\0') {
+        if(eq[end + 1] == '\0' || eq[end] == 0) {
             sectionCount = i + 1;
             break;
         }
@@ -3789,6 +3789,12 @@ char** parseArgumentList(const char* list) {
     return out;
 }
 int argListAppend(char*** pointerToList, char* toAppend, int* pointerToSize) {
+    if(*pointerToList == NULL) {
+        *pointerToList = calloc(2, sizeof(char*));
+        **pointerToList = toAppend;
+        *pointerToSize = 2;
+        return 0;
+    }
     //Find length
     int i = -1;
     while((*pointerToList)[++i] != NULL) if(strcmp(toAppend, pointerToList[0][i]) == 0) {
@@ -3970,7 +3976,6 @@ void generateFunction(const char* eq) {
         clean[strlen(clean) - 1] = '\0';
     }
     CodeBlock code = parseToCodeBlock(clean + isBlock, argNames, NULL, NULL, NULL);
-    free(clean);
     if(globalError) {
         free(name);
         int i = 0;
@@ -5064,502 +5069,863 @@ int getVariableType(const char* name, bool useUnits, char** argNames, char** loc
     if(tree.optype == optype_localvar) return 18;
     return 13;
 }
-const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Null11","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable","Control Flow" };
-char* highlightSyntax(const char* eq) {
-    /*
-        0 - Null (white)
-        1 - Number
-        2 - Variable
-        3 - Comment (green)
-        4 - Error character (red)
-        5 - Bracket (white)
-        6 - Operator (bright black)
-        7 - String (yellow)
-        8 - Command (blue)
-    9 - Space(white)
+const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Delimiter","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable","Control Flow" };
+/*
+    0 - Null (no color)
+    1 - Number (bold)
+    2 - Variable (not used)
+    3 - Comment (green)
+    4 - Error character (red)
+    5 - Bracket (white)
+    6 - Operator (bright black)
+    7 - String (yellow)
+    8 - Command (blue)
+    9 - Space (no color)
     10 - Escape sequence(for strings)
-    Advanced only
-    11 -
-    12 - Invalid operator
-    13 - Invalid varible name
-    14 - Builtin variable
-    15 - Custom functions
-    16 - Arguments
-    17 - Unit
-    18 - Local Variable
-    19 - Control Flow
-    * */
+    11 - Delimeter (commas, white)
+    12 - Invalid operator (red)
+    13 - Invalid varible name (red)
+    14 - Builtin variable (yellow)
+    15 - Custom functions (purple)
+    16 - Arguments (blue)
+    17 - Unit (green)
+    18 - Local Variable (blue)
+    19 - Control Flow (bold purple)
+* */
+void highlightSyntax(char* eq, char* out, char** args, char** localVars, int base, bool useUnits) {
     int eqLen = strlen(eq);
-    char* out = calloc(eqLen, 1);
-    bool isComment = false;
-    int i = -1;
-    //Comments
-    if(eq[0] == '/' && eq[1] == '/') {
-        out[0] = out[1] = 3;
-        isComment = true;
-        i += 2;
-    }
-    if(eq[0] == '#') {
-        out[0] = 3;
-        isComment = true;
-        i += 1;
-    }
-    if(eq[0] == '.') {
-        i++;
-        out[0] = 8;
-    }
-    int bracket = 0;
-    //Commands
-    if(eq[0] == '-') {
-        int j = 0;
-        while(eq[j] != ' ' && eq[j] != '\0') {
-            out[j] = 8;
-            j++;
+    int start = 0;
+    int end = start;
+    while(eq[start] != 0) {
+        while(eq[start] == ' ') {
+            out[start] = 9;
+            start++;
+            if(eq[start] == 0) break;
         }
-        i = j - 1;
-    }
-    //Is local variable
-    int eqPos = isLocalVariableStatement(eq);
-    if(eqPos) {
-        i = eqPos;
-        memset(out, 2, i);
-        out[i] = 8;
-    }
-    int state = 0;
-    int base = 10;
-    //Main loop
-    while(eq[++i] != '\0') {
-        char ch = eq[i];
-        if(ch == ' ' || ch == '\t') out[i] = 9;
-        if(state == 0) base = 10;
-        //Commented characters
-        if(bracket == 0 && isComment) {
-            out[i] = 3;
-            if(eq[i] == '$' && eq[i + 1] == '(') {
-                out[i] = 6;
-                out[i + 1] = 5;
-                i++;
-                bracket++;
-                continue;
-            }
+        if(eq[start] == ',' || eq[start] == ';') {
+            out[start] = 11;
+            start++;
             continue;
         }
-        if(ch == '(' || ch == '[' || ch == '<' || ch == ')' || ch == ']' || (ch == '>' && eq[i - 1] != '=')) {
-            out[i] = 5;
-            state = 0;
-            if(ch == '(' || ch == '[' || ch == '<') bracket++;
-            else {
-                bracket--;
-                // Error if no opening bracket
-                if(bracket < 0) out[i] = 4;
-                // ]_ base syntax
-                if(ch == ']') {
-                    if(eq[i + 1] == '_') {
-                        out[i + 1] = 6;
-                        i++;
-                    }
-                }
-            }
-            continue;
-        }
-        if(ch == ';') {
-            //Set character as bracket
-            state = 0;
-            out[i] = 5;
-            continue;
-        }
-        if(ch == ',') {
-            state = 0;
-            out[i] = 5;
-            continue;
-        }
-        if(ch == '*' || ch == '/' || ch == '+' || ch == '-' || ch == '^' || ch == '%') {
-            state = 0;
-            out[i] = 6;
-            continue;
-        }
-        if(ch == '=' && eq[i + 1] == '>') {
-            out[i] = 6;
-            out[i + 1] = 6;
-            i++;
-            state = 0;
+        int type = nextSection(eq, start, &end, base);
+        int len = end - start + 1;
+        if(type == -1) {
+            out[start] = 4;
+            start++;
             continue;
         }
         //Numbers
-        if(((ch >= '0' && ch <= '9') || ch == '.' || ch == 'e') && state != 2) {
-            if(ch == '0' && state != 1) {
-                char b = eq[i + 1];
-                base = 10;
-                if(b == 'x') base = 16;
-                if(b == 'd') base = 10;
-                if(b == 'o') base = 8;
-                if(b == 't') base = 3;
-                if(b == 'b') base = 2;
-                if(base != 10) {
-                    out[i] = 1;
-                    i++;
-                }
-            }
-            out[i] = 1;
-            state = 1;
-            continue;
-        }
-        // ABCDEF for hexadecimal
-        if(ch >= 'A' && state != 2 && (ch - 'A' < base - 10)) {
-            out[i] = 1;
-            state = 1;
-            continue;
-        }
+        else if(type == 0) memset(out + start, 1, len);
         //Variables
-        if((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '$' || (state == 2 && ((ch >= '0' && ch <= '9') || ch == '.' || ch == '_'))) {
-            out[i] = 2;
-            state = 2;
-            continue;
+        else if(type == 1) {
+            char name[len + 1];
+            memcpy(name, eq + start, len);
+            name[len] = 0;
+            inputClean(name);
+            if(!useUnits) lowerCase(name);
+            Tree op = findFunction(name, useUnits, args, localVars);
+            //Units
+            if(op.optype == -1) op.optype = 3;
+            //Variable not found
+            if(op.optype == 0 && op.op == 0) op.optype = -1;
+            memset(out + start, op.optype + 14, len);
         }
-        //Spaces
-        if(ch == ' ' || ch == '\t') out[i] = 9;
-        //Error character
-        else {
-            out[i] = 4;
-            state = 0;
+        //Function
+        else if(type == 2) {
+            //Copy name and remove spaces
+            int firstParenth = findNext(eq, start, '(');
+            int len = firstParenth - start;
+            char name[len + 1];
+            //Remove spaces and lowercase
+            int offset = 0;
+            for(int i = 0;i < len - offset;i++) {
+                if(eq[i + start + offset] == ' ') { i--;offset++; }
+                char copy = eq[i + start + offset];
+                if(copy <= 'Z') copy += 32;
+                name[i] = copy;
+            }
+            name[len - offset] = 0;
+            Tree op = findFunction(name, false, NULL, NULL);
+            memset(out + start, op.optype + 14, len);
+            if(eq[end] == 0) {
+                start = firstParenth + 1;
+                out[firstParenth] = 4;
+                continue;
+            }
+            out[firstParenth] = 5;
+            out[end] = 5;
+            char endOriginal = eq[end];
+            eq[end] = 0;
+            highlightSyntax(eq + firstParenth + 1, out + firstParenth + 1, args, localVars, base, useUnits);
+            eq[end] = endOriginal;
         }
-    }
-    if(bracket > 0) {
-        bracket = 0;
-        int i = eqLen - 1;
-        //Find unmatched brackets
-        for(i = eqLen - 1;i > -1;i--) {
-            if(out[i] == 3) continue;
-            char ch = eq[i];
-            if(ch == '(' || ch == '<' || ch == '[') {
-                bracket--;
-                if(bracket < 0) {
-                    out[i] = 4;
-                    bracket = 0;
+        //Parenthesis, square brackets or vectors
+        else if(type == 4 || type == 3 || type == 7) {
+            if(eq[end] == 0) {
+                out[start] = 4;
+                start++;
+                if(type == 4) useUnits = true;
+                continue;
+            }
+            out[start] = 5;
+            out[end] = 5;
+            char endOriginal = eq[end];
+            eq[end] = 0;
+            highlightSyntax(eq + start + 1, out + start + 1, args, localVars, base, type == 4 ? true : useUnits);
+            eq[end] = endOriginal;
+        }
+        //Square bracket with base
+        else if(type == 5) {
+            int endBrac = findNext(eq, start, ']');
+            int underscore = findNext(eq, endBrac + 1, '_');
+            out[endBrac] = 5;
+            out[start] = 5;
+            eq[endBrac] = 0;
+            //Calculate base
+            double base = 0;
+            char charAfterEndOfBase = eq[end + 1];
+            eq[end + 1] = 0;
+            ignoreError = true;
+            Value baseVal = calculate(eq + underscore + 1, base);
+            ignoreError = false;
+            eq[end + 1] = charAfterEndOfBase;
+            if(globalError) {
+                globalError = false;
+                base = 10;
+                highlightSyntax(eq + underscore + 1, out + underscore + 1, NULL, NULL, base, false);
+            }
+            else {
+                base = getR(baseVal);
+                freeValue(baseVal);
+                //Highlight as error if out of bounds
+                if(base < 1 || base>36) {
+                    memset(out, 4, end - underscore);
+                    base = 10;
                 }
+                else highlightSyntax(eq + underscore + 1, out + underscore + 1, NULL, NULL, base, false);
             }
-            if(ch == ')' || (ch == '>' && eq[i - 1] != '=') || ch == ']') {
-                bracket++;
+            //Highlight underscore as operator
+            out[underscore] = 6;
+            highlightSyntax(eq + start + 1, out + start + 1, args, localVars, base, true);
+            eq[endBrac] = ']';
+        }
+        //Operators
+        else if(type == 6) {
+            //Copy operator to opStr and remove spaces
+            char opStr[len + 1];
+            memcpy(opStr, eq + start, len);
+            opStr[len] = 0;
+            inputClean(opStr);
+            int opLen = strlen(opStr);
+            //Check if it ends in a negative
+            if(opStr[opLen - 1] == '-' && opLen != 1) {
+                opStr[opLen - 1] = 0;
+                opLen--;
             }
-
-        }
-    }
-    return out;
-}
-char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, char** arguments, char** localVariables) {
-    int i = -1;
-    int prev = 0;
-    int prevPos = 0;
-    int bracket = 0;
-    bool useUnits = forceUnits;
-    int unitBracketID = -1;
-    int len = strlen(eq);
-    char* out = calloc(len, 1);
-    memcpy(out, syntax, len);
-    char** oldArgs = arguments;
-    char** freeArgs = NULL;
-    if(eq[0] == '-') {
-        char name[strlen(eq)];
-        int j = 0;
-        int nameI = 0;
-        while(eq[++j] != ' ' && eq[j] != '\0') {
-            name[nameI++] = eq[j];
-        }
-        name[nameI] = '\0';
-        if(strcmp(name, "f") == 0) {
-            if(len > 3) memset(out + 3, 0, len - 3);
-            return out;
-        }
-        if(strcmp(name, "dx") == 0 || strcmp(name, "g") == 0) {
-            char x[2] = "x";
-            char* xArgs[2];
-            xArgs[0] = x;
-            xArgs[1] = NULL;
-            arguments = mergeArgList(arguments, xArgs);
-        }
-        if(strcmp(name, "def") == 0) {
-            int equal = 4;
-            while(eq[++equal] != '=' && eq[equal] != '\0');
-            if(eq[equal] == '=') {
-                out[equal] = 8;
-                //Find ( position
-                int br = 4;
-                while(eq[++br] != '(' && br < equal);
-                if(br != equal) {
-                    ignoreError = true;
-                    char** args = parseArgumentList(eq + br);
-                    ignoreError = false;
-                    freeArgs = args;
-                    arguments = mergeArgList(arguments, args);
-                }
-                memset(out + 5, 15, br - 5);
+            //Check if section is valid
+            bool isValid = true;
+            if(opLen == 1) {
+                if(opStr[0] == '+');
+                else if(opStr[0] == '-');
+                else if(opStr[0] == '*');
+                else if(opStr[0] == '/');
+                else if(opStr[0] == '^');
+                else if(opStr[0] == '%');
+                else isValid = false;
             }
+            else if(opLen == 2) {
+                if(opStr[0] == '*' && opStr[1] == '*');
+                else isValid = false;
+            }
+            else isValid = false;
+            if(isValid) memset(out + start, 6, len);
+            else memset(out + start, 12, len);
         }
-        if(strcmp(name, "degset") == 0) {
-            char rad[4] = "rad";
-            char deg[4] = "deg";
-            char grad[5] = "grad";
-            char* args[4];
-            args[0] = rad;
-            args[1] = deg;
-            args[2] = grad;
-            args[3] = NULL;
-            arguments = mergeArgList(arguments, args);
-        }
-        if(strcmp(name, "include") == 0) {
-            //Add included funcs names to arguments list
-            char* names[includeFuncsLen + 1];
-            names[includeFuncsLen] = NULL;
-            for(int i = 0;i < includeFuncsLen;i++)
-                names[i] = includeFuncs[i].name;
-            arguments = mergeArgList(arguments, names);
-        }
-    }
-    while(eq[i] != '\0' || i == -1) {
-        i++;
-        //Spaces
-        if(syntax[i] == 9) continue;
-        if(prev != syntax[i]) {
-            //Operators
-            if(prev == 6) {
-                if(eq[prevPos] == '=' && eq[prevPos + 1] == '>') {
-                    i = prevPos + 2;
-                    //Find start of arguments
-                    int j = prevPos - 1;
-                    //Multiple variables
-                    if(eq[prevPos - 1] == ')') {
-                        while(j != 0 && eq[--j] != '(') {
-                            if(syntax[j] != 2 && syntax[j] != 5) out[j] = 4;
-                            if(syntax[j] == 13 || syntax[j] == 2) out[j] = 16;
-                        }
-                    }
-                    //Single variable
-                    else {
-                        j++;
-                        while(true) {
-                            j--;
-                            if(j == -1) break;
-                            if(syntax[j] == 2 || (syntax[j] > 12 && syntax[j] < 19)) {
-                                out[j] = 16;
-                                continue;
-                            }
+        //Anonymous functions
+        else if(type == 9 || type == 8) {
+            int eqPos = highlightArgumentList(eq + start, out + start) + start;
+            out[eqPos] = 6;
+            out[eqPos + 1] = 6;
+            char** args = parseArgumentList(eq + start);
+            //For non-code blocks
+            if(type == 8) {
+                //Find the acutal end of the statement
+                int newEnd = eqPos + 2;
+                for(;true;newEnd++) {
+                    char ch = eq[newEnd];
+                    if(ch == '(' || ch == '[' || ch == '<' || ch == '{') {
+                        char endType = ')';
+                        if(ch == '[') endType = ']';
+                        if(ch == '{') endType = '}';
+                        if(ch == '<') endType = '>';
+                        newEnd = findNext(eq, newEnd, endType);
+                        if(newEnd == -1) {
+                            newEnd = strlen(eq) - 1;
                             break;
                         }
-                        j++;
                     }
-                    //Calculate argument list
-                    ignoreError = true;
-                    char** argList = parseArgumentList(eq + j);
-                    char** newArguments = mergeArgList(arguments, argList);
-                    //Find function bounding range
-                    int startBracket = bracket;
-                    int x = i;
-                    for(x = i;eq[x] != '\0';x++) {
-                        bool isCloseBracket = (eq[x] == ')' || eq[x] == ']' || (eq[x] == '>' && eq[x - 1] != '='));
-                        if(bracket == startBracket && (eq[x] == ',' || isCloseBracket)) break;
-                        if(isCloseBracket) bracket--;
-                        if(eq[x] == '(' || eq[x] == '[' || eq[x] == '<') bracket++;
+                    if(ch == ',' || ch == ';' || ch == 0) {
+                        break;
                     }
-                    //Copy strings
-                    char expression[x - i + 2];
-                    memcpy(expression, eq + i, x - i);
-                    expression[x - i] = '\0';
-                    char syn[x - i + 2];
-                    memcpy(syn, syntax + i, x - i);
-                    syn[x - i] = '\0';
-                    //Highlight anonymous function contents
-                    char* highlighted = advancedHighlight(expression, syn, useUnits, newArguments, localVariables);
-                    memcpy(out + i, highlighted, x - i);
-
-                    //Cleanup
-                    ignoreError = false;
-                    freeArgList(argList);
-                    free(newArguments);
-                    i = x;
-                    prev = 0;
-                    prevPos = i;
-                    continue;
                 }
-                else {
-                    //This block determines if it is a valid operator
-                    bool isValid = false;
-                    char op[i - prevPos + 1];
-                    int x = prevPos - 1, y = 0;
-                    while(++x != i) if(eq[x] != ' ') op[y++] = eq[x];
-                    op[y] = '\0';
-                    int len = strlen(op);
-                    //Possible negative character
-                    if(op[len - 1] == '-' && len != 1) {
-                        op[len - 1] = '\0';
-                        len--;
-                    }
-                    if(len == 1) {
-                        const char* ops = "+-/*^%";
-                        char opchar = op[0];
-                        if(opchar == '+') isValid = true;
-                        if(opchar == '-') isValid = true;
-                        if(opchar == '/') isValid = true;
-                        if(opchar == '*') isValid = true;
-                        if(opchar == '^') isValid = true;
-                        if(opchar == '%') isValid = true;
-                        if(opchar == '_' && eq[prevPos - 1] == ']') isValid = true;
-                        // $() in comments
-                        if(opchar == '$' && syntax[prevPos - 1] == 3) isValid = true;
-                    }
-                    // **
-                    if(len == 2 && op[0] == '*' && op[1] == '*') isValid = true;
-                    if(!isValid) memset(out + prevPos, 12, i - prevPos);
-                }
+                char endChar = eq[newEnd];
+                eq[newEnd] = 0;
+                highlightSyntax(eq + eqPos + 2, out + eqPos + 2, args, NULL, 10, false);
+                eq[newEnd] = endChar;
+                end = newEnd;
             }
-            //Variables
-            if(prev == 2) {
-                //Local Variables
-                if(eq[i] == '=' && syntax[i] == 8) memset(out, 18, i);
-                else {
-                    //Copy name
-                    char name[i - prevPos + 1];
-                    memcpy(name, eq + prevPos, i - prevPos);
-                    name[i - prevPos] = '\0';
-                    //Get name type
-                    int type = getVariableType(name, useUnits, arguments, localVariables);
-                    //Set type to out
-                    memset(out + prevPos, type, i - prevPos);
+            ///For code blocks
+            else {
+                int startBracket = findNext(eq, eqPos + 2, '{');
+                bool isEndBracket = eq[end] != 0;
+                if(isEndBracket) {
+                    out[startBracket] = 5;
+                    out[end] = 5;
+                    eq[end] = 0;
                 }
+                else out[startBracket] = 4;
+                highlightCodeBlock(eq + startBracket + 1, out + startBracket + 1, args, NULL);
+                if(isEndBracket) eq[end] = '}';
             }
-            prev = out[i];
-            prevPos = i;
+            freeArgList(args);
         }
-        if(syntax[i] == 3) continue;
-        //Opening brackets
-        if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
-            if(eq[i] == '[' && unitBracketID == -1) {
-                unitBracketID = bracket;
-                useUnits = true;
-            }
-            bracket++;
+        start = end + 1;
+    }
+}
+int highlightArgumentList(char* eq, char* out) {
+    int endPos = 0;
+    int i = 0;
+    if(eq[0] == '(') {
+        endPos = findNext(eq, 0, ')');
+        if(endPos == -1) out[0] = 4;
+        else {
+            out[0] = 5;
+            out[endPos] = 5;
         }
-        //Closing brackets
-        if(eq[i] == ']' || eq[i] == ')' || (eq[i] == '>' && eq[i - 1] != '=')) {
-            bracket--;
-            if(eq[i] == ']' && unitBracketID == bracket) {
-                unitBracketID = -1;
-                if(!forceUnits) useUnits = false;
-            }
+        i++;
+    }
+    bool prevWasComma = true;
+    for(;true;i++) {
+        if(eq[i] == '=' && i > endPos) return i;
+        if(eq[i] == 0) return i;
+        if(eq[i] == ' ') {
+            out[i] = 9;
+            continue;
+        }
+        if(eq[i] == ',') {
+            out[i] = 11;
+            prevWasComma = true;
+            continue;
+        }
+        if(eq[i] >= 'A' && eq[i] <= 'Z') out[i] = 16;
+        else if(eq[i] >= 'a' && eq[i] <= 'z') out[i] = 16;
+        else if(eq[i] == '.' || eq[i] == '_') out[i] = 16;
+        else if(eq[i] >= '0' && eq[i] <= '9') out[i] = 16;
+        if(prevWasComma) {
+            prevWasComma = false;
+            if((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') out[i] = 4;
         }
     }
-    if(arguments != oldArgs) free(arguments);
-    if(freeArgs != NULL) freeArgList(freeArgs);
+}
+char* highlightLine(char* eq) {
+    char* out = calloc(strlen(eq) + 1, 1);
+    int start = 0;
+    //Comments
+    if((eq[0] == '/' && eq[1] == '/') || eq[0] == '#') {
+        for(int i = 0;eq[i] != 0;i++) {
+            //Set out to comment character
+            out[i] = 3;
+            if(eq[i] == '$' && eq[i + 1] == '(') {
+                //Set $ to operator and find end bracket
+                out[i] = 6;
+                int endBrac = findNext(eq, i + 1, ')');
+                //If end bracket doesn't exist, set ( to error and highlight the rest
+                if(endBrac == -1) {
+                    out[i + 1] = 4;
+                    highlightSyntax(eq + i + 2, out + i + 2, NULL, globalLocalVariables, 10, false);
+                    i = strlen(eq) - 1;
+                }
+                //Else set both to matching and set i to the end bracket
+                else {
+                    out[i + 1] = 5;
+                    out[endBrac] = 5;
+                    eq[endBrac] = 0;
+                    highlightSyntax(eq + i + 2, out + i + 2, NULL, globalLocalVariables, 10, false);
+                    eq[endBrac] = ')';
+                    i = endBrac + 1;
+                }
+            }
+        }
+        return out;
+    }
+    if(eq[0] == '-') {
+        //Find the position of the space
+        while(eq[start] != ' ' && eq[start] != 0) start++;
+        memset(out, 8, start);
+        if(startsWith(eq, "-base") || startsWith(eq, "-unit")) {
+            //Highlight the command suffix
+            eq[start] = 0;
+            highlightSyntax(eq + 5, out + 5, NULL, globalLocalVariables, 10, false);
+            //Highlight the rest
+            eq[start] = ' ';
+            highlightSyntax(eq + start + 1, out + start + 1, NULL, globalLocalVariables, 10, false);
+            return out;
+        }
+        if(startsWith(eq, "-def ")) {
+            int firstParenth = start;
+            while(eq[firstParenth] != '(' && eq[firstParenth] != 0) firstParenth++;
+            //Highlight the name
+            memset(out + start + 1, 15, firstParenth - start - 1);
+            //highlight the argument list and find the equal position
+            int eqPos = highlightArgumentList(eq + firstParenth, out + firstParenth) + firstParenth;
+            if(eq[eqPos] != 0) {
+                out[eqPos] = 8;
+                int next = eqPos + 1;
+                while(eq[next] == ' ') next++;
+                char** args = parseArgumentList(eq + firstParenth);
+                //If function is a code block
+                if(eq[next] == '{') {
+                    //Find end bracket
+                    int endBrac = findNext(eq, next, '}');
+                    bool hasEndBracket = endBrac == -1;
+                    if(hasEndBracket) {
+                        out[next] = 4;
+                        endBrac = strlen(eq);
+                    }
+                    else {
+                        out[next] = 5;
+                        out[endBrac] = 5;
+                        eq[endBrac] = 0;
+                    }
+                    //Copy content and highlight
+                    int len = next - endBrac - 1;
+                    char content[len + 1];
+                    memcpy(content, eq + next + 1, len);
+                    content[len] = 0;
+                    highlightCodeBlock(content, eq + next + 1, args, NULL);
+                    if(hasEndBracket) out[endBrac] = '}';
+                }
+                else highlightSyntax(eq + eqPos + 1, out + eqPos + 1, args, NULL, 10, false);
+                freeArgList(args);
+            }
+        }
+        if(startsWith(eq, "-f ")) {
+            return out;
+        }
+        if(startsWith(eq, "-dx ") || startsWith(eq, "-g ")) {
+            char* args[2];
+            args[0] = "x";
+            args[1] = NULL;
+            highlightSyntax(eq + start + 1, out + start + 1, args, globalLocalVariables, 10, false);
+            return out;
+        }
+        if(startsWith(eq, "-degset ")) {
+            char* args[4];
+            args[0] = "rad";
+            args[1] = "deg";
+            args[2] = "grad";
+            args[3] = NULL;
+            highlightSyntax(eq + start + 1, out + start + 1, args, globalLocalVariables, 10, false);
+            return out;
+        }
+        if(startsWith(eq, "-include ")) {
+            for(int i = 0;i < includeFuncsLen;i++) {
+                if(strcmp(eq + 9, includeFuncs[i].name) == 0) {
+                    memset(out + 9, 15, strlen(eq + 9));
+                    return out;
+                }
+            }
+            memset(out + 9, 13, strlen(eq + 9));
+            return out;
+        }
+        out[start]=9;
+    }
+    if(eq[0] == '.') {
+        out[0] = 8;
+        start++;
+    }
+    int isLocalVariable = isLocalVariableStatement(eq);
+    if(isLocalVariable) {
+        memset(out, 2, isLocalVariable);
+        out[isLocalVariable] = 8;
+        start = isLocalVariable + 1;
+    }
+    highlightSyntax(eq + start, out + start, NULL, globalLocalVariables, 10, false);
     return out;
 }
-char* syntaxHighlightFunction(const char* eq, char** arguments, char** localVariables) {
-    char** localVars = argListCopy(localVariables);
-    int localVarSize = argListLen(localVars);
-    int bracket = 0;
-    int eqLen = strlen(eq);
-    char* out = calloc(eqLen + 1, 0);
+void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
+    if(eq[0] == 0) return;
+    char** localVarCopy = argListCopy(localVars);
+    int localVarSize = argListLen(localVarCopy);
     int prevLineIsIf = false;
+    int eqLen = strlen(eq);
     for(int i = 0;i < eqLen;i++) {
+        while(eq[i] == ' ') out[i++] = 9;
         //This loop parses each statement separated by ;
-        if(i != 0) out[i] = 19;
-        i++;
-        const char* type = eq + i;
+        char* type = eq + i;
+        bool isCodeBlock = false;
+        int end = findNext(eq, i + 1, ';');
+        bool endIsNull = end == -1;
+        if(endIsNull) end = strlen(eq);
+        else eq[end] = 0;
         int isEqual = isLocalVariableStatement(eq + i);
-        char name[isEqual + 1];
-        bool isCodeBlock = false, takesStatement = true;
-        prevLineIsIf = false;
         if(isEqual) {
+            char* name = calloc(isEqual + 1, 1);
             memset(out + i, 18, isEqual);
             out[i + isEqual] = 8;
             memcpy(name, out + i, isEqual);
-            name[isEqual] = 0;
             i = isEqual + 1;
-            //Parse rest
+            highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
+            argListAppend(&localVarCopy, name, &localVarSize);
         }
         else if(startsWith(type, "return")) {
-            memset(out + i + 1, 6, 19);
+            memset(out + i, 19, 6);
             i += 6;
-        }
-        else if(startsWith(type, "if")) {
-            memset(out + i + 1, 2, 19);
-            isCodeBlock = true;
-            i += 2;
-            prevLineIsIf = true;
-            //Todo: highlight inside ()
+            if(i != end) highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
         }
         else if(startsWith(type, "else")) {
-            if(prevLineIsIf) memset(out + i + 1, 19, 4);
-            else memset(out + i + 1, 13, 4);
+            if(prevLineIsIf) memset(out + i, 19, 4);
+            else memset(out + i, 4, 4);
             i += 4;
             isCodeBlock = true;
         }
-        else if(startsWith(type, "while")) {
-            memset(out + i + 1, 5, 19);
-            //TODO: Highligh the innards then place i at the end of the block
+        else if(startsWith(type, "if") || startsWith(type, "while")) {
+            int typeLen = type[0] == 'i' ? 2 : 5;
+            memset(out + i, 19, typeLen);
             isCodeBlock = true;
-        }
-        else if(startsWith(type, "for")) {
-            memset(out + i + 1, 3, 19);
-            //TODO: Highlight the three statements
+            i += typeLen;
+            int startBrac = findNext(eq, i, '(');
+            if(startBrac == -1) {
+                memset(out + i, 4, end - i);
+                goto next;
+            }
+            int endBrac = findNext(eq, startBrac, ')');
+            if(endBrac == -1) {
+                out[startBrac] = 4;
+                highlightSyntax(eq + startBrac + 1, out + startBrac + 1, args, localVarCopy, 10, false);
+                goto next;
+            }
+            out[startBrac] = 5;
+            out[endBrac] = 5;
+            eq[endBrac] = 0;
+            highlightSyntax(eq + startBrac + 1, out + startBrac + 1, args, localVarCopy, 10, false);
+            eq[endBrac] = ')';
+            if(type[0] == 'i') prevLineIsIf = true;
             isCodeBlock = true;
-            i += 3;
+            i = endBrac + 1;
         }
         else if(startsWith(type, "break") || startsWith(type, "continue")) {
             if(type[0] == 'b') {
-                memset(out + i + 1, 5, 19);
+                memset(out + i, 19, 5);
                 i += 5;
             }
             else {
-                memset(out + i + 1, 7, 19);
-                i += 6;
+                memset(out + i, 19, 8);
+                i += 8;
             }
-            takesStatement = false;
-        }
-        //Highlight rest of the statement
-        int nextSemicolon = findNext(out, i, ';');
-        if(nextSemicolon == -1) nextSemicolon = eqLen;
-        if(isCodeBlock) {
-            //Find { and } (if they exist)
-            int openBracket = findNext(out, i, '{');
-            int closeBracket = nextSemicolon;
-            while(eq[--closeBracket] != '}' && closeBracket != 0);
-            //Find start and end
-            int end = closeBracket;
-            int start = openBracket;
-            if(end == 0) end = nextSemicolon;
-            if(start == -1) start = i;
-            //Copy equation
-            char equation[end - start];
-            memcpy(equation, eq + start + 1, end - start - 1);
-            equation[end - start - 1] = 0;
-            //Highlight equation
-            char* highlighted = syntaxHighlightFunction(equation, arguments, localVars);
-            memcpy(out + start + 1, highlighted, end - start - 1);
-            free(highlighted);
-        }
-        else if(takesStatement) {
-            //Copy equation and highlight it
-            char equation[nextSemicolon - i + 2];
-            memcpy(equation, eq + i, nextSemicolon - i);
-            equation[nextSemicolon - i] = 0;
-            //Highlight it
-            //TODO: ignore commands
-            char* highlight = highlightSyntax(equation);
-            char* advanced = advancedHighlight(equation, highlight, false, arguments, localVars);
-            free(highlight);
-            memcpy(out + i, advanced, nextSemicolon - i);
-            free(advanced);
-            //Set semicolon to control flow
-            if(nextSemicolon != eqLen) out[nextSemicolon] = 19;
+            memset(out + i, 4, end - i);
         }
         else {
             //Set invalid characters to error
-            memset(out + i, 4, nextSemicolon - i);
+            memset(out + i, 4, end - i);
         }
-        i = nextSemicolon - 1;
-        //Append arg list after variable and it has been parsed
-        if(isEqual) argListAppend(&localVars, name, &localVarSize);
+        //Highlight rest of the statement
+        if(isCodeBlock) {
+            while(eq[i] == ' ') out[i++] = 9;
+            //Find open bracket
+            int openBrac = eq[i] == '{' ? i : -1;
+            if(openBrac == -1) {
+                //If doesn't exist, highlight anyway
+                highlightCodeBlock(eq + i, out + i, args, localVarCopy);
+                goto next;
+            }
+            //Find closing bracket
+            int closeBrac = findNext(eq, openBrac, '}');
+            if(closeBrac == -1) {
+                //If doesn't exist, set open to error and highlight rest
+                out[openBrac] = 4;
+                highlightCodeBlock(eq + openBrac + 1, out + openBrac + 1, args, localVarCopy);
+                goto next;
+            }
+            //If they both exist, set both to valid brackets and highlight the innards
+            out[openBrac] = 5;
+            out[closeBrac] = 5;
+            eq[closeBrac] = 0;
+            highlightCodeBlock(eq + openBrac + 1, out + openBrac + 1, args, localVarCopy);
+            eq[closeBrac] = '}';
+        }
+    next:
+        if(!startsWith(type, "if")) prevLineIsIf = false;
+        i = end;
+        if(endIsNull) break;
+        else eq[end] = ';';
     }
-    return out;
+    return;
+}
+//char* highlightSyntax(const char* eq) {
+//    int eqLen = strlen(eq);
+//    char* out = calloc(eqLen, 1);
+//    bool isComment = false;
+//    int i = -1;
+//    //Comments
+//    if(eq[0] == '/' && eq[1] == '/') {
+//        out[0] = out[1] = 3;
+//        isComment = true;
+//        i += 2;
+//    }
+//    if(eq[0] == '#') {
+//        out[0] = 3;
+//        isComment = true;
+//        i += 1;
+//    }
+//    if(eq[0] == '.') {
+//        i++;
+//        out[0] = 8;
+//    }
+//    int bracket = 0;
+//    //Commands
+//    if(eq[0] == '-') {
+//        int j = 0;
+//        while(eq[j] != ' ' && eq[j] != '\0') {
+//            out[j] = 8;
+//            j++;
+//        }
+//        i = j - 1;
+//    }
+//    //Is local variable
+//    int eqPos = isLocalVariableStatement(eq);
+//    if(eqPos) {
+//        i = eqPos;
+//        memset(out, 2, i);
+//        out[i] = 8;
+//    }
+//    int state = 0;
+//    int base = 10;
+//    //Main loop
+//    while(eq[++i] != '\0') {
+//        char ch = eq[i];
+//        if(ch == ' ' || ch == '\t') out[i] = 9;
+//        if(state == 0) base = 10;
+//        //Commented characters
+//        if(bracket == 0 && isComment) {
+//            out[i] = 3;
+//            if(eq[i] == '$' && eq[i + 1] == '(') {
+//                out[i] = 6;
+//                out[i + 1] = 5;
+//                i++;
+//                bracket++;
+//                continue;
+//            }
+//            continue;
+//        }
+//        if(ch == '(' || ch == '[' || ch == '<' || ch == ')' || ch == ']' || (ch == '>' && eq[i - 1] != '=')) {
+//            out[i] = 5;
+//            state = 0;
+//            if(ch == '(' || ch == '[' || ch == '<') bracket++;
+//            else {
+//                bracket--;
+//                // Error if no opening bracket
+//                if(bracket < 0) out[i] = 4;
+//                // ]_ base syntax
+//                if(ch == ']') {
+//                    if(eq[i + 1] == '_') {
+//                        out[i + 1] = 6;
+//                        i++;
+//                    }
+//                }
+//            }
+//            continue;
+//        }
+//        if(ch == ';') {
+//            //Set character as bracket
+//            state = 0;
+//            out[i] = 5;
+//            continue;
+//        }
+//        if(ch == ',') {
+//            state = 0;
+//            out[i] = 5;
+//            continue;
+//        }
+//        if(ch == '*' || ch == '/' || ch == '+' || ch == '-' || ch == '^' || ch == '%') {
+//            state = 0;
+//            out[i] = 6;
+//            continue;
+//        }
+//        if(ch == '=' && eq[i + 1] == '>') {
+//            out[i] = 6;
+//            out[i + 1] = 6;
+//            i++;
+//            state = 0;
+//            continue;
+//        }
+//        //Numbers
+//        if(((ch >= '0' && ch <= '9') || ch == '.' || ch == 'e') && state != 2) {
+//            if(ch == '0' && state != 1) {
+//                char b = eq[i + 1];
+//                base = 10;
+//                if(b == 'x') base = 16;
+//                if(b == 'd') base = 10;
+//                if(b == 'o') base = 8;
+//                if(b == 't') base = 3;
+//                if(b == 'b') base = 2;
+//                if(base != 10) {
+//                    out[i] = 1;
+//                    i++;
+//                }
+//            }
+//            out[i] = 1;
+//            state = 1;
+//            continue;
+//        }
+//        // ABCDEF for hexadecimal
+//        if(ch >= 'A' && state != 2 && (ch - 'A' < base - 10)) {
+//            out[i] = 1;
+//            state = 1;
+//            continue;
+//        }
+//        //Variables
+//        if((ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '$' || (state == 2 && ((ch >= '0' && ch <= '9') || ch == '.' || ch == '_'))) {
+//            out[i] = 2;
+//            state = 2;
+//            continue;
+//        }
+//        //Spaces
+//        if(ch == ' ' || ch == '\t') out[i] = 9;
+//        //Error character
+//        else {
+//            out[i] = 4;
+//            state = 0;
+//        }
+//    }
+//    if(bracket > 0) {
+//        bracket = 0;
+//        int i = eqLen - 1;
+//        //Find unmatched brackets
+//        for(i = eqLen - 1;i > -1;i--) {
+//            if(out[i] == 3) continue;
+//            char ch = eq[i];
+//            if(ch == '(' || ch == '<' || ch == '[') {
+//                bracket--;
+//                if(bracket < 0) {
+//                    out[i] = 4;
+//                    bracket = 0;
+//                }
+//            }
+//            if(ch == ')' || (ch == '>' && eq[i - 1] != '=') || ch == ']') {
+//                bracket++;
+//            }
+
+//        }
+//    }
+//    return out;
+//}
+//char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, char** arguments, char** localVariables) {
+//    int i = -1;
+//    int prev = 0;
+//    int prevPos = 0;
+//    int bracket = 0;
+//    bool useUnits = forceUnits;
+//    int unitBracketID = -1;
+//    int len = strlen(eq);
+//    char* out = calloc(len, 1);
+//    memcpy(out, syntax, len);
+//    char** oldArgs = arguments;
+//    char** freeArgs = NULL;
+//    if(eq[0] == '-') {
+//        char name[strlen(eq)];
+//        int j = 0;
+//        int nameI = 0;
+//        while(eq[++j] != ' ' && eq[j] != '\0') {
+//            name[nameI++] = eq[j];
+//        }
+//        name[nameI] = '\0';
+//        if(strcmp(name, "f") == 0) {
+//            if(len > 3) memset(out + 3, 0, len - 3);
+//            return out;
+//        }
+//        if(strcmp(name, "dx") == 0 || strcmp(name, "g") == 0) {
+//            char x[2] = "x";
+//            char* xArgs[2];
+//            xArgs[0] = x;
+//            xArgs[1] = NULL;
+//            arguments = mergeArgList(arguments, xArgs);
+//        }
+//        if(strcmp(name, "def") == 0) {
+//            int equal = 4;
+//            while(eq[++equal] != '=' && eq[equal] != '\0');
+//            if(eq[equal] == '=') {
+//                out[equal] = 8;
+//                //Find ( position
+//                int br = 4;
+//                while(eq[++br] != '(' && br < equal);
+//                if(br != equal) {
+//                    ignoreError = true;
+//                    char** args = parseArgumentList(eq + br);
+//                    ignoreError = false;
+//                    freeArgs = args;
+//                    arguments = mergeArgList(arguments, args);
+//                }
+//                memset(out + 5, 15, br - 5);
+//            }
+//        }
+//        if(strcmp(name, "degset") == 0) {
+//            char rad[4] = "rad";
+//            char deg[4] = "deg";
+//            char grad[5] = "grad";
+//            char* args[4];
+//            args[0] = rad;
+//            args[1] = deg;
+//            args[2] = grad;
+//            args[3] = NULL;
+//            arguments = mergeArgList(arguments, args);
+//        }
+//        if(strcmp(name, "include") == 0) {
+//            //Add included funcs names to arguments list
+//            char* names[includeFuncsLen + 1];
+//            names[includeFuncsLen] = NULL;
+//            for(int i = 0;i < includeFuncsLen;i++)
+//                names[i] = includeFuncs[i].name;
+//            arguments = mergeArgList(arguments, names);
+//        }
+//    }
+//    while(eq[i] != '\0' || i == -1) {
+//        i++;
+//        //Spaces
+//        if(syntax[i] == 9) continue;
+//        if(prev != syntax[i]) {
+//            //Operators
+//            if(prev == 6) {
+//                if(eq[prevPos] == '=' && eq[prevPos + 1] == '>') {
+//                    i = prevPos + 2;
+//                    //Find start of arguments
+//                    int j = prevPos - 1;
+//                    //Multiple variables
+//                    if(eq[prevPos - 1] == ')') {
+//                        while(j != 0 && eq[--j] != '(') {
+//                            if(syntax[j] != 2 && syntax[j] != 5) out[j] = 4;
+//                            if(syntax[j] == 13 || syntax[j] == 2) out[j] = 16;
+//                        }
+//                    }
+//                    //Single variable
+//                    else {
+//                        j++;
+//                        while(true) {
+//                            j--;
+//                            if(j == -1) break;
+//                            if(syntax[j] == 2 || (syntax[j] > 12 && syntax[j] < 19)) {
+//                                out[j] = 16;
+//                                continue;
+//                            }
+//                            break;
+//                        }
+//                        j++;
+//                    }
+//                    //Calculate argument list
+//                    ignoreError = true;
+//                    char** argList = parseArgumentList(eq + j);
+//                    char** newArguments = mergeArgList(arguments, argList);
+//                    //Find function bounding range
+//                    int startBracket = bracket;
+//                    int x = i;
+//                    for(x = i;eq[x] != '\0';x++) {
+//                        bool isCloseBracket = (eq[x] == ')' || eq[x] == ']' || (eq[x] == '>' && eq[x - 1] != '='));
+//                        if(bracket == startBracket && (eq[x] == ',' || isCloseBracket)) break;
+//                        if(isCloseBracket) bracket--;
+//                        if(eq[x] == '(' || eq[x] == '[' || eq[x] == '<') bracket++;
+//                    }
+//                    //Copy strings
+//                    char expression[x - i + 2];
+//                    memcpy(expression, eq + i, x - i);
+//                    expression[x - i] = '\0';
+//                    char syn[x - i + 2];
+//                    memcpy(syn, syntax + i, x - i);
+//                    syn[x - i] = '\0';
+//                    //Highlight anonymous function contents
+//                    char* highlighted = advancedHighlight(expression, syn, useUnits, newArguments, localVariables);
+//                    memcpy(out + i, highlighted, x - i);
+
+//                    //Cleanup
+//                    ignoreError = false;
+//                    freeArgList(argList);
+//                    free(newArguments);
+//                    i = x;
+//                    prev = 0;
+//                    prevPos = i;
+//                    continue;
+//                }
+//                else {
+//                    //This block determines if it is a valid operator
+//                    bool isValid = false;
+//                    char op[i - prevPos + 1];
+//                    int x = prevPos - 1, y = 0;
+//                    while(++x != i) if(eq[x] != ' ') op[y++] = eq[x];
+//                    op[y] = '\0';
+//                    int len = strlen(op);
+//                    //Possible negative character
+//                    if(op[len - 1] == '-' && len != 1) {
+//                        op[len - 1] = '\0';
+//                        len--;
+//                    }
+//                    if(len == 1) {
+//                        const char* ops = "+-/*^%";
+//                        char opchar = op[0];
+//                        if(opchar == '+') isValid = true;
+//                        if(opchar == '-') isValid = true;
+//                        if(opchar == '/') isValid = true;
+//                        if(opchar == '*') isValid = true;
+//                        if(opchar == '^') isValid = true;
+//                        if(opchar == '%') isValid = true;
+//                        if(opchar == '_' && eq[prevPos - 1] == ']') isValid = true;
+//                        // $() in comments
+//                        if(opchar == '$' && syntax[prevPos - 1] == 3) isValid = true;
+//                    }
+//                    // **
+//                    if(len == 2 && op[0] == '*' && op[1] == '*') isValid = true;
+//                    if(!isValid) memset(out + prevPos, 12, i - prevPos);
+//                }
+//            }
+//            //Variables
+//            if(prev == 2) {
+//                //Local Variables
+//                if(eq[i] == '=' && syntax[i] == 8) memset(out, 18, i);
+//                else {
+//                    //Copy name
+//                    char name[i - prevPos + 1];
+//                    memcpy(name, eq + prevPos, i - prevPos);
+//                    name[i - prevPos] = '\0';
+//                    //Get name type
+//                    int type = getVariableType(name, useUnits, arguments, localVariables);
+//                    //Set type to out
+//                    memset(out + prevPos, type, i - prevPos);
+//                }
+//            }
+//            prev = out[i];
+//            prevPos = i;
+//        }
+//        if(syntax[i] == 3) continue;
+//        //Opening brackets
+//        if(eq[i] == '(' || eq[i] == '[' || eq[i] == '<') {
+//            if(eq[i] == '[' && unitBracketID == -1) {
+//                unitBracketID = bracket;
+//                useUnits = true;
+//            }
+//            bracket++;
+//        }
+//        //Closing brackets
+//        if(eq[i] == ']' || eq[i] == ')' || (eq[i] == '>' && eq[i - 1] != '=')) {
+//            bracket--;
+//            if(eq[i] == ']' && unitBracketID == bracket) {
+//                unitBracketID = -1;
+//                if(!forceUnits) useUnits = false;
+//            }
+//        }
+//    }
+//    if(arguments != oldArgs) free(arguments);
+//    if(freeArgs != NULL) freeArgList(freeArgs);
+//    return out;
+//}
+char* syntaxHighlightFunction(const char* eq, char** arguments, char** localVariables) {
 }
 #pragma endregion
 #pragma endregion

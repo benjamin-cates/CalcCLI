@@ -93,11 +93,10 @@ void disableRawMode() {
 bool useFancyInput = true;
 void printWithHighlighting(char* str) {
     const char* colorCodes[] = {
-        "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36"
+        "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
     };
     int strLen = strlen(str);
-    char* simpleSyntax = highlightSyntax(str);
-    char* colors = advancedHighlight(str, simpleSyntax, false, NULL, globalLocalVariables);
+    char* colors = highlightLine(str);
     int prevColor = 0;
     printf("\033[0m");
     for(int i = 0;i < strLen;i++) {
@@ -109,7 +108,6 @@ void printWithHighlighting(char* str) {
     }
     printf("\033[0m");
     free(colors);
-    free(simpleSyntax);
 }
 void printInput(char* string, int cursorPos) {
     //Clear old input
@@ -458,27 +456,23 @@ void runLine(char* input) {
         else if(startsWith(input, "-d")) {
             if(startsWith(input, "-dsyntax")) {
                 input += 9;
-                char* normalSyntax = highlightSyntax(input);
-                char* advancedSyntax = advancedHighlight(input, normalSyntax, false, NULL, NULL);
+                char* syntax = highlightLine(input);
                 int i;
                 int len = strlen(input);
-                for(i = 0;i < 2;i++) {
-                    char* syntax = i ? advancedSyntax : normalSyntax;
-                    if(i == 0) printf("Regular syntax:\n");
-                    if(i == 1) printf("Advanced syntax:\n");
-                    int j;
-                    int type = 0;
-                    putchar('"');
-                    for(j = 0;j < len + 1;j++) {
-                        if(syntax[j] != type) {
-                            if(type != 0) printf("\" %s, \"", syntaxTypes[type]);
-                            type = syntax[j];
-                        }
-                        putchar(input[j]);
+                putchar('"');
+                int prevType = 0;
+                for(int j = 0;j < len + 1;j++) {
+                    if(syntax[j] != prevType) {
+                        if(prevType != 0) printf("\" %s, \"", syntaxTypes[prevType]);
+                        prevType = syntax[j];
                     }
-                    putchar('"');
-                    putchar('\n');
+                    putchar(input[j]);
                 }
+                putchar('"');
+                if(syntax[len-1]==0) printf(" NULL");
+                putchar('\n');
+                free(syntax);
+                return;
             }
             if(startsWith(input, "-darb")) {
                 input += 5;
@@ -520,21 +514,10 @@ void runLine(char* input) {
                     clock_t t = clock();
                     //Time basic syntax
                     for(int i = 0;i < runCount;i++) {
-                        char* out = highlightSyntax(in);
-                        free(out);
+                        free(highlightLine(in));
                     }
                     t = clock() - t;
-                    printPerformance("Basic syntax", t, runCount);
-                    //Time advanced syntax
-                    char* basicSyn = highlightSyntax(in);
-                    t = clock();
-                    for(int i = 0;i < runCount;i++) {
-                        char* out = advancedHighlight(in, basicSyn, false, NULL, NULL);
-                        free(out);
-                    }
-                    t = clock() - t;
-                    printPerformance("Advanced syntax", t, runCount);
-                    free(basicSyn);
+                    printPerformance("Syntax", t, runCount);
                     return;
                 }
                 else if(startsWith(runType, "runline")) {

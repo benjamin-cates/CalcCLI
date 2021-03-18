@@ -352,9 +352,7 @@ void test_randomCharacterParsing() {
         //Test highlighting
         printf("\rHighlighting %s            ", test);
         fflush(stdout);
-        char* basic = highlightSyntax(test);
-        free(advancedHighlight(test, basic, false, NULL, NULL));
-        free(basic);
+        free(highlightLine(test));
         globalError = false;
         testIndex++;
     }

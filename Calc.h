@@ -821,16 +821,28 @@ void getRatio(double num, int* numerOut, int* denomOut);
  */
 char* printRatio(double in, bool forceSign);
 /*
-    Returns a string with the syntax color codes for the text
-    Return value must be free()d
+    Fills out with the color codes for eq
+    Note: out must be a string with an allocated length greater than or equal to eq
+    "eq" is not const to do some null termination tricks, but the contents of eq will not be different after the function is complete.
 */
-char* highlightSyntax(const char* eq);
-/*
-    Takes equation and syntax from highlightSyntax and adds more
-    This will identify variable types and identify invalid operators
-    Return value must be free()d
-*/
-char* advancedHighlight(const char* eq, const char* syntax, bool forceUnits, char** arguments, char** localVariables);
+void highlightSyntax(char* eq, char* out, char** args, char** localVars, int base, bool useUnits);
+/**
+ * Returns an allocated string containing the color information for a line
+ * This will highlight commands and comments properly
+ * Return value must be freed
+ */
+char* highlightLine(char* eq);
+/**
+ * Highlights a code block
+ * Note: if eq is wrapped by { and }, it will not work
+ * Note: out must be a string with an allocated length greater than or equal to eq
+ */
+void highlightCodeBlock(char* eq, char* out, char** args, char** localVars);
+/**
+ * highlights an argument list and returns the position of the terminating equal sign
+ *
+ */
+int highlightArgumentList(char* eq, char* out);
 #pragma endregion
 #ifdef __cplusplus
 }
