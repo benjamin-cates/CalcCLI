@@ -97,11 +97,34 @@ int cmpFunctionNames(int id1, int id2) {
 }
 int findNext(const char* str, int start, char find) {
     int bracket = 0;
+    char brackets[strlen(str + start) + 1];
     char ch;
-    for(int i = start;(ch = str[i]) != 0; i++) {
-        if(bracket == 0 && ch == find) return i;
-        if(ch == '(' || ch == '[' || ch == '<' || ch == '{') bracket++;
-        if(ch == ')' || ch == ']' || (ch == '>' && (i != 0 && str[i - 1] != '=')) || ch == '}') bracket--;
+    for(int i = start;(ch = str[i]) != 0;i++) {
+        if(ch == '(' || ch == '[' || ch == '{' || ch == '<') {
+            brackets[bracket] = ch;
+            bracket++;
+        }
+        if(ch == ')') {
+            int j = bracket - 1;
+            for(;j > 0;j--) if(brackets[j] == '(') break;
+            if(j == 0 && brackets[0] != '(') bracket = j + 1;
+            else bracket = j;
+        }
+        if(ch == ']') {
+            int j = bracket - 1;
+            for(;j > 0;j--) if(brackets[j] == '[') break;
+            if(j == 0 && brackets[0] != '[') bracket = j + 1;
+            else bracket = j;
+        }
+        if(ch == '}') {
+            int j = bracket - 1;
+            for(;j > 0;j--) if(brackets[j] == '{') break;
+            if(j == 0 && brackets[0] != '{') bracket = j + 1;
+            else bracket = j;
+        }
+        if(ch == '>' && i != 0 && str[i - 1] != '=') {
+            if(brackets[bracket - 1] == '<') bracket--;
+        }
         if(bracket == 0 && ch == find) return i;
     }
     return -1;
@@ -2285,7 +2308,8 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         //Function
         if(type == 2) {
             //Set name to lowercase and find function id
-            int brac = findNext(section, 0, '(');
+            int brac = 0;
+            while(section[brac] != '(') brac++;
             section[brac] = '\0';
             lowerCase(section);
             Tree op = findFunction(section, false, NULL, NULL);
@@ -5133,7 +5157,8 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
         //Function
         else if(type == 2) {
             //Copy name and remove spaces
-            int firstParenth = findNext(eq, start, '(');
+            int firstParenth = start;
+            while(eq[firstParenth] != '(') firstParenth++;
             int len = firstParenth - start;
             char name[len + 1];
             //Remove spaces and lowercase
@@ -5288,7 +5313,8 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             }
             ///For code blocks
             else {
-                int startBracket = findNext(eq, eqPos + 2, '{');
+                int startBracket = eqPos + 2;
+                while(eq[startBracket] != '{') startBracket++;
                 memset(out + eqPos + 2, 9, startBracket - eqPos - 2);
                 bool isEndBracket = eq[end] != 0;
                 if(isEndBracket) {
@@ -5508,8 +5534,9 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
             memset(out + i, 19, typeLen);
             isCodeBlock = true;
             i += typeLen;
-            int startBrac = findNext(eq, i, '(');
-            if(startBrac == -1) {
+            int startBrac = i;
+            while(eq[startBrac] != '(' && eq[startBrac] != 0) startBrac++;
+            if(eq[startBrac] == 0) {
                 memset(out + i, 4, end - i);
                 goto next;
             }
