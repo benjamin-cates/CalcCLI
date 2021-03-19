@@ -5246,7 +5246,13 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             int eqPos = highlightArgumentList(eq + start, out + start) + start;
             out[eqPos] = 6;
             out[eqPos + 1] = 6;
+            ignoreError=true;
             char** args = parseArgumentList(eq + start);
+            ignoreError=false;
+            if(globalError) {
+                args=NULL;
+                globalError=false;
+            }
             //For non-code blocks
             if(type == 8) {
                 //Find the acutal end of the statement
