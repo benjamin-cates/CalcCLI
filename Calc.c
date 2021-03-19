@@ -5331,6 +5331,7 @@ int highlightArgumentList(char* eq, char* out) {
             prevWasComma = false;
             if((eq[i] >= '0' && eq[i] <= '9') || eq[i] == '.') out[i] = 4;
         }
+        if(out[i] == 0) out[i] = 4;
     }
 }
 char* highlightLine(char* eq) {
