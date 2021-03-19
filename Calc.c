@@ -5362,6 +5362,7 @@ char* highlightLine(char* eq) {
         //Find the position of the space
         while(eq[start] != ' ' && eq[start] != 0) start++;
         memset(out, 8, start);
+        out[start]=9;
         if(startsWith(eq, "-base") || startsWith(eq, "-unit")) {
             //Highlight the command suffix
             eq[start] = 0;
