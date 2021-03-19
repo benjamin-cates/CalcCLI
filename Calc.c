@@ -5100,7 +5100,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
         while(eq[start] == ' ') {
             out[start] = 9;
             start++;
-            if(eq[start] == 0) break;
+            if(eq[start] == 0) return;
         }
         if(eq[start] == ',' || eq[start] == ';') {
             out[start] = 11;
