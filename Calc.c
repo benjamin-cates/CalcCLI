@@ -5289,6 +5289,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             ///For code blocks
             else {
                 int startBracket = findNext(eq, eqPos + 2, '{');
+                memset(out + eqPos + 2, 9, startBracket - eqPos - 2);
                 bool isEndBracket = eq[end] != 0;
                 if(isEndBracket) {
                     out[startBracket] = 5;
