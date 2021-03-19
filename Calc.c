@@ -5177,11 +5177,17 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
         //Square bracket with base
         else if(type == 5) {
             int endBrac = findNext(eq, start, ']');
-            int underscore = findNext(eq, endBrac + 1, '_');
+            //Find underscore
+            int underscore = endBrac + 1;
+            while(eq[underscore] != '_') {
+                out[underscore] = 9;
+                underscore++;
+            }
+            //Color brackets
             out[endBrac] = 5;
             out[start] = 5;
-            eq[endBrac] = 0;
             //Calculate base
+            eq[endBrac] = 0;
             double base = 0;
             char charAfterEndOfBase = eq[end + 1];
             eq[end + 1] = 0;
@@ -5198,8 +5204,8 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                 base = getR(baseVal);
                 freeValue(baseVal);
                 //Highlight as error if out of bounds
-                if(base < 1 || base>36) {
-                    memset(out, 4, end - underscore);
+                if(base < 1 || base > 36) {
+                    memset(out + underscore + 1, 4, end - underscore);
                     base = 10;
                 }
                 else highlightSyntax(eq + underscore + 1, out + underscore + 1, NULL, NULL, base, false);
