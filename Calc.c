@@ -5246,12 +5246,12 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             int eqPos = highlightArgumentList(eq + start, out + start) + start;
             out[eqPos] = 6;
             out[eqPos + 1] = 6;
-            ignoreError=true;
+            ignoreError = true;
             char** args = parseArgumentList(eq + start);
-            ignoreError=false;
+            ignoreError = false;
             if(globalError) {
-                args=NULL;
-                globalError=false;
+                args = NULL;
+                globalError = false;
             }
             //For non-code blocks
             if(type == 8) {
@@ -5278,7 +5278,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                 eq[newEnd] = 0;
                 highlightSyntax(eq + eqPos + 2, out + eqPos + 2, args, NULL, 10, false);
                 eq[newEnd] = endChar;
-                end = newEnd;
+                end = newEnd - 1;
             }
             ///For code blocks
             else {
@@ -5368,7 +5368,7 @@ char* highlightLine(char* eq) {
         //Find the position of the space
         while(eq[start] != ' ' && eq[start] != 0) start++;
         memset(out, 8, start);
-        out[start]=9;
+        out[start] = 9;
         if(startsWith(eq, "-base") || startsWith(eq, "-unit")) {
             //Highlight the command suffix
             eq[start] = 0;
@@ -5445,7 +5445,6 @@ char* highlightLine(char* eq) {
             memset(out + 9, 13, strlen(eq + 9));
             return out;
         }
-        out[start]=9;
     }
     if(eq[0] == '.') {
         out[0] = 8;
