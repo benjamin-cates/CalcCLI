@@ -5571,7 +5571,10 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
         if(!startsWith(type, "if")) prevLineIsIf = false;
         i = end;
         if(endIsNull) break;
-        else eq[end] = ';';
+        else {
+            eq[end] = ';';
+            out[end] = 11;
+        }
     }
     return;
 }
