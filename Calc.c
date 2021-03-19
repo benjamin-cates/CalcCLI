@@ -2190,14 +2190,18 @@ int nextSection(const char* eq, int start, int* end, int base) {
     //Operators
     if((eq[start] >= '*' && eq[start] <= '/') || eq[start] == '%' || eq[start] == '^') {
         int next = start;
-        while(eq[++next] == ' ');
-        //Double asterisk power
-        if(eq[start] == '*' && eq[next] == '*') {
-            start = next;
-            while(eq[++next] == ' ');
+        while(eq[++next]) {
+            //Break on period
+            if(eq[next]=='.') break;
+            //Space
+            if(eq[next]==' ') continue;
+            //Multiply, divide, add, subtract
+            if(eq[next]>='*'&&eq[next]<='/') continue;
+            //Modulo and power
+            if(eq[next]=='%'&&eq[next]=='^') continue;
+            break;
         }
-        if(eq[next] == '-') start = next;
-        *end = start;
+        *end=next-1;
         return 6;
     }
     return -1;
