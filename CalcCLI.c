@@ -463,13 +463,13 @@ void runLine(char* input) {
                 int prevType = 0;
                 for(int j = 0;j < len + 1;j++) {
                     if(syntax[j] != prevType) {
-                        if(prevType != 0) printf("\" %s, \"", syntaxTypes[prevType]);
+                        if(j != 0) printf("\" %s, \"", syntaxTypes[prevType]);
                         prevType = syntax[j];
                     }
                     putchar(input[j]);
                 }
                 putchar('"');
-                if(syntax[len-1]==0) printf(" NULL");
+                if(syntax[len - 1] == 0) printf(" NULL");
                 putchar('\n');
                 free(syntax);
                 return;
