@@ -10,6 +10,7 @@ int testIndex = 0;
 void error(const char* format, ...) {
     globalError = true;
     if(testExpectsErrors) return;
+    if(ignoreError) return;
     //Print error
     printf("Error: ");
     va_list argptr;
@@ -334,6 +335,32 @@ void test_units() {
         }
     }
 }
+void test_randomCharacterHighlighting() {
+    testType = "random char highlighting";
+    srand(0);
+    char test[50];
+    currentTest = test;
+    for(int i = 0;i < 100000;i++) {
+        for(int j = 0;j < 49;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
+        test[49] = 0;
+        char* out = highlightLine(test);
+        //Check for an uncaught error
+        if(globalError) {
+            failedTest(i, test, "recieved error");
+            globalError = false;
+        }
+        //Check for nulls in the output
+        for(int j = 0;j < 49;j++) {
+            if(out[j] == 0) {
+                //Don't print an error for -f command
+                if(j == 3 && test[0] == '-' && test[1] == 'f') break;
+                failedTest(i, test, "null character at position %d on '%c'", j, test[j]);
+                break;
+            }
+        }
+        free(out);
+    }
+}
 void test_randomCharacterParsing() {
     testType = "random character parsing";
     srand(0);
@@ -398,6 +425,7 @@ int main() {
     test_zeroes();
     test_units();
     test_randomCharacterParsing();
+    test_randomCharacterHighlighting();
     test_randomExpressionCalculation();
     printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
     cleanup();
