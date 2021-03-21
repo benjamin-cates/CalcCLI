@@ -2192,16 +2192,16 @@ int nextSection(const char* eq, int start, int* end, int base) {
         int next = start;
         while(eq[++next]) {
             //Break on period
-            if(eq[next]=='.') break;
+            if(eq[next] == '.') break;
             //Space
-            if(eq[next]==' ') continue;
+            if(eq[next] == ' ') continue;
             //Multiply, divide, add, subtract
-            if(eq[next]>='*'&&eq[next]<='/') continue;
+            if(eq[next] >= '*' && eq[next] <= '/') continue;
             //Modulo and power
-            if(eq[next]=='%'&&eq[next]=='^') continue;
+            if(eq[next] == '%' && eq[next] == '^') continue;
             break;
         }
-        *end=next-1;
+        *end = next - 1;
         return 6;
     }
     return -1;
@@ -5517,7 +5517,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
             char* name = calloc(isEqual + 1, 1);
             memset(out + i, 18, isEqual);
             out[i + isEqual] = 8;
-            memcpy(name, out + i, isEqual);
+            memcpy(name, eq + i, isEqual);
             i = isEqual + 1;
             highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
             argListAppend(&localVarCopy, name, &localVarSize);
@@ -5608,6 +5608,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
             out[end] = 11;
         }
     }
+    freeArgList(localVarCopy);
     return;
 }
 #pragma endregion
