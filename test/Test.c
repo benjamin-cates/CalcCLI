@@ -335,6 +335,47 @@ void test_units() {
         }
     }
 }
+void test_highlighting() {
+    const char* syntax[] = {
+        "1+10e2",
+        "a=>a^2, a*2",
+        "[)]",
+        "[1J]_36",
+        "[1J]_ 38",
+        "<<10;4>,(sqrt(10)+fill(40)>",
+        "60*sqrt(10+fill(>)**[Mm+min]/sqrt(10e3)",
+        "*/*-",
+        "+-",
+        "**-",
+        "a=>{y=10;if(1) retrun 10;else break;if(1) {j.8=92+a;continue ; while(10+a) {b.2=10;return 15;continue;};return y+b.2+a;}",
+    };
+    const char* colors[] = {
+        "\1\6\1\1\1\1",
+        "\20\6\6\20\6\1\13\11\15\6\1",
+        "\5\4\5",
+        "\5\1\1\5\6\1\1",
+        "\5\1\21\5\6\4\4\4",
+        "\4\5\1\1\13\1\5\13\4\16\16\16\16\5\1\1\5\6\16\16\16\16\5\1\1\5\4",
+        "\1\1\6\16\16\16\16\4\1\1\6\16\16\16\16\5\4\5\6\6\5\21\21\6\21\21\21\5\6\16\16\16\16\5\1\1\1\1\5",
+        "\14\14\14\14",
+        "\6\6",
+        "\6\6\6",
+    };
+    testType = "highlighting";
+    for(int i = 0;i < sizeof(syntax) / sizeof(char*);i++) {
+        //Copy syntax
+        char syntaxCopy[strlen(syntax[i])];
+        strcpy(syntaxCopy, syntax[i]);
+        //Highlight
+        char* out = highlightLine(syntaxCopy);
+        //Confirm that all characters match
+        for(int j = 0;j < strlen(colors[i]);j++) if(colors[i][j] != out[j]) {
+            failedTest(i, syntax[i], "expected %s at position %d, but got %s", syntaxTypes[colors[i][j]], j, syntaxTypes[out[j]]);
+            break;
+        }
+        free(out);
+    }
+}
 void test_randomCharacterHighlighting() {
     testType = "random char highlighting";
     srand(0);
@@ -424,6 +465,7 @@ int main() {
     test_standard();
     test_zeroes();
     test_units();
+    test_highlighting();
     test_randomCharacterParsing();
     test_randomCharacterHighlighting();
     test_randomExpressionCalculation();
