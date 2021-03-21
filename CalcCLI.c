@@ -177,6 +177,7 @@ char* readLine(bool erasePrevious) {
                     continue;
                 }
             }
+            continue;
         }
         //Windows escape sequences
         if(character == 0) {
