@@ -237,13 +237,47 @@ char* readLine(bool erasePrevious) {
             continue;
         }
         if(character < 27) {
-            for(i = strLen;i > cursorPos - 1;i--) {
-                input[i + 1] = input[i];
+            //Control character info
+            if(character == 'i' - 96) {
+                printf("\nCtrl+I - Show info about control characters\nCtrl+D - Debugging codes\nCtrl+A - Delete all of the input\n\0337");
+                continue;
             }
-            input[cursorPos] = '^';
-            strLen++;
-            cursorPos++;
-            character += 64;
+            //Delete All contents
+            else if(character == 'a' - 96) {
+                memset(input, 0, strLenAllocated + 1);
+                cursorPos = 0;
+                continue;
+            }
+            //Debugging
+            else if(character == 'd' - 96) {
+                printf("E - Echo current buffer contents\nP - Print cursor position\nL - Print buffer length\nDebugging code is: ");
+                int ch = readCharacter();
+                printf("%c\n\0337",ch);
+                //Echo buffer contents
+                if(ch == 'E' || ch == 'e') {
+                    printf("Current buffer contents: ");
+                    for(int j = 0;j < strLen;j++) printf("%d, ", (input[j]+256)%256);
+                    printf("\n\0337");
+                }
+                //Position of the cursor
+                else if(ch == 'P' || ch == 'p') {
+                    printf("Current cursor position: %d\n\0337", cursorPos);
+                }
+                //Length of the buffer
+                else if(ch == 'L' || ch == 'l') {
+                    printf("Current length: %d, strlen lenght: %d\n\0337", strLen, strlen(input));
+                }
+                continue;
+            }
+            else {
+                for(i = strLen;i > cursorPos - 1;i--) {
+                    input[i + 1] = input[i];
+                }
+                input[cursorPos] = '^';
+                strLen++;
+                cursorPos++;
+                character += 64;
+            }
         }
         for(i = strLen;i > cursorPos - 1;i--) {
             input[i + 1] = input[i];
