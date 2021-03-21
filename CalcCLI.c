@@ -218,6 +218,19 @@ char* readLine(bool erasePrevious) {
             }
             continue;
         }
+        //Ignore non-ascii utf-8 encodings
+        if(character >= 128) {
+            /*
+                Basically 11110000 indicates a four-byte sequence, so ignore the next three
+                11100000 indicates a three-byte sequence
+                11000000 indicates a two-byte sequence
+                10000000 is not a valid starting byte, ignore the character
+            */
+            if(character >= 0b11110000) readCharacter();
+            if(character >= 0b11100000) readCharacter();
+            if(character >= 0b11000000) readCharacter();
+            continue;
+        }
         if(character == 127 || character == 8) {
             if(cursorPos == 0)
                 continue;
