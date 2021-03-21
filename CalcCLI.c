@@ -571,6 +571,15 @@ void runLine(char* input) {
                 else error("Performance test type unrecognized.");
                 return;
             }
+            if(startsWith(input, "-dchars")) {
+                while(true) {
+                    int ch = readCharacter();
+                    printf("%d, ", ch);
+                    //Should exit the program normally on ctrl+c, this is a safeguard
+                    if(ch == 3) break;
+                }
+                return;
+            }
             else {
                 error("command '%s' is not a valid debugging command", input + 2);
             }
