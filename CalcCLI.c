@@ -1,6 +1,12 @@
-#include "Calc.h"
+#include "src/general.h"
+#include "src/arb.h"
+#include "src/compute.h"
+#include "src/functions.h"
+#include "src/parser.h"
 #include <stdarg.h>
+#include <time.h>
 #if defined __linux__ || defined unix || defined __unix__ || defined __APPLE__
+#include <signal.h>
 #define USE_TERMIOS_H
 #endif
 #if defined __WIN32 || defined _WIN64 || defined _WIN32

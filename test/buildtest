@@ -1,3 +1,3 @@
 #!/usr/bin/bash
-gcc ../Calc.c Test.c -lm -g -o test
+gcc Test.c -lm -g -o test ../src/arb.c ../src/command.c ../src/compute.c ../src/functions.c ../src/general.c ../src/highlight.c ../src/misc.c ../src/parser.c ../src/print.c ../src/units.c
 ./test

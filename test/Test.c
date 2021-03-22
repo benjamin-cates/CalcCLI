@@ -1,4 +1,8 @@
-#include "../Calc.h"
+#include "../src/arb.h"
+#include "../src/compute.h"
+#include "../src/functions.h"
+#include "../src/general.h"
+#include "../src/parser.h"
 #include <stdarg.h>
 #pragma region Global Variables
 const char* testType;
