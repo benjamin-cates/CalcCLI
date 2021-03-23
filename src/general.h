@@ -7,6 +7,9 @@
 #include <math.h>
 #include <stdio.h>
 #pragma region Structures
+typedef enum ValueType ValueType;
+typedef enum Op Op;
+typedef enum OpType OpType;
 #define unit_t unsigned long long
 /**
  * Complex number with unit
@@ -27,7 +30,7 @@ typedef struct NumberStruct {
  * val[mat.width-1] is the top right corner
  */
 typedef struct VectorStruct {
-    Number *val;
+    Number* val;
     //Width of the vector
     short width;
     //Height of the vector
@@ -133,13 +136,13 @@ typedef struct TreeStruct {
  * @param argCount Number of arguments
  * @param nameLen length of name (used to make searching faster)
  */
-/**
- * This describes a line of code in a code block
- * @param id Type of action, see #define action_xxx for types
- * @param localVarID Only for id==2 describes the local variable id
- * @param tree Returns a conditional for: if, while, and for blocks. Returns a value for: return, setVariable, and statement.
- * @param code Code block for: if, else, while, and for.
- */
+ /**
+  * This describes a line of code in a code block
+  * @param id Type of action, see #define action_xxx for types
+  * @param localVarID Only for id==2 describes the local variable id
+  * @param tree Returns a conditional for: if, while, and for blocks. Returns a value for: return, setVariable, and statement.
+  * @param code Code block for: if, else, while, and for.
+  */
 typedef struct FunctionAction {
     int id;
     int localVarID;
@@ -440,7 +443,7 @@ Vector newVecScalar(Number num);
 /**
  * Initializes an empty vector with width and height
  */
-Vector newVec(short width,short height);
+Vector newVec(short width, short height);
 /**
  * Create a numeral value from r, i, and u
  */
@@ -480,7 +483,7 @@ void freeTree(Tree op);
  * @param optimize whether to precalculate non-variable branches
  * @return return value must be freeTree()ed
  */
-Tree copyTree(Tree tree, const Tree* replaceArgs, int replaceCount,bool unfold);
+Tree copyTree(Tree tree, const Tree* replaceArgs, int replaceCount, bool unfold);
 /**
  * Returns new operator from args and opID
  * @param args Arguments of the operation
@@ -524,7 +527,7 @@ void freeTree(Tree op);
  * @param optimize whether to precalculate non-variable branches
  * @return return value must be freeTree()ed
  */
-Tree copyTree(Tree tree, const Tree* replaceArgs, int replaceCount,bool unfold);
+Tree copyTree(Tree tree, const Tree* replaceArgs, int replaceCount, bool unfold);
 #pragma endregion
 #pragma region Argument Lists
 //Frees an argument list
@@ -549,92 +552,98 @@ int argListAppend(char*** pointerToList, char* toAppend, int* pointerToSize);
 //Returns the position of name in argList, -1 if not found
 int getArgListId(char** argList, const char* name);
 #pragma endregion
-//Value types
-#define value_num 0
-#define value_vec 1
-#define value_func 2
-#define value_arb 3
-//Optypes
-#define optype_builtin 0
-#define optype_custom 1
-#define optype_argument 2
-#define optype_anon 3
-#define optype_localvar 4
+#pragma region Enumerators
+typedef enum ValueType {
+    value_num = 0,
+    value_vec = 1,
+    value_func = 2,
+    value_arb = 3
+} ValueType;
+typedef enum OpType {
+    optype_builtin = 0,
+    optype_custom = 1,
+    optype_argument = 2,
+    optype_anon = 3,
+    optype_localvar = 4
+} OpType;
 //Builtin function ids
-#define op_val 0
-#define op_i 1
-#define op_neg 2
-#define op_pow 3
-#define op_mod 4
-#define op_mult 5
-#define op_div 6
-#define op_add 7
-#define op_sub 8
-#define op_sin 12
-#define op_cos 13
-#define op_tan 14
-#define op_csc 15
-#define op_sec 16
-#define op_cot 17
-#define op_sinh 18
-#define op_cosh 19
-#define op_tanh 20
-#define op_asin 21
-#define op_acos 22
-#define op_atan 23
-#define op_acsc 24
-#define op_asec 25
-#define op_acot 26
-#define op_asinh 27
-#define op_acosh 28
-#define op_atanh 29
-#define op_sqrt 32
-#define op_cbrt 33
-#define op_exp 34
-#define op_ln 35
-#define op_logten 36
-#define op_log 37
-#define op_fact 38
-#define op_sgn 43
-#define op_abs 44
-#define op_arg 45
-#define op_round 47
-#define op_floor 48
-#define op_ceil 49
-#define op_getr 50
-#define op_geti 51
-#define op_getu 52
-#define op_grthan 53
-#define op_equal 54
-#define op_min 55
-#define op_max 56
-#define op_lerp 57
-#define op_dist 58
-#define op_not 65
-#define op_and 67
-#define op_or 68
-#define op_xor 69
-#define op_ls 70
-#define op_rs 71
-#define op_pi 75
-#define op_phi 76
-#define op_e 77
-#define op_ans 84
-#define op_hist 85
-#define op_histnum 86
-#define op_rand 87
-#define op_run 90
-#define op_sum 91
-#define op_product 92
-#define op_vector 96
-#define op_width 97
-#define op_height 98
-#define op_length 99
-#define op_ge 100
-#define op_fill 101
-#define op_map 102
-#define op_det 103
-#define op_transpose 104
-#define op_mat_mult 105
-#define op_mat_inv 106
+typedef enum Op {
+    op_val = 0,
+    op_i = 1,
+    op_neg = 2,
+    op_pow = 3,
+    op_mod = 4,
+    op_mult = 5,
+    op_div = 6,
+    op_add = 7,
+    op_sub = 8,
+    op_sin = 12,
+    op_cos = 13,
+    op_tan = 14,
+    op_csc = 15,
+    op_sec = 16,
+    op_cot = 17,
+    op_sinh = 18,
+    op_cosh = 19,
+    op_tanh = 20,
+    op_asin = 21,
+    op_acos = 22,
+    op_atan = 23,
+    op_acsc = 24,
+    op_asec = 25,
+    op_acot = 26,
+    op_asinh = 27,
+    op_acosh = 28,
+    op_atanh = 29,
+    op_sqrt = 32,
+    op_cbrt = 33,
+    op_exp = 34,
+    op_ln = 35,
+    op_logten = 36,
+    op_log = 37,
+    op_fact = 38,
+    op_sgn = 43,
+    op_abs = 44,
+    op_arg = 45,
+    op_round = 47,
+    op_floor = 48,
+    op_ceil = 49,
+    op_getr = 50,
+    op_geti = 51,
+    op_getu = 52,
+    op_grthan = 53,
+    op_equal = 54,
+    op_min = 55,
+    op_max = 56,
+    op_lerp = 57,
+    op_dist = 58,
+    op_not = 65,
+    op_and = 67,
+    op_or = 68,
+    op_xor = 69,
+    op_ls = 70,
+    op_rs = 71,
+    op_pi = 75,
+    op_phi = 76,
+    op_e = 77,
+    op_ans = 84,
+    op_hist = 85,
+    op_histnum = 86,
+    op_rand = 87,
+    op_run = 90,
+    op_sum = 91,
+    op_product = 92,
+    op_vector = 96,
+    op_width = 97,
+    op_height = 98,
+    op_length = 99,
+    op_ge = 100,
+    op_fill = 101,
+    op_map = 102,
+    op_det = 103,
+    op_transpose = 104,
+    op_mat_mult = 105,
+    op_mat_inv = 106,
+} Op;
+#pragma endregion
 #endif
