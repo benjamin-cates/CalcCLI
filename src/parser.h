@@ -3,6 +3,19 @@
 #define PARSER_H 1
 #include <stdbool.h>
 typedef struct TreeStruct Tree;
+typedef enum Section {
+    sec_undef=-1,
+    sec_number=0,
+    sec_variable=1,
+    sec_function=2,
+    sec_parenthesis=3,
+    sec_square=4,
+    sec_squareWithBase=5,
+    sec_operator=6,
+    sec_vector=7,
+    sec_anonymousFunction=8,
+    sec_anonymousMultilineFunction=9,
+} Section;
 /**
  * Returns the type of a section and when it ends
  * In the parsing engine, text is first split into secttions, this function will find the end of the section.
@@ -10,18 +23,7 @@ typedef struct TreeStruct Tree;
  * @param start Position of the first character in the section
  * @param out Return value, sets the int at the pointer to the final character in the section
  * @param base Base (for things like 10A)
- * @return Section type: {
- *      -1: Section not recognized
- *      0: Number
- *      1: Variable
- *      2: Function call
- *      3: Parenthesis
- *      4: Square bracket
- *      5: Square bracket with underscore notation
- *      6: Operator
- *      7: Vector
- *      8: Anonymous function
- *   }
+ * @return section type (see enum Section)
  */
 int nextSection(const char* eq, int start, int* end, int base);
 int getCharType(char in, int curType, int base, bool useUnits);

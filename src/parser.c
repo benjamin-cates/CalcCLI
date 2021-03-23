@@ -29,7 +29,7 @@ int nextSection(const char* eq, int start, int* end, int base) {
         int endPos = findNext(eq, start, ')');
         if(endPos == -1) {
             *end = strlen(eq);
-            return 3;
+            return sec_parenthesis;
         }
         int endNext = endPos + 1;
         while(eq[endNext] == ' ') endNext++;
@@ -41,20 +41,20 @@ int nextSection(const char* eq, int start, int* end, int base) {
                 endNext = findNext(eq, endNext, '}');
                 if(endNext == -1) *end = strlen(eq);
                 else *end = endNext;
-                return 9;
+                return sec_anonymousMultilineFunction;
             }
             else *end = strlen(eq);
-            return 8;
+            return sec_anonymousFunction;
         }
         *end = endPos;
-        return 3;
+        return sec_parenthesis;
     }
     //Square brackets
     if(eq[start] == '[') {
         int endPos = findNext(eq, start, ']');
         if(endPos == -1) {
             *end = strlen(eq);
-            return 4;
+            return sec_square;
         }
         *end = endPos;
         endPos++;
@@ -63,15 +63,15 @@ int nextSection(const char* eq, int start, int* end, int base) {
         if(eq[endPos] == '_') {
             //Calling this will set end to the end of the next section
             nextSection(eq, endPos, end, 10);
-            return 5;
+            return sec_squareWithBase;
         }
-        return 4;
+        return sec_square;
     }
     //Vectors
     if(eq[start] == '<') {
         *end = findNext(eq, start, '>');
         if(*end == -1) *end = strlen(eq);
-        return 7;
+        return sec_vector;
     }
     //Numbers
     if((eq[start] >= '0' && eq[start] <= '9') || eq[start] == '.') {
@@ -102,7 +102,7 @@ int nextSection(const char* eq, int start, int* end, int base) {
             break;
         }
         (*end)--;
-        return 0;
+        return sec_number;
     }
     //Variables and units
     if(eq[start] == '_' || eq[start] == '$' || (eq[start] >= 'a' && eq[start] <= 'z') || (eq[start] >= 'A' && eq[start] <= 'Z')) {
@@ -117,7 +117,7 @@ int nextSection(const char* eq, int start, int* end, int base) {
             if(ch == '(') {
                 *end = findNext(eq, *end, ')');
                 if(*end == -1) *end = strlen(eq);
-                return 2;
+                return sec_function;
             }
             //Anonymous functions
             if(ch == '=' && eq[(*end) + 1] == '>') {
@@ -127,15 +127,15 @@ int nextSection(const char* eq, int start, int* end, int base) {
                     int endPos = findNext(eq, next, '}');
                     if(endPos == -1) *end = strlen(eq);
                     else *end = endPos;
-                    return 9;
+                    return sec_anonymousMultilineFunction;
                 }
                 else *end = strlen(eq);
-                return 8;
+                return sec_anonymousFunction;
             }
             break;
         }
         (*end)--;
-        return 1;
+        return sec_variable;
     }
     //Operators
     if((eq[start] >= '*' && eq[start] <= '/') || eq[start] == '%' || eq[start] == '^') {
@@ -152,9 +152,9 @@ int nextSection(const char* eq, int start, int* end, int base) {
             break;
         }
         *end = next - 1;
-        return 6;
+        return sec_operator;
     }
-    return -1;
+    return sec_undef;
 }
 double parseNumber(const char* num, double base) {
     int i;
@@ -212,12 +212,12 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
     for(int i = 0;true;i++) {
         int end = -1;
         int type = nextSection(eq, sections[i] + 1, &end, base);
-        if(type == -1) {
+        if(type == sec_undef) {
             error("fatal parsing error (next section not found)");
             return NULLOPERATION;
         }
         if(eq[end] == 0) {
-            if(type == 2 || type == 3 || type == 4 || type == 7 || type == 9) {
+            if(type == sec_function || type == sec_parenthesis || type == sec_square || type == sec_anonymousFunction || type == sec_anonymousMultilineFunction) {
                 error("bracket mismatch");
                 return NULLOPERATION;
             }
@@ -242,8 +242,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         memcpy(section, eq + sections[i] + 1, sectionLen);
         section[sectionLen] = 0;
         int j = 0;
-        //Number
-        if(type == 0) {
+        if(type == sec_number) {
             double baseToUse = base;
             char* numString = section;
             if(section[0] == '0' && section[1] >= 'a' && section[1] != 'e') {
@@ -266,8 +265,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             else ops[i] = newOpVal(parseNumber(numString, baseToUse), 0, 0);
             if(globalError) goto error;
         }
-        //Variable
-        if(type == 1) {
+        if(type == sec_variable) {
             if(!useUnits) lowerCase(section);
             Tree op = findFunction(section, useUnits, argNames, localVars);
             if(op.optype == 0 && op.op == 0) {
@@ -283,8 +281,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 ops[i] = newOpVal(op.value.r, 0, op.value.u);
             else ops[i] = newOp(NULL, 0, op.op, op.optype);
         }
-        //Function
-        if(type == 2) {
+        if(type == sec_function) {
             //Set name to lowercase and find function id
             int brac = 0;
             while(section[brac] != '(') brac++;
@@ -339,21 +336,17 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             }
             ops[i] = newOp(args, argCount, op.op, op.optype);
         }
-        //Parenthesis
-        if(type == 3) {
-            //Round bracket
+        if(type == sec_parenthesis) {
             section[sectionLen - 1] = '\0';
             ops[i] = generateTree(section + 1, argNames, localVars, useUnits ? base : 0);
             if(globalError) goto error;
         }
-        //Square bracket
-        if(type == 4) {
+        if(type == sec_square) {
             section[sectionLen - 1] = '\0';
             ops[i] = generateTree(section + 1, argNames, localVars, useUnits ? base : 10);
             if(globalError) goto error;
         }
-        //Square bracket with underscore notation
-        if(type == 5) {
+        if(type == sec_squareWithBase) {
             //Find underscore
             int underscore = findNext(section, 0, '_');
             if(underscore == -1) { error("could not find underscore");goto error; }
@@ -368,8 +361,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             ops[i] = generateTree(section + 1, argNames, localVars, baseR);
             if(globalError) goto error;
         }
-        //Operators
-        if(type == 6) {
+        if(type == sec_operator) {
             if(section[0] == '-' && i == 0) {
                 firstNegative = true;
                 continue;
@@ -398,8 +390,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             }
             ops[i] = newOp(NULL, 0, op, optype_builtin);
         }
-        //Vectors
-        if(type == 7) {
+        if(type == sec_vector) {
             int commas[sectionLen];
             commas[0] = 0;
             int commaCount = 0;
@@ -454,8 +445,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             ops[i].argCount = width * height;
             ops[i].argWidth = width;
         }
-        //Anonymous functions
-        if(type == 8) {
+        if(type == sec_anonymousFunction) {
             char** argList = parseArgumentList(section);
             if(globalError) goto error;
             char** argListMerged = mergeArgList(argList, argNames);
@@ -475,8 +465,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             ops[i].argCount = argListLen(argList);
             ops[i].argWidth = argListLen(argNames);
         }
-        //Anonymous function with a code block
-        if(type == 9) {
+        if(type == sec_anonymousMultilineFunction) {
             char** argList = parseArgumentList(section);
             if(globalError) goto error;
             char** argListMerged = mergeArgList(argList, argNames);
@@ -494,7 +483,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             ops[i].argCount = argListLen(argList);
             ops[i].argWidth = argListLen(argNames);
         }
-        if(nextNegative && type != 6) {
+        if(nextNegative && type != sec_operator) {
             nextNegative = false;
             ops[i] = newOp(allocArg(ops[i], false), 1, op_neg, 0);
         }

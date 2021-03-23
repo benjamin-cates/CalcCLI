@@ -78,15 +78,13 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
         }
         int type = nextSection(eq, start, &end, base);
         int len = end - start + 1;
-        if(type == -1) {
+        if(type == sec_undef) {
             out[start] = hl_error;
             start++;
             continue;
         }
-        //Numbers
-        else if(type == 0) memset(out + start, hl_number, len);
-        //Variables
-        else if(type == 1) {
+        if(type == sec_number) memset(out + start, hl_number, len);
+        if(type == sec_variable) {
             char name[len + 1];
             memcpy(name, eq + start, len);
             name[len] = 0;
@@ -99,8 +97,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             if(op.optype == 0 && op.op == 0) op.optype = -1;
             memset(out + start, op.optype + 14, len);
         }
-        //Function
-        else if(type == 2) {
+        if(type == sec_function) {
             //Copy name and remove spaces
             int firstParenth = start;
             while(eq[firstParenth] != '(') firstParenth++;
@@ -129,12 +126,11 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             highlightSyntax(eq + firstParenth + 1, out + firstParenth + 1, args, localVars, base, useUnits);
             eq[end] = endOriginal;
         }
-        //Parenthesis, square brackets or vectors
-        else if(type == 4 || type == 3 || type == 7) {
+        if(type == sec_square || type == sec_parenthesis || type == sec_vector) {
             if(eq[end] == 0) {
                 out[start] = hl_error;
                 start++;
-                if(type == 4) useUnits = true;
+                if(type == sec_square) useUnits = true;
                 continue;
             }
             out[start] = hl_bracket;
@@ -144,8 +140,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             highlightSyntax(eq + start + 1, out + start + 1, args, localVars, base, type == 4 ? true : useUnits);
             eq[end] = endOriginal;
         }
-        //Square bracket with base
-        else if(type == 5) {
+        if(type == sec_squareWithBase) {
             int endBrac = findNext(eq, start, ']');
             //Find underscore
             int underscore = endBrac + 1;
@@ -185,8 +180,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             highlightSyntax(eq + start + 1, out + start + 1, args, localVars, base, true);
             eq[endBrac] = ']';
         }
-        //Operators
-        else if(type == 6) {
+        if(type == sec_operator) {
             //Copy operator to opStr and remove spaces
             char opStr[len + 1];
             memcpy(opStr, eq + start, len);
@@ -217,8 +211,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             if(isValid) memset(out + start, hl_operator, len);
             else memset(out + start, hl_invalidOperator, len);
         }
-        //Anonymous functions
-        else if(type == 9 || type == 8) {
+        if(type == sec_anonymousMultilineFunction || type == sec_anonymousFunction) {
             int eqPos = highlightArgumentList(eq + start, out + start) + start;
             out[eqPos] = hl_operator;
             out[eqPos + 1] = hl_operator;
@@ -229,8 +222,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                 args = NULL;
                 globalError = false;
             }
-            //For non-code blocks
-            if(type == 8) {
+            if(type == sec_anonymousFunction) {
                 //Find the acutal end of the statement
                 int newEnd = eqPos + 2;
                 for(;true;newEnd++) {
