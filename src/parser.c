@@ -217,7 +217,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             return NULLOPERATION;
         }
         if(eq[end] == 0) {
-            if(type == sec_function || type == sec_parenthesis || type == sec_square || type == sec_anonymousFunction || type == sec_anonymousMultilineFunction) {
+            if(type == sec_function || type == sec_parenthesis || type == sec_square || type == sec_vector || type == sec_anonymousMultilineFunction) {
                 error("bracket mismatch");
                 return NULLOPERATION;
             }
