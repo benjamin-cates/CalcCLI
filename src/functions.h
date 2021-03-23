@@ -114,13 +114,15 @@ char* codeBlockToString(CodeBlock code, char** localVariables, char** arguments)
 extern const FunctionReturn return_null;
 extern const FunctionReturn return_break;
 extern const FunctionReturn return_continue;
-#define action_statement 0
-#define action_return 1
-#define action_localvar 2
-#define action_if 3
-#define action_else 4
-#define action_while 5
-#define action_for 6
-#define action_break 7
-#define action_continue 8
+typedef enum FunctionActionTypes {
+    action_statement=0,
+    action_return=1,
+    action_localvar=2,
+    action_if=3,
+    action_else=4,
+    action_while=5,
+    action_for=6,
+    action_break=7,
+    action_continue=8,
+} FunctionActionTypes;
 #endif
