@@ -13,15 +13,15 @@ char* doubleToString(double num, double base) {
     if(isnan(num)) {
         char* out = malloc(5);
         if(out == NULL) { error(mallocError);return NULL; }
-        if(num < 0) strcpy(out,"-NaN");
-        else strcpy(out,"NaN");
+        if(num < 0) strcpy(out, "-NaN");
+        else strcpy(out, "NaN");
         return out;
     }
     if(isinf(num)) {
         char* out = malloc(5);
         if(out == NULL) { error(mallocError);return NULL; }
-        if(num < 0) strcpy(out,"-Inf");
-        else strcpy(out,"Inf");
+        if(num < 0) strcpy(out, "-Inf");
+        else strcpy(out, "Inf");
         return out;
     }
     //Allocate string
@@ -228,16 +228,20 @@ char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
         char* argListString = argListToString(tree.argNames);
         char** newArgNames = mergeArgList(argNames, tree.argNames);
         char* code;
+        bool isBlock = true;
         if((*tree.code).list[0].id == action_return) {
             code = treeToString(*(*tree.code).list[0].tree, true, newArgNames, localVars);
+            isBlock = false;
         }
         else code = codeBlockToString(*tree.code, localVars, newArgNames);
         int argListLen = strlen(argListString);
-        char* out = calloc(argListLen + 2 + strlen(code) + 1, 1);
+        char* out = calloc(argListLen + 2 + strlen(code) + 3, 1);
         if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argListString);
         strcpy(out + argListLen, "=>");
-        strcpy(out + argListLen + 2, code);
+        if(isBlock) strcpy(out + argListLen + 2, "{");
+        strcat(out + argListLen + 2, code);
+        if(isBlock) strcat(out + argListLen + 2, "}");
         free(argListString);
         free(code);
         free(newArgNames);
