@@ -7,9 +7,6 @@
 #include <math.h>
 #include <stdio.h>
 #pragma region Structures
-typedef enum ValueType ValueType;
-typedef enum Op Op;
-typedef enum OpType OpType;
 #define unit_t unsigned long long
 /**
  * Complex number with unit
