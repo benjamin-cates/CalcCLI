@@ -196,34 +196,36 @@ Number compTrig(int type, Number num) {
         return out;
     }
 }
-Number compBinOp(int type, Number one, Number two) {
-    if(type == op_not) {
-        if(one.r != 0)
-            one.r = (double)~((long)one.r);
-        if(one.i != 0)
-            one.i = (double)~((long)one.i);
-        return one;
-    }
-    else if(type == op_and) {
-        one.r = (double)(((long)one.r) & ((long)two.r));
-        one.i = (double)(((long)one.i) & ((long)two.i));
-    }
-    else if(type == op_or) {
-        one.r = (double)(((long)one.r) | ((long)two.r));
-        one.i = (double)(((long)one.i) | ((long)two.i));
-    }
-    else if(type == op_xor) {
-        one.r = (double)(((long)one.r) ^ ((long)two.r));
-        one.i = (double)(((long)one.i) ^ ((long)two.i));
-    }
-    else if(type == op_ls) {
-        one.r = (double)(((long)one.r) << ((long)two.r));
-        one.i = (double)(((long)one.i) << ((long)two.i));
-    }
-    else if(type == op_rs) {
-        one.r = (double)(((long)one.r) >> ((long)two.r));
-        one.i = (double)(((long)one.i) >> ((long)two.i));
-    }
+Number compBinNot(Number one) {
+    if(one.r != 0)
+        one.r = (double)~((long)one.r);
+    if(one.i != 0)
+        one.i = (double)~((long)one.i);
+    return one;
+}
+Number compBinAnd(Number one, Number two) {
+    one.r = (double)(((long)one.r) & ((long)two.r));
+    one.i = (double)(((long)one.i) & ((long)two.i));
+    return one;
+}
+Number compBinOr(Number one, Number two) {
+    one.r = (double)(((long)one.r) | ((long)two.r));
+    one.i = (double)(((long)one.i) | ((long)two.i));
+    return one;
+}
+Number compBinXor(Number one, Number two) {
+    one.r = (double)(((long)one.r) ^ ((long)two.r));
+    one.i = (double)(((long)one.i) ^ ((long)two.i));
+    return one;
+}
+Number compBinLs(Number one, Number two) {
+    one.r = (double)(((long)one.r) << ((long)two.r));
+    one.i = (double)(((long)one.i) << ((long)two.i));
+    return one;
+}
+Number compBinRs(Number one, Number two) {
+    one.r = (double)(((long)one.r) >> ((long)two.r));
+    one.i = (double)(((long)one.i) >> ((long)two.i));
     return one;
 }
 #pragma endregion
@@ -962,15 +964,28 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         }
         //Binary Operations
         if(tree.op < 72) {
-            if(tree.op != op_not && one.type != two.type) valueConvert(op_add, &one, &two);
-            if(one.type == value_num) {
-                Value out;
-                out.type = value_num;
-                out.num = compBinOp(tree.op, one.num, two.num);
+            if(tree.op == op_not) {
+                if(one.type == value_num) {
+                    Value out;
+                    out.type = value_num;
+                    out.num = compBinNot(one.num);
+                    return out;
+                }
+                if(one.type == value_vec) {
+                    Value out;
+                    out.type = value_vec;
+                    out.vec = one.vec;
+                    out.vec.val = malloc(one.vec.total * sizeof(Number));
+                    for(int i = 0;i < one.vec.total;i++) out.vec.val[i] = compBinNot(one.vec.val[i]);
+                    freeValue(one);
+                    return out;
+                }
                 freeValue(one);
-                if(tree.op != op_not) freeValue(two);
-                return out;
+                return NULLVAL;
             }
+            //Apply the binary operations properly with vectors
+            const Number(*funcs[])(Number, Number) = { &compBinAnd,&compBinOr,&compBinXor,&compBinLs,&compBinRs };
+            return DivPowMod(funcs[tree.op - op_and], one, two, op_div);
         }
         //Constants
         if(tree.op < 88) {
