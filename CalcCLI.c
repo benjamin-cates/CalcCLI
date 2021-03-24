@@ -750,6 +750,7 @@ void runLine(char* input) {
         output[i + 1] = ' ';
         printWithHighlighting(output + i + 1);
         putchar('\n');
+        free(output);
     }
 }
 int main(int argc, char** argv) {
