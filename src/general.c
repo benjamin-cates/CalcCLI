@@ -207,12 +207,12 @@ Vector newVec(short width, short height) {
     return out;
 }
 //Values
-void valueConvert(int type, Value* one, Value* two) {
+int valueConvert(int type, Value* one, Value* two) {
     //Convert to Arb if one is arb
     if((one->type == value_arb || two->type == value_arb) && one->type != two->type) {
         if(one->type == value_vec || two->type == value_vec) {
             error("Vectors do not have arbitrary precision support.");
-            return;
+            return 0;
         }
         if(two->type == value_num) {
             //Swap pointers to make one the non-arb type.
@@ -227,26 +227,30 @@ void valueConvert(int type, Value* one, Value* two) {
             num->r = doubleToArb(one->num.r, globalAccuracy);
             num->i = doubleToArb(one->num.i, globalAccuracy);
             one->numArb = num;
+            return 1;
         }
     }
-    //Throw if(one.type!=two.type) valueConvert(&one,&two); to make them have the same type
+    //Throw if(one.type!=two.type) valueConvert(type,&one,&two); to make them have the same type
     //Put the vector first if multiplied by value
-    //and convert vectors to vectors if multiplied by a vector
     if(type == op_mult) if(one->type == value_num && two->type == value_vec) {
         //Swap values
         Value temp = *one;
         *one = *two;
         *two = temp;
+        return 0;
     }
     //Convert both values to the same type
     if(type == op_add) {
         if(one->type == value_num && two->type == value_vec) {
             *one = newValMatScalar(value_vec, one->num);
+            return 1;
         }
         if(one->type == value_vec && two->type == value_num) {
             *two = newValMatScalar(value_vec, two->num);
+            return 2;
         }
     }
+    return 0;
 }
 Value newValMatScalar(int type, Number scalar) {
     Value out;

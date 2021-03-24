@@ -464,8 +464,9 @@ char* valueToString(Value val, double base);
 double getR(Value val);
 //Returns the value converted to a number
 Number getNum(Value val);
-//one and two will be altered to be similar types depending on what (int type) is. (int type) can be op_mult or op_add
-void valueConvert(int type, Value* one, Value* two);
+//one and two will be altered to be similar types depending on what (int type) is. (int type) can be op_mult, op_add, or op_div
+// The (return & 1) is whether one has been altered. The (return &2) is whether two has been altered
+int valueConvert(int type, Value* one, Value* two);
 /**
  * Frees the op.args and runs freeTree on all arguments. Does not need to be called if the operation has no arguments.
  * @param op Operation to free

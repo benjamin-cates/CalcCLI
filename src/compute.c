@@ -321,7 +321,8 @@ Vector matInv(Vector one) {
 #pragma endregion
 #pragma region Values
 Value valMult(Value one, Value two) {
-    if(one.type != two.type) valueConvert(op_mult, &one, &two);
+    int freeType = 0;
+    if(one.type != two.type) freeType = valueConvert(op_mult, &one, &two);
     if(one.type == value_num) {
         Value out;
         out.type = 0;
@@ -339,6 +340,8 @@ Value valMult(Value one, Value two) {
             for(i = 0;i < out.vec.total;i++) {
                 out.vec.val[i] = compMultiply(one.vec.val[i], two.num);
             }
+            if(freeType & 1) freeValue(one);
+            if(freeType & 2) freeValue(two);
             return out;
         }
         if(two.type == value_vec) {
@@ -351,6 +354,8 @@ Value valMult(Value one, Value two) {
             for(i = 0;i < width;i++) for(j = 0;j < height;j++) {
                 out.vec.val[i + j * width] = compMultiply(one.vec.val[i + j * one.vec.width], two.vec.val[i + j * two.vec.width]);
             }
+            if(freeType & 1) freeValue(one);
+            if(freeType & 2) freeValue(two);
             return out;
         }
     }
@@ -360,7 +365,8 @@ Value valMult(Value one, Value two) {
     return NULLVAL;
 }
 Value valAdd(Value one, Value two) {
-    if(one.type != two.type) valueConvert(op_add, &one, &two);
+    int freeType = 0;
+    if(one.type != two.type) freeType = valueConvert(op_add, &one, &two);
     if(one.type == value_num) {
         Value out;
         out.type = value_num;
@@ -394,6 +400,8 @@ Value valAdd(Value one, Value two) {
                 if(cell->u == 0) cell->u = cellTwo->u;
             }
         }
+        if(freeType & 1) freeValue(one);
+        if(freeType & 2) freeValue(two);
         return out;
     }
     return NULLVAL;
@@ -426,7 +434,8 @@ Value valNegate(Value one) {
     return NULLVAL;
 }
 Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int type) {
-    if(one.type != two.type) valueConvert(op_div, &one, &two);
+    int freeType = 0;
+    if(one.type != two.type) freeType = valueConvert(op_div, &one, &two);
     if(one.type == value_num) {
         Value out;
         out.type = two.type;
@@ -440,6 +449,7 @@ Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int typ
             for(i = 0;i < out.vec.total;i++) {
                 out.vec.val[i] = (*function)(one.num, two.vec.val[i]);
             }
+            if(freeType & 2) freeValue(two);
             return out;
         }
     }
@@ -452,6 +462,7 @@ Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int typ
             for(i = 0;i < out.vec.total;i++) {
                 out.vec.val[i] = (*function)(one.vec.val[i], two.num);
             }
+            if(freeType & 1) freeValue(one);
             return out;
         }
         // max width if type is 0, min width if type is 1
@@ -468,6 +479,8 @@ Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int typ
                 out.vec.val[i + j * newWidth] = (*function)(oneNum, twoNum);
             }
         }
+        if(freeType & 1) freeValue(one);
+        if(freeType & 2) freeValue(two);
         return out;
     }
     return NULLVAL;
@@ -869,7 +882,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     return one;
                 }
             }
-            if(one.type != two.type) valueConvert(op_add, &one, &two);
+            int freeType = 0;
+            if(one.type != two.type) freeType = valueConvert(op_add, &one, &two);
             if(tree.op == op_equal) {
                 if(one.type == value_num) {
                     if(one.r == two.r && one.r == two.r)
@@ -891,6 +905,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                             return newValNum(0, 0, 0);
                         }
                     }
+                    freeValue(one);
+                    freeValue(two);
                     return newValNum(1, 0, 0);
                 }
             }
@@ -940,6 +956,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 freeValue(oneSubC);
                 freeValue(cTimesTwo);
                 freeValue(oneSubCTimesTwo);
+                freeValue(one);
+                freeValue(two);
                 return out;
             }
             if(tree.op == op_dist) {
@@ -985,7 +1003,10 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
             }
             //Apply the binary operations properly with vectors
             const Number(*funcs[])(Number, Number) = { &compBinAnd,&compBinOr,&compBinXor,&compBinLs,&compBinRs };
-            return DivPowMod(funcs[tree.op - op_and], one, two, op_div);
+            Value out= DivPowMod(funcs[tree.op - op_and], one, two, op_div);
+            freeValue(one);
+            freeValue(two);
+            return out;
         }
         //Constants
         if(tree.op < 88) {
