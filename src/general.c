@@ -13,8 +13,8 @@ Tree NULLOPERATION;
 Value NULLVAL;
 CodeBlock NULLCODE;
 char* emptyArg = "";
-const char* mallocError="malloc returned null";
-const char numberChars[]="0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char* mallocError = "malloc returned null";
+const char numberChars[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 #pragma endregion
 #pragma region Standard Functions
 bool startsWith(const char* string, const char* sw) {
@@ -120,7 +120,7 @@ int findNext(const char* str, int start, char find) {
             else bracket = j;
         }
         if(ch == '>' && i != 0 && str[i - 1] != '=') {
-            if(brackets[bracket - 1] == '<') bracket--;
+            if(bracket != 0 && brackets[bracket - 1] == '<') bracket--;
         }
         if(bracket == 0 && ch == find) return i;
     }
