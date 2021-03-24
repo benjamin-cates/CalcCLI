@@ -327,7 +327,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 char argText[len + 1];
                 memcpy(argText, section + commas[j] + 1, len);
                 argText[len] = 0;
-                args[j] = generateTree(argText, argNames, localVars, 0);
+                args[j] = generateTree(argText, argNames, localVars, useUnits ? base : 0);
                 if(globalError) {
                     for(int x = 0;x < j;x++) freeTree(args[x]);
                     free(args);
