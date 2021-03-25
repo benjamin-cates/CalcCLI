@@ -1003,7 +1003,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
             }
             //Apply the binary operations properly with vectors
             const Number(*funcs[])(Number, Number) = { &compBinAnd,&compBinOr,&compBinXor,&compBinLs,&compBinRs };
-            Value out= DivPowMod(funcs[tree.op - op_and], one, two, op_div);
+            Value out = DivPowMod(funcs[tree.op - op_and], one, two, op_div);
             freeValue(one);
             freeValue(two);
             return out;
@@ -1027,7 +1027,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 int i = (int)floor(getR(one));
                 freeValue(one);
                 if(i < 0) {
-                    if(-i > historyCount) {
+                    if(i < -historyCount) {
                         error("history too short", NULL);
                         return NULLVAL;
                     }
@@ -1048,8 +1048,9 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         if(tree.op < 93) {
             if(one.type != value_func) {
                 error("first argument of %s is not a function", stdfunctions[tree.op].name);
-                freeValue(one);
-                freeValue(two);
+                if(tree.argCount > 0) freeValue(one);
+                if(tree.argCount > 1) freeValue(two);
+                return NULLVAL;
             }
             if(tree.op == op_run) {
                 int argCount = tree.argCount - 1;
@@ -1128,6 +1129,12 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     Value three = computeTree(tree.branch[2], args, argLen, localVars);
                     height = getR(three);
                     freeValue(three);
+                }
+                if(width * height >= 0x7FFF || width * height < 0) {
+                    if(width * height > 0) error("vector size too large");
+                    else error("vector size cannot be negative");
+                    freeValue(one);
+                    return NULLVAL;
                 }
                 int i, j;
                 Value out;

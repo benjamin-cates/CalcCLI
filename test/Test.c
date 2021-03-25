@@ -31,7 +31,12 @@ char* randomEquation(int length, int base, bool isSquare) {
         char* out = calloc(11, 1);
         for(int i = 0;i < 10;i++) out[i] = digits[rand() % base];
         out[rand() % 5] = '.';
-        out[(rand() % 4) + 5] = 'e';
+        int ePos = rand() % 4 + 5;
+        out[ePos] = 'e';
+        //Prevent letters in exponent
+        if(base >= 10) for(int i = ePos;i < 10;i++) out[i] = digits[rand() % 10];
+        //Prevent numbers starting with a letter
+        if(out[0] >= '9') out[0] = '0';
         return out;
     }
     int type = rand() % 6;
@@ -115,9 +120,11 @@ char* randomEquation(int length, int base, bool isSquare) {
         char* baseStr = NULL;
         int newBase = base;
         //Generate base
-        if(rand() % 2 == 1) {
+        if(rand() % 3 == 1) {
             baseStr = randomEquation(1, 10, false);
+            ignoreError++;
             Value base = calculate(baseStr, 0);
+            ignoreError--;
             newBase = getR(base);
             //If error, set base to 10
             if(globalError || newBase <= 1 || newBase >= 36) {
@@ -130,7 +137,7 @@ char* randomEquation(int length, int base, bool isSquare) {
         }
         char* inside = randomEquation(length - 1, newBase, true);
         //Get length
-        int len = strlen(inside) + 4;
+        int len = strlen(inside) + 6;
         if(baseStr != NULL) len += strlen(baseStr);
         //Compile out
         char* out = calloc(len, 1);
@@ -139,7 +146,13 @@ char* randomEquation(int length, int base, bool isSquare) {
         strcat(out, "]");
         if(baseStr != NULL) {
             strcat(out, "_");
+            bool useBrac = false;
+            if(baseStr[0] != '(' && baseStr[0] != '[' && baseStr[0] != '<') {
+                strcat(out, "(");
+                useBrac = true;
+            }
             strcat(out, baseStr);
+            if(useBrac) strcat(out, ")");
         }
         free(inside);
         free(baseStr);
