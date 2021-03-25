@@ -129,6 +129,7 @@ char* randomEquation(int length, int base, bool isSquare) {
             //If error, set base to 10
             if(globalError || newBase <= 1 || newBase >= 36) {
                 newBase = 10;
+                free(baseStr);
                 baseStr = calloc(3, 1);
                 memcpy(baseStr, "10", 2);
                 globalError = false;
