@@ -185,12 +185,14 @@ char* randomEquation(int length, int base, bool isSquare) {
 #pragma region Commandline arguments
 double timer = 0;
 double printCommands = 0;
+double seed=0;
 const struct CommandArg {
     const char* name;
     double* location;
 } commands[] = {
     {"--timer",&timer},
     {"--printcommands",&printCommands},
+    {"--seed",&seed},
 };
 #pragma endregion
 #pragma region Constants
@@ -408,7 +410,7 @@ void test_highlighting() {
 }
 void test_randomCharacterHighlighting() {
     testType = "random char highlighting";
-    srand(0);
+    srand(seed);
     char test[50];
     currentTest = test;
     for(int i = 0;i < 100000;i++) {
@@ -434,7 +436,7 @@ void test_randomCharacterHighlighting() {
 }
 void test_randomCharacterParsing() {
     testType = "random character parsing";
-    srand(0);
+    srand(seed);
     testExpectsErrors = true, testIndex = 0;
     char test[30];
     currentTest = test;
@@ -460,7 +462,7 @@ void test_randomCharacterParsing() {
 }
 void test_randomExpressionCalculation() {
     testType = "random expression";
-    srand(0);
+    srand(seed);
     for(int i = 0;i < 10000;i++) {
         char* test = randomEquation(3, 10, 0);
         currentTest = test;
@@ -526,10 +528,9 @@ int main(int argc, char** argv) {
     for(int i = 0;i < sizeof(tests) / sizeof(struct Test);i++) {
         clock_t start = clock();
         (*(tests[i].test))();
-        clock_t total=clock()-start;
-        if(timer) printf("%s test took %g ms\n", tests[i].name, ((double)total)/CLOCKS_PER_SEC*1000);
+        clock_t total = clock() - start;
+        if(timer) printf("%s test took %g ms\n", tests[i].name, ((double)total) / CLOCKS_PER_SEC * 1000);
     }
-
     printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
     cleanup();
     return 0;
