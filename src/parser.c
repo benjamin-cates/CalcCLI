@@ -23,6 +23,7 @@ int isLocalVariableStatement(const char* eq) {
     return 0;
 }
 int nextSection(const char* eq, int start, int* end, int base) {
+    if(eq[start] == 0) return sec_undef;
     while(eq[start] == ' ') start++;
     //Parenthesis
     if(eq[start] == '(') {
@@ -61,8 +62,9 @@ int nextSection(const char* eq, int start, int* end, int base) {
         while(eq[endPos] == ' ') endPos++;
         //Base notation
         if(eq[endPos] == '_') {
+            *end = endPos;
             //Calling this will set end to the end of the next section
-            nextSection(eq, endPos, end, 10);
+            nextSection(eq, endPos + 1, end, 10);
             return sec_squareWithBase;
         }
         return sec_square;
