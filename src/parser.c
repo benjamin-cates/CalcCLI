@@ -226,7 +226,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         }
         sectionTypes[i] = type;
         sections[i + 1] = end;
-        if(eq[end + 1] == '\0' || eq[end] == 0) {
+        if(eq[end] == 0 || eq[end + 1] == 0) {
             sectionCount = i + 1;
             break;
         }
