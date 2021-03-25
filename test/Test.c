@@ -4,6 +4,7 @@
 #include "../src/general.h"
 #include "../src/parser.h"
 #include <stdarg.h>
+#include <time.h>
 #pragma region Global Variables
 const char* testType;
 bool testExpectsErrors = false;
@@ -180,6 +181,17 @@ char* randomEquation(int length, int base, bool isSquare) {
         return out;
     }
 }
+#pragma endregion
+#pragma region Commandline arguments
+double timer = 0;
+double printCommands = 0;
+const struct CommandArg {
+    const char* name;
+    double* location;
+} commands[] = {
+    {"--timer",&timer},
+    {"--printcommands",&printCommands},
+};
 #pragma endregion
 #pragma region Constants
 char validChars[] = "          ()$***+++,,,,--...0123456789;<==>ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^____abcdefghijklmnopqrstuvwxyz{}";
@@ -470,8 +482,25 @@ void test_randomExpressionCalculation() {
     }
     printf("\r                                              \r");
 }
+enum testType {
+    testtype_constant,
+    testtype_random,
+};
+const struct Test {
+    void (*test)(void);
+    const char* name;
+    enum testType type;
+} tests[] = {
+    {&test_standard,"standard",testtype_constant},
+    {&test_zeroes,"zeroes",testtype_constant},
+    {&test_units,"units",testtype_constant},
+    {&test_highlighting,"highlighting",testtype_constant},
+    {&test_randomCharacterHighlighting,"random highlighting",testtype_random},
+    {&test_randomCharacterParsing,"random parsing",testtype_random},
+    {&test_randomExpressionCalculation,"random computation",testtype_random},
+};
 #pragma endregion
-int main() {
+int main(int argc, char** argv) {
 #ifdef __linux__
     struct sigaction action;
     memset(&action, 0, sizeof(action));
@@ -479,14 +508,28 @@ int main() {
     action.sa_sigaction = segFaultHandler;
     sigaction(SIGSEGV, &action, NULL);
 #endif
+    //Parse command line arguments
+    for(int i = 1;i < argc;i++) {
+        for(int j = 0;j < sizeof(commands) / sizeof(struct CommandArg);j++) {
+            if(memcmp(argv[i], commands[j].name, strlen(commands[j].name)) == 0) {
+                int eqpos = strlen(commands[j].name);
+                *(commands[j].location) = parseNumber(argv[i] + eqpos + 1, 10);
+            }
+        }
+    }
+    //Print commands if necessary
+    if(printCommands) for(int i = 0;i < sizeof(commands) / sizeof(struct CommandArg);i++) {
+        printf("%s set to %g\n", commands[i].name, *commands[i].location);
+    }
     startup();
-    test_standard();
-    test_zeroes();
-    test_units();
-    test_highlighting();
-    test_randomCharacterParsing();
-    test_randomCharacterHighlighting();
-    test_randomExpressionCalculation();
+    //Do tests
+    for(int i = 0;i < sizeof(tests) / sizeof(struct Test);i++) {
+        clock_t start = clock();
+        (*(tests[i].test))();
+        clock_t total=clock()-start;
+        if(timer) printf("%s test took %g ms\n", tests[i].name, ((double)total)/CLOCKS_PER_SEC*1000);
+    }
+
     printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
     cleanup();
     return 0;
