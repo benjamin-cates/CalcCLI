@@ -353,7 +353,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             int underscore = findNext(section, 0, '_');
             if(underscore == -1) { error("could not find underscore");goto error; }
             //Parse base
-            Tree baseTree = generateTree(section + underscore + 1, NULL, NULL, useUnits ? base : 0);
+            Tree baseTree = generateTree(section + underscore + 1, NULL, NULL, 10);
             Value newBase = computeTree(baseTree, NULL, 0, NULL);
             freeTree(baseTree);
             double baseR = getR(newBase);

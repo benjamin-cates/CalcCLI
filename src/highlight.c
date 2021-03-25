@@ -157,13 +157,13 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             char charAfterEndOfBase = eq[end + 1];
             eq[end + 1] = 0;
             ignoreError = true;
-            Value baseVal = calculate(eq + underscore + 1, base);
+            Value baseVal = calculate(eq + underscore + 1, 10);
             ignoreError = false;
             eq[end + 1] = charAfterEndOfBase;
             if(globalError) {
                 globalError = false;
                 base = 10;
-                highlightSyntax(eq + underscore + 1, out + underscore + 1, NULL, NULL, base, false);
+                highlightSyntax(eq + underscore + 1, out + underscore + 1, NULL, NULL, 10, false);
             }
             else {
                 base = getR(baseVal);
