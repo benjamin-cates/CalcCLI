@@ -615,7 +615,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     int i = getR(index);
                     freeValue(index);
                     if(i < 0) {
-                        if(-i > historyCount) {
+                        if(i < -historyCount) {
                             error("history too short", NULL);
                             return NULLVAL;
                         }
@@ -642,6 +642,11 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     int width = vec.vec.width;
                     Value out;
                     out.type = value_num;
+                    if(x + y * width >= vec.vec.total) {
+                        error("ge out of bounds");
+                        if(freeVec) freeValue(vec);
+                        return NULLVAL;
+                    }
                     out.num = vec.vec.val[x + y * width];
                     if(freeVec) freeValue(vec);
                     if(tree.argCount == 3)
