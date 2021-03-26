@@ -28,26 +28,26 @@
 */
 const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Delimiter","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable","Control Flow" };
 typedef enum Color {
-    hl_null=0,
-    hl_number=1,
-    hl_variable=2,
-    hl_comment=3,
-    hl_error=4,
-    hl_bracket=5,
-    hl_operator=6,
-    hl_string=7,
-    hl_command=8,
-    hl_space=9,
-    hl_escape=10,
-    hl_delimiter=11,
-    hl_invalidOperator=12,
-    hl_invalidVariable=13,
-    hl_builtin=14,
-    hl_custom=15,
-    hl_argument=16,
-    hl_unit=17,
-    hl_localvar=18,
-    hl_controlFlow=19
+    hl_null = 0,
+    hl_number = 1,
+    hl_variable = 2,
+    hl_comment = 3,
+    hl_error = 4,
+    hl_bracket = 5,
+    hl_operator = 6,
+    hl_string = 7,
+    hl_command = 8,
+    hl_space = 9,
+    hl_escape = 10,
+    hl_delimiter = 11,
+    hl_invalidOperator = 12,
+    hl_invalidVariable = 13,
+    hl_builtin = 14,
+    hl_custom = 15,
+    hl_argument = 16,
+    hl_unit = 17,
+    hl_localvar = 18,
+    hl_controlFlow = 19
 } Color;
 int getVariableType(const char* name, bool useUnits, char** argNames, char** localVars) {
     Tree tree = findFunction(name, useUnits, argNames, localVars);
@@ -266,6 +266,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             freeArgList(args);
         }
         start = end + 1;
+        if(eq[end] == 0) break;
     }
 }
 int highlightArgumentList(char* eq, char* out) {
