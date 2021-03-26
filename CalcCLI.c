@@ -12,7 +12,46 @@
 #if defined __WIN32 || defined _WIN64 || defined _WIN32
 #define USE_CONIO_H
 #endif
-bool useColors = true;
+double useColors = 1;
+double rawMode = 0;
+double showHelp = 0;
+struct CommandArg {
+    const char* name;
+    double* location;
+    int argvPos;
+} commands[] = {
+    {"--color",&useColors,0},
+    {"--raw",&rawMode,0},
+    {"--help",&showHelp,0},
+    {"-h",&showHelp,0},
+};
+void showUsage(char** argv) {
+    char* type;
+    if(commands[2].argvPos != 0) type = argv[commands[2].argvPos + 1];
+    if(commands[3].argvPos != 0) type = argv[commands[3].argvPos + 1];
+    if(type == NULL || type[0] == 0) {
+        printf("Calc is a command line calculator written in C\nTry running:\n\tcalc -h commands\n\tcalc -h functions\n\tcalc -h features\n\tcalc -h args\n\tor calc -h info\nFor a more detailed help page, visit https://unfit-donkey.github.io/CalcForJS.\n");
+    }
+    else if(memcmp(type, "args",4)==0) {
+        printf("Command line arguments:\n\t--color=x\tWhether to enable colors (0 is disable)\n\t--raw\t\tEnable raw mode\n\t--help\t\tShow help messages\n");
+    }
+    else if(memcmp(type, "command", 7) == 0) {
+        printf("Commands:\n\t-def name(a,b)=[exp]\tDefine a function with arguments a and b\n\t-del name\tDelete the function named name\n\t-g [exp]\tGraph the expression when it comes to x\n\t-dx [exp]\tFind the derivative of the function along x\n\t-f [FILE]\tOpen the file and run every line\n\t-ls\tList all user-defined functions\n\t-quit\tExit the program (Ctrl-C also works)\n");
+    }
+    else if(memcmp(type, "functions", 8) == 0) {
+        printf("Built-in functions:\ni            \tThe imaginary number\nadd(a,b)    \tAddition (also +)\nmult(a,b)   \tMultiplication (also *)\ndiv(a,b)    \tDivision (also /)\nmod(a,b)    \tModulo (also %%)\npow(a,b)    \tPower (also ^)\nneg(a)      \tNegate (also -)\nsubtract(a,b)\tSubtraction (also -)\nmultneg(a,b)\tNegative multiplication (also *-)\ndivneg(a,b) \tNegative divide (also /-)\nmodneg(a,b) \tNegative modulo (also %%-)\npowneg(a,b) \tNegative power (also ^-)\n\nsin(x)      \tSine\ncos(x)      \tCosine\ntan(x)      \tTangent\ncsc(x)      \tCosecant (reciprocal sine)\nsec(x)      \tSecant (reciprocal cosine)\ncot(x)      \tCotangent (reciprocal tangent)\nasin(x)     \tInverse sine\nacos(x)     \tInverse cosine(x)\natan(x)     \tInverse tangent\nacsc(x)\tInverse cosecant\nasec(x)      \tInverse secant\nacot(x)     \tInverse cotangent\n\nln(x)        \tNatural log\nlogten(x)   \tLog base 10\nlog(x,b)    \tShorthand for ln(x)/ln(b)\nround(x)    \tNearest integer\nfloor(x)    \tRound down\nceil(x)     \tRound up\nsgn(x)      \tSign\nabs(x)      \tAbsolute value\narg(x)      \tComplex argument\ngetr(x)     \tReal component\ngeti(x)     \tImaginary component\n\nnot(x)      \tBinary not\nand(a,b)    \tBinary and\nor(a,b)     \tBinary or\nxor(a,b)    \tBinary exclusive-or\nls(a,b)     \tBinary leftshift\nrs(a,b)     \tBinary rightshift\n\npi          \tThe circle constant\nphi         \tThe golden ratio\ne           \tEuler's constant\nans         \tPrevious answer\nhist(x)     \tGet xth result from history\nhistnum     \tNumber of items in history\n");
+    }
+    else if(memcmp(type, "info", 4) == 0) {
+        printf("CalcCLI is a command line program witten by Benjamin Cates in C. More info can be found at https://github.com/unfit-donkey/CalcCLI. A web version is hosted at https://unfit-donkey.github.io/CalcForJS.\n");
+    }
+    else if(memcmp(type, "features", 7) == 0) {
+        printf("Calc currently has these features:\n\tFunctions\n\tCustom functions\n\tHistory\n\tCLI graphing\n\tComplex number support\n\tBinary operation support\n\tDerivatives\n\tBase convertion\n");
+    }
+    else {
+        printf("Could not find help type '%s'", type);
+    }
+    exit(0);
+}
 void CLI_cleanup() {
     cleanup();
     if(useColors) printf("\b\b\33[34;1m-quit\33[0m\n");
@@ -51,11 +90,11 @@ int getTermWidth() {
     return ws.ws_col;
 }
 struct termios orig_termios;
-void disableRawMode() {
+void disableUnixRawRead() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
-void enableRawMode() {
-    atexit(disableRawMode);
+void enableUnixRawRead() {
+    atexit(disableUnixRawRead);
     struct termios raw;
     tcgetattr(STDIN_FILENO, &orig_termios);
     raw = orig_termios;
@@ -96,7 +135,6 @@ void disableRawMode() {
 }
 #endif
 #ifdef USE_FANCY_INPUT
-bool useFancyInput = true;
 void printWithHighlighting(char* str) {
     const char* colorCodes[] = {
         "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
@@ -129,6 +167,7 @@ void printInput(char* string, int cursorPos) {
     if(cursorPos > width - 1) printf("\033[%dB", cursorPos / width);
 }
 char* readLine(bool erasePrevious) {
+    if(rawMode) return readLineRaw();
     char* input = calloc(11, 1);
     if(input == NULL) { error(mallocError);return NULL; }
     int strLenAllocated = 10;
@@ -272,11 +311,11 @@ char* readLine(bool erasePrevious) {
             else if(character == 'd' - 96) {
                 printf("E - Echo current buffer contents\nP - Print cursor position\nL - Print buffer length\nDebugging code is: ");
                 int ch = readCharacter();
-                printf("%c\n\0337",ch);
+                printf("%c\n\0337", ch);
                 //Echo buffer contents
                 if(ch == 'E' || ch == 'e') {
                     printf("Current buffer contents: ");
-                    for(int j = 0;j < strLen;j++) printf("%d, ", (input[j]+256)%256);
+                    for(int j = 0;j < strLen;j++) printf("%d, ", (input[j] + 256) % 256);
                     printf("\n\0337");
                 }
                 //Position of the cursor
@@ -316,7 +355,6 @@ char* readLine(bool erasePrevious) {
     return input;
 }
 #else
-bool useFancyInput = false;
 char* readLine(bool erasePrevious) {
     return readLineRaw();
 };
@@ -646,7 +684,7 @@ void runLine(char* input) {
     //If comment
     else if(input[0] == '#' || (input[0] == '/' && input[0] == '/')) {
         //Replace $() instances
-        if(useFancyInput) {
+        if(!rawMode) {
             printf("\0338\33[J\r");
             if(useColors) printf("\33[32m");
             int i = -1;
@@ -693,8 +731,7 @@ void runLine(char* input) {
     }
     //If dot command
     else if(input[0] == '.') {
-        //If in raw mode
-        if(!useFancyInput) {
+        if(rawMode) {
             error("dot command is not supported in raw mode");
             return;
         }
@@ -756,62 +793,57 @@ void runLine(char* input) {
 int main(int argc, char** argv) {
     //Set cleanup on interupt
     signal(SIGINT, CLI_cleanup);
-    startup();
-    //Parse arguments
-    int i;
-    for(i = 0; i < argc; i++) {
-        if(argv[i][0] == '-') {
-            //Verbosity
-            if(argv[i][1] == 'r') useFancyInput = false;
-            //Help
-            if(argv[i][1] == 'h') {
-                if(argc == i + 1) {
-                    printf("Calc is a command line calculator written in c\nTry running:\n\tcalc -h commands\n\tcalc -h syntax\n\tcalc -h functions\n\tcalc -h features\n\tor calc -h info\n");
-                    return 0;
+    //Parse command line arguments
+    int commandCount = sizeof(commands) / sizeof(struct CommandArg);
+    for(int i = 1;i < argc;i++) {
+        for(int j = 0;j < commandCount;j++) {
+            if(memcmp(argv[i], commands[j].name, strlen(commands[j].name)) == 0) {
+                int eqpos = strlen(commands[j].name);
+                //Set to one if no number provided
+                if(argv[i][eqpos] == 0) {
+                    *(commands[j].location) = 1;
+                    commands[j].argvPos = i;
                 }
-                if(strcmp("commands", argv[i + 1]) == 0) {
-                    printf("Commands:\n\t-def name(a,b)=[exp]\tDefine a function with arguments a and b\n\t-del name\tDelete the function named name\n\t-g [exp]\tGraph the expression when it comes to x\n\t-dx [exp]\tFind the derivative of the function along x\n\t-f [FILE]\tOpen the file and run every line\n\t-ls\tList all user-defined functions\n\t-quit\tExit the program (Ctrl-C also works)\n");
-                }
-                if(strcmp("syntax", argv[i + 1]) == 0) {
-                }
-                if(strcmp("functions", argv[i + 1]) == 0) {
-                    printf("Built-in functions:\ni            \tThe imaginary number\nadd(a,b)    \tAddition (also +)\nmult(a,b)   \tMultiplication (also *)\ndiv(a,b)    \tDivision (also /)\nmod(a,b)    \tModulo (also %%)\npow(a,b)    \tPower (also ^)\nneg(a)      \tNegate (also -)\nsubtract(a,b)\tSubtraction (also -)\nmultneg(a,b)\tNegative multiplication (also *-)\ndivneg(a,b) \tNegative divide (also /-)\nmodneg(a,b) \tNegative modulo (also %%-)\npowneg(a,b) \tNegative power (also ^-)\n\nsin(x)      \tSine\ncos(x)      \tCosine\ntan(x)      \tTangent\ncsc(x)      \tCosecant (reciprocal sine)\nsec(x)      \tSecant (reciprocal cosine)\ncot(x)      \tCotangent (reciprocal tangent)\nasin(x)     \tInverse sine\nacos(x)     \tInverse cosine(x)\natan(x)     \tInverse tangent\nacsc(x)\tInverse cosecant\nasec(x)      \tInverse secant\nacot(x)     \tInverse cotangent\n\nln(x)        \tNatural log\nlogten(x)   \tLog base 10\nlog(x,b)    \tShorthand for ln(x)/ln(b)\nround(x)    \tNearest integer\nfloor(x)    \tRound down\nceil(x)     \tRound up\nsgn(x)      \tSign\nabs(x)      \tAbsolute value\narg(x)      \tComplex argument\ngetr(x)     \tReal component\ngeti(x)     \tImaginary component\n\nnot(x)      \tBinary not\nand(a,b)    \tBinary and\nor(a,b)     \tBinary or\nxor(a,b)    \tBinary exclusive-or\nls(a,b)     \tBinary leftshift\nrs(a,b)     \tBinary rightshift\n\npi          \tThe circle constant\nphi         \tThe golden ratio\ne           \tEuler's constant\nans         \tPrevious answer\nhist(x)     \tGet xth result from history\nhistnum     \tNumber of items in history\n");
-                }
-                if(strcmp("features", argv[i + 1]) == 0) {
-                    printf("Calc currently has these features:\n\tFunctions\n\tCustom functions\n\tHistory\n\tCLI graphing\n\tComplex number support\n\tBinary operation support\n\tDerivatives\n\tBase convertion\n");
-                }
-                if(strcmp("info", argv[i + 1]) == 0) {
-                    printf("Calc is a command line program witten by Benjamin Cates in C\nCalc is currently in beta\n");
-                }
-                return 0;
+                if(argv[i][eqpos] != '=') continue;
+                *(commands[j].location) = parseNumber(argv[i] + eqpos + 1, 10);
+                commands[j].argvPos = i;
             }
         }
     }
-    if(useFancyInput) enableRawMode();
-    //Test VT-100 compatability
-    printf("\033[c");
-    int firstChar = readCharacter();
-    if(firstChar != 27) {
-        useFancyInput = false;
-        printf("\r    \r");
-        printf("Reverting to raw mode\n");
-        disableRawMode();
-        printf("%c", firstChar);
-#ifdef USE_CONIO_H
-        ungetch(firstChar);
-#else
-        ungetc(firstChar, stdin);
+    //Show help
+    if(showHelp) showUsage(argv);
+    startup();
+#ifdef USE_FANCY_INPUT
+    if(!rawMode) enableUnixRawRead();
+#elif
+    rawMode = 1;
 #endif
-    }
-    else {
-        while(readCharacter() != 'c');
-        printf("\r           \r");
+    if(!rawMode) {
+        //Test VT-100 compatability
+        printf("\033[c");
+        int firstChar = readCharacter();
+        if(firstChar != 27) {
+            rawMode = 1;
+            printf("\r    \r");
+            printf("Reverting to raw mode\n");
+#ifdef USE_FANCY_INPUT
+            disableUnixRawRead();
+#endif
+            printf("%c", firstChar);
+#ifdef USE_CONIO_H
+            ungetch(firstChar);
+#else
+            ungetc(firstChar, stdin);
+#endif
+        }
+        else {
+            while(readCharacter() != 'c');
+            printf("\r           \r");
+        }
     }
     //Main loop
     while(true) {
-        char* input;
-        if(useFancyInput) input = readLine(globalError);
-        else input = readLineRaw();
+        char* input = readLine(globalError);
         if(input == NULL) break;
         globalError = false;
         runLine(input);
