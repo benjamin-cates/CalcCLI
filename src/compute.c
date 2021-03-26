@@ -164,7 +164,7 @@ Number compTrig(int type, Number num) {
             double temp = num.r;
             num.r = Sq.r - num.i;
             num.i = Sq.i + temp;
-            if(opID == 19)
+            if(opID == op_acos)
                 out = newNum(1.570796326794896619 - atan2(num.i, num.r), 0.5 * log(num.r * num.r + num.i * num.i), num.u);
             else out = newNum(atan2(num.i, num.r), -0.5 * log(num.r * num.r + num.i * num.i), num.u);
         }
