@@ -313,6 +313,7 @@ CodeBlock codeBlockFromTree(Tree tree) {
     out.list[0].tree = malloc(sizeof(Tree));
     *(out.list[0].tree) = tree;
     out.list[0].id = action_return;
+    out.list[0].code = NULL;
     out.localVarCount = 0;
     out.localVariables = NULL;
     return out;
