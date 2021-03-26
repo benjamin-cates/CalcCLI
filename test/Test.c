@@ -5,6 +5,23 @@
 #include "../src/parser.h"
 #include <stdarg.h>
 #include <time.h>
+#pragma region Commandline arguments
+double timer = 0;
+double printCommands = 0;
+double seed = 0;
+double estimatedTime = 3;
+double useColors=1;
+const struct CommandArg {
+    const char* name;
+    double* location;
+} commands[] = {
+    {"--timer",&timer},
+    {"--printcommands",&printCommands},
+    {"--seed",&seed},
+    {"--time",&estimatedTime},
+    {"--color",&useColors},
+};
+#pragma endregion
 #pragma region Global Variables
 const char* testType;
 bool testExpectsErrors = false;
@@ -12,12 +29,18 @@ const char* currentTest = NULL;
 int failedCount = 0;
 int testIndex = 0;
 #pragma endregion
+//Use "b exception" to break when an error is printed
+void exception() {
+    if(useColors) printf("\033[1;31mError: \033[0m");
+    else printf("Error: ");
+}
+//Warning: do not break on calls to "error" in the debugger because error() is called during normal testing. Instead break on exception because it is only called when an error is printed.
 void error(const char* format, ...) {
     globalError = true;
     if(testExpectsErrors) return;
     if(ignoreError) return;
     //Print error
-    printf("Error: ");
+    exception();
     va_list argptr;
     va_start(argptr, format);
     vprintf(format, argptr);
@@ -181,21 +204,6 @@ char* randomEquation(int length, int base, bool isSquare) {
         return out;
     }
 }
-#pragma endregion
-#pragma region Commandline arguments
-double timer = 0;
-double printCommands = 0;
-double seed = 0;
-double estimatedTime = 3;
-const struct CommandArg {
-    const char* name;
-    double* location;
-} commands[] = {
-    {"--timer",&timer},
-    {"--printcommands",&printCommands},
-    {"--seed",&seed},
-    {"--time",&estimatedTime},
-};
 #pragma endregion
 #pragma region Constants
 char validChars[] = "          ()$***+++,,,,--...0123456789;<==>ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^____abcdefghijklmnopqrstuvwxyz{}";
