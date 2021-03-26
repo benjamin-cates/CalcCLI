@@ -37,7 +37,7 @@ char* randomEquation(int length, int base, bool isSquare) {
         //Prevent letters in exponent
         if(base >= 10) for(int i = ePos;i < 10;i++) out[i] = digits[rand() % 10];
         //Prevent numbers starting with a letter
-        if(out[0] >= '9') out[0] = '0';
+        if(out[0] >= '9' && out[0] != '.') out[0] = '0';
         return out;
     }
     int type = rand() % 6;
@@ -185,7 +185,8 @@ char* randomEquation(int length, int base, bool isSquare) {
 #pragma region Commandline arguments
 double timer = 0;
 double printCommands = 0;
-double seed=0;
+double seed = 0;
+double estimatedTime = 3;
 const struct CommandArg {
     const char* name;
     double* location;
@@ -193,11 +194,13 @@ const struct CommandArg {
     {"--timer",&timer},
     {"--printcommands",&printCommands},
     {"--seed",&seed},
+    {"--time",&estimatedTime},
 };
 #pragma endregion
 #pragma region Constants
 char validChars[] = "          ()$***+++,,,,--...0123456789;<==>ABCDEFGHIJKLMNOPQRSTUVWXYZ[]^____abcdefghijklmnopqrstuvwxyz{}";
 char invalidChars[] = "!\"#%&':=?@\\`|~";
+int totalNumberOfTests = 0;
 #pragma endregion
 void failedTest(int index, const char* equation, const char* format, ...) {
     printf("Failed test %d (%s)", index, testType);
@@ -301,7 +304,6 @@ void test_standard() {
         {0.0,0.0,0},
         {0.0,0.0,0},
     };
-    testType = "standard";
     //Loop over regularTests
     for(int i = 0;i < sizeof(regularTestResults) / 24;i++) {
         //Get result and expected
@@ -319,12 +321,12 @@ void test_standard() {
             globalError = false;
         }
     }
+    totalNumberOfTests += sizeof(regularTestResults) / 24;
 }
 void test_zeroes() {
     const char* zeroTests[] = {
         "i-i", "neg(1)+1", "-1+1", "pow(10,0)-1", "2^0-1", "mod(10,5)", "10%5", "mult(0,10)", "0*10", "div(10,10)-1", "10/10-1", "add(neg(1),1)", "sub(10.5,10.5)", "sin(0)", "cos(0)-1", "floor(tan(1.56))-92", "csc(pi/2)-1", "sec(pi)+1", "floor(1/cot(1.56))-92", "floor(sinh(10.3))-14866", "cosh(0)-1", "tanh(0)", "asin(1)-pi/2", "acos(1)", "atan(1e50)-pi/2", "acsc(-1)+pi/2", "asec(1)", "acot(1)-pi/4", "asinh(sinh(1))-1", "acosh(cosh(1))-1", "round(atanh(tanh(1)))-1", "sqrt(4)-2", "round(cbrt(8))-2", "exp(ln(2))-2", "ln(exp(2))-2", "round(logten(1000))-3", "round(log(1000,10))-3", "round(fact(3))-6", "sgn(i)-i", "abs(-i)-1", "arg(i)-pi/2", "round(0.5)-1", "floor(0.5)", "ceil(0.3)-1", "getr(i)", "geti(10.5[m])", "getu([km])/[m]-1", "grthan(10,4)-1", "equal(10.3,10.3)-1", "min(4,5)-4", "min(5,4)-4", "max(5,4)-5", "max(4,5)-5", "lerp(-1,1,0.5)", "dist(0,3+4i)-5", "not(1)+2", "and(0,5)", "or(0,5)-5", "xor(5,3)-6", "ls(5,1)-10", "rs(5,1)-2", "floor(1/(pi-3.14))-627", "floor(1/(phi-1.6))-55", "floor(1/(e-2.71))-120", "histnum", "floor(rand)", "run(x=>x+1,-1)", "sum(x=>x,0,10,1)-55", "product(x=>x,1,10,1)-3628800", "width(<>)-1", "height(<10;20>)-2", "length(<1,1,1;1>)-6", "ge(<0,1>,0,0)", "ge(<0,1>,0)", "abs(fill(x=>0,4,4))", "abs(map(<0,1,2,3,4,5>,(v,x)=>v-x))", "det(<0,1;0,2>)", "abs(transpose(<0,0;0>))", "run(n=>{while(1) break;return 2;},0)-2","-1*1-(-1)",
     };
-    testType = "zeroes";
     for(int i = 0;i < sizeof(zeroTests) / sizeof(char*);i++) {
         currentTest = zeroTests[i];
         Value out = calculate(zeroTests[i], 0.0);
@@ -336,9 +338,9 @@ void test_zeroes() {
         }
         freeValue(out);
     }
+    totalNumberOfTests += sizeof(zeroTests) / sizeof(char*);
 }
 void test_units() {
-    testType = "all units";
     int testIndex = 0;
     for(int i = 0;i < unitCount;i++) {
         for(int j = 0;j < metricCount + 1;j++) {
@@ -366,6 +368,7 @@ void test_units() {
             globalError = false;
         }
     }
+    totalNumberOfTests += testIndex;
 }
 void test_highlighting() {
     const char* syntax[] = {
@@ -393,7 +396,6 @@ void test_highlighting() {
         "\6\6",
         "\6\6\6",
     };
-    testType = "highlighting";
     for(int i = 0;i < sizeof(syntax) / sizeof(char*);i++) {
         //Copy syntax
         char syntaxCopy[strlen(syntax[i])];
@@ -408,81 +410,59 @@ void test_highlighting() {
         free(out);
     }
 }
-void test_randomCharacterHighlighting() {
-    testType = "random char highlighting";
-    srand(seed);
+void test_singleRandomHighlight() {
     char test[50];
-    currentTest = test;
-    for(int i = 0;i < 100000;i++) {
-        for(int j = 0;j < 49;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
-        test[49] = 0;
-        char* out = highlightLine(test);
-        //Check for an uncaught error
-        if(globalError) {
-            failedTest(i, test, "recieved error");
-            globalError = false;
-        }
-        //Check for nulls in the output
-        for(int j = 0;j < 49;j++) {
-            if(out[j] == 0) {
-                //Don't print an error for -f command
-                if(j == 3 && test[0] == '-' && test[1] == 'f') break;
-                failedTest(i, test, "null character at position %d on '%c'", j, test[j]);
-                break;
-            }
-        }
-        free(out);
+    for(int j = 0;j < 49;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
+    test[49] = 0;
+    char* out = highlightLine(test);
+    //Check for an uncaught error
+    if(globalError) {
+        failedTest(testIndex, test, "recieved error");
+        globalError = false;
     }
+    //Check for nulls in the output
+    for(int j = 0;j < 49;j++) {
+        if(out[j] == 0) {
+            //Don't print an error for -f command
+            if(j == 3 && test[0] == '-' && test[1] == 'f') break;
+            failedTest(testIndex, test, "null character at position %d on '%c'", j, test[j]);
+            break;
+        }
+    }
+    free(out);
 }
-void test_randomCharacterParsing() {
-    testType = "random character parsing";
-    srand(seed);
-    testExpectsErrors = true, testIndex = 0;
-    char test[30];
-    currentTest = test;
-    for(int i = 0;i < 200000;i++) {
-        for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
-        test[9] = '\0';
-        //Test parsing and computing
-        printf("\rParsing      %s                ", test);
-        fflush(stdout);
-        Value val = calculate(test, 0);
-        freeValue(val);
-        globalError = false;
-        //Test highlighting
-        printf("\rHighlighting %s            ", test);
-        fflush(stdout);
-        free(highlightLine(test));
-        globalError = false;
-        testIndex++;
-    }
-    printf("\r                                              \r");
-    fflush(stdout);
+void test_singleRandomParse() {
+    testExpectsErrors = true;
+    char test[11];
+    for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
+    test[9] = '\0';
+    //Test parsing and computing
+    Value val = calculate(test, 0);
+    freeValue(val);
+    globalError = false;
+    //Test highlighting
+    free(highlightLine(test));
+    globalError = false;
     testExpectsErrors = false;
 }
-void test_randomExpressionCalculation() {
-    testType = "random expression";
-    srand(seed);
-    for(int i = 0;i < 10000;i++) {
-        char* test = randomEquation(3, 10, 0);
-        currentTest = test;
-        //Parse tree
-        Tree tree = generateTree(test, NULL, NULL, 0);
-        if(globalError) {
-            failedTest(i, test, "experienced parsing error");
-            globalError = false;
-        }
-        //Compute tree (only checks for crash)
-        testExpectsErrors = true;
-        Value out = computeTree(tree, NULL, 0, NULL);
-        testExpectsErrors = false;
+void test_singleRandomCompute() {
+    char* test = randomEquation(3, 10, 0);
+    currentTest = test;
+    //Parse tree
+    Tree tree = generateTree(test, NULL, NULL, 0);
+    if(globalError) {
+        failedTest(testIndex, test, "experienced parsing error");
         globalError = false;
-        //Free
-        freeTree(tree);
-        freeValue(out);
-        free(test);
     }
-    printf("\r                                              \r");
+    //Compute tree (only checks for crash)
+    testExpectsErrors = true;
+    Value out = computeTree(tree, NULL, 0, NULL);
+    testExpectsErrors = false;
+    globalError = false;
+    //Free
+    freeTree(tree);
+    freeValue(out);
+    free(test);
 }
 enum testType {
     testtype_constant,
@@ -497,9 +477,9 @@ const struct Test {
     {&test_zeroes,"zeroes",testtype_constant},
     {&test_units,"units",testtype_constant},
     {&test_highlighting,"highlighting",testtype_constant},
-    {&test_randomCharacterHighlighting,"random highlighting",testtype_random},
-    {&test_randomCharacterParsing,"random parsing",testtype_random},
-    {&test_randomExpressionCalculation,"random computation",testtype_random},
+    {&test_singleRandomHighlight,"random highlighting",testtype_random},
+    {&test_singleRandomParse,"random parsing",testtype_random},
+    {&test_singleRandomCompute,"random computation",testtype_random},
 };
 #pragma endregion
 int main(int argc, char** argv) {
@@ -511,10 +491,12 @@ int main(int argc, char** argv) {
     sigaction(SIGSEGV, &action, NULL);
 #endif
     //Parse command line arguments
+    int commandCount = sizeof(commands) / sizeof(struct CommandArg);
     for(int i = 1;i < argc;i++) {
-        for(int j = 0;j < sizeof(commands) / sizeof(struct CommandArg);j++) {
+        for(int j = 0;j < commandCount;j++) {
             if(memcmp(argv[i], commands[j].name, strlen(commands[j].name)) == 0) {
                 int eqpos = strlen(commands[j].name);
+                if(argv[i][eqpos] != '=') continue;
                 *(commands[j].location) = parseNumber(argv[i] + eqpos + 1, 10);
             }
         }
@@ -524,14 +506,35 @@ int main(int argc, char** argv) {
         printf("%s set to %g\n", commands[i].name, *commands[i].location);
     }
     startup();
+    double remainingTime = estimatedTime;
     //Do tests
-    for(int i = 0;i < sizeof(tests) / sizeof(struct Test);i++) {
-        clock_t start = clock();
-        (*(tests[i].test))();
-        clock_t total = clock() - start;
-        if(timer) printf("%s test took %g ms\n", tests[i].name, ((double)total) / CLOCKS_PER_SEC * 1000);
+    int testCount = sizeof(tests) / sizeof(struct Test);
+    for(int i = 0;i < testCount;i++) {
+        testType = tests[i].name;
+        double start = (double)clock();
+        double testTime = remainingTime / (double)(testCount - i);
+        if(tests[i].type == testtype_constant) {
+            (*(tests[i].test))();
+        }
+        else if(tests[i].type == testtype_random) {
+            srand(seed);
+            testIndex = 0;
+            clock_t endTime = testTime * CLOCKS_PER_SEC + clock();
+            while(clock() < endTime) {
+                //Doing 100 will reduce the number of calls to clock()
+                for(int j = 0;j < 10;j++) {
+                    (*(tests[i].test))();
+                    testIndex++;
+                }
+            }
+            totalNumberOfTests += testIndex;
+        }
+        //Compute time taken
+        double total = (double)((double)clock() - start) / (double)CLOCKS_PER_SEC;
+        remainingTime -= total;
+        if(timer) printf("%s test took %g ms\n", tests[i].name, ((double)total) * 1000);
     }
-    printf("Failed %d %s.\n", failedCount, failedCount == 1 ? "test" : "tests");
+    printf("Failed %d %s out of %d.\n", failedCount, failedCount == 1 ? "test" : "tests", totalNumberOfTests);
     cleanup();
     return 0;
 }
