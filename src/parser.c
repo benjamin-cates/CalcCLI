@@ -384,31 +384,31 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 sectionLen -= 1;
             }
             int op = 0;
+            int opOrder = 0;
             if(sectionLen == 2) {
-                if(section[0] == '*' && section[1] == '*') op = op_pow;
-                else if(section[0] == '=' && section[1] == '=') op = op_equal;
-                else if(section[0] == '>' && section[1] == '=') op = op_gt_equal;
-                else if(section[0] == '<' && section[1] == '=') op = op_lt_equal;
-                else if(section[0] == '!' && section[1] == '=') op = op_not_equal;
+                if(section[0] == '*' && section[1] == '*') op = op_pow, opOrder = 1;
+                else if(section[0] == '=' && section[1] == '=') op = op_equal, opOrder = 4;
+                else if(section[0] == '>' && section[1] == '=') op = op_gt_equal, opOrder = 4;
+                else if(section[0] == '<' && section[1] == '=') op = op_lt_equal, opOrder = 4;
+                else if(section[0] == '!' && section[1] == '=') op = op_not_equal, opOrder = 4;
             }
             if(sectionLen == 1) {
-                if(section[0] == '+') op = op_add;
-                else if(section[0] == '-') op = op_sub;
-                else if(section[0] == '*') op = op_mult;
-                else if(section[0] == '/') op = op_div;
-                else if(section[0] == '%') op = op_mod;
-                else if(section[0] == '^') op = op_pow;
-                else if(section[0] == '>') op = op_gt;
-                else if(section[0] == '<') op = op_lt;
-                else if(section[0] == '=') op = op_equal;
+                if(section[0] == '+') op = op_add, opOrder = 3;
+                else if(section[0] == '-') op = op_sub, opOrder = 3;
+                else if(section[0] == '*') op = op_mult, opOrder = 2;
+                else if(section[0] == '/') op = op_div, opOrder = 2;
+                else if(section[0] == '%') op = op_mod, opOrder = 2;
+                else if(section[0] == '^') op = op_pow, opOrder = 1;
+                else if(section[0] == '>') op = op_gt, opOrder = 4;
+                else if(section[0] == '<') op = op_lt, opOrder = 4;
+                else if(section[0] == '=') op = op_equal, opOrder = 4;
             }
             if(op == 0) {
                 error("operator '%s' not found", section);
                 goto error;
             }
-            ops[i] = newOp(NULL, 0, op, optype_builtin);
-            int prevOp = ops[i - 1].op;
-            if(i != 0 && ops[i - 1].argCount == 0 && ((prevOp >= op_neg && prevOp <= op_sub) || (prevOp >= op_equal && prevOp <= op_gt_equal))) {
+            ops[i] = newOp(NULL, -opOrder, op, optype_builtin);
+            if(i != 0 && ops[i - 1].argCount == -1 && ops[i - 1].op != op_val) {
                 error("cannot combine two different operators");
                 goto error;
             }
@@ -521,17 +521,15 @@ error:
         ops[0] = newOp(allocArg(ops[0], false), 1, op_neg, 0);
         sectionCount -= 1;
     }
-    if(sectionCount == 1 && (ops[0].optype != 0 || ops[0].argCount != 0 || ops[0].op == 0)) return ops[0];
+    if(sectionCount == 1 && ops[0].argCount >= 0) return ops[0];
     //Compile operations into tree
     int offset = 0;
     //Side-by-side multiplication
     for(i = 1; i < sectionCount; i++) {
         ops[i] = ops[i + offset];
         //Check if ineligible
-        int op = ops[i].op;
-        int prevOp = ops[i - 1].op;
-        if(((op >= op_pow && op <= op_sub) || (op >= op_equal && op <= op_gt_equal)) && ops[i].argCount == 0 && ops[i].optype == optype_builtin) continue;
-        if(((prevOp >= op_pow && prevOp <= op_sub) || (prevOp >= op_equal && prevOp <= op_gt_equal)) && ops[i - 1].argCount == 0 && ops[i - 1].optype == optype_builtin) continue;
+        if(ops[i].argCount < 0 && ops[i].op != op_val) continue;
+        if(ops[i - 1].argCount < 0 && ops[i - 1].op != op_val) continue;
         //Combine them
         ops[i - 1] = newOp(allocArgs(ops[i - 1], ops[i], 0, 0), 2, op_mult, 0);
         offset++;
@@ -540,27 +538,20 @@ error:
     }
     ops[i] = ops[i + offset];
     //Condense operations: ^%*/+-
-    for(i = 0; i < 4; i++) {
+    for(i = 1; i < 5; i++) {
         offset = 0;
         int j;
         for(j = 0; j < sectionCount; j++) {
             ops[j] = ops[j + offset];
             //Configure order of operations
-            int op = ops[j].op;
-            if(i == 0) if(op != op_pow) continue;
-            if(i == 1) if(op != op_mod && op != op_mult && op != op_div) continue;
-            if(i == 2) if(op != op_add && op != op_sub) continue;
-            if(i == 3) if(op < op_equal || op > op_gt_equal) continue;
-            //Confirm that current item is a builtin operation
-            if(ops[j].optype != optype_builtin || ops[j].argCount != 0) continue;
+            if(ops[j].argCount != -i || ops[j].op == op_val) continue;
             //Check for missing argument
             if(j == 0 || j == sectionCount - 1) {
                 error("missing argument in operation", NULL);
                 return NULLOPERATION;
             }
             //Combine previous and next, set offset
-            ops[j] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, op, 0);
-            ops[j - 1] = ops[j];
+            ops[j - 1] = newOp(allocArgs(ops[j - 1], ops[j + 1 + offset], 0, 0), 2, ops[j].op, 0);
             j--;
             sectionCount -= 2;
             offset += 2;
