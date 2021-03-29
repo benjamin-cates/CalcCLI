@@ -521,27 +521,13 @@ error:
         ops[0] = newOp(allocArg(ops[0], false), 1, op_neg, 0);
         sectionCount -= 1;
     }
+    //Return early if no compilation is necessary
     if(sectionCount == 1 && ops[0].argCount >= 0) return ops[0];
-    //Compile operations into tree
+    //Compile operations into a single tree
     int offset = 0;
-    //Side-by-side multiplication
-    for(i = 1; i < sectionCount; i++) {
-        ops[i] = ops[i + offset];
-        //Check if ineligible
-        if(ops[i].argCount < 0 && ops[i].op != op_val) continue;
-        if(ops[i - 1].argCount < 0 && ops[i - 1].op != op_val) continue;
-        //Combine them
-        ops[i - 1] = newOp(allocArgs(ops[i - 1], ops[i], 0, 0), 2, op_mult, 0);
-        offset++;
-        sectionCount--;
-        i--;
-    }
-    ops[i] = ops[i + offset];
-    //Condense operations: ^%*/+-
     for(i = 1; i < 5; i++) {
         offset = 0;
-        int j;
-        for(j = 0; j < sectionCount; j++) {
+        for(int j = 0; j < sectionCount; j++) {
             ops[j] = ops[j + offset];
             //Configure order of operations
             if(ops[j].argCount != -i || ops[j].op == op_val) continue;
@@ -555,6 +541,23 @@ error:
             j--;
             sectionCount -= 2;
             offset += 2;
+        }
+        //Do side by side multiplication after exponentiation
+        if(i == 1) {
+            offset = 0;
+            int j;
+            for(j = 1; j < sectionCount; j++) {
+                ops[j] = ops[j + offset];
+                //Check if ineligible
+                if(ops[j].argCount < 0 && ops[j].op != op_val) continue;
+                if(ops[j - 1].argCount < 0 && ops[j - 1].op != op_val) continue;
+                //Combine them
+                ops[j - 1] = newOp(allocArgs(ops[j - 1], ops[j], 0, 0), 2, op_mult, 0);
+                offset++;
+                sectionCount--;
+                j--;
+            }
+            ops[j] = ops[j + offset];
         }
     }
     return ops[0];
