@@ -274,15 +274,21 @@ char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
     if(tree.optype == optype_builtin && tree.op == op_val)
         return valueToString(tree.value, 10);
     //Operations
-    if(tree.optype == optype_builtin && tree.op > 1 && tree.op < 9) {
+    if(tree.optype == optype_builtin && (tree.op >= op_neg && tree.op <= op_sub) || (tree.op >= op_equal && tree.op <= op_gt_equal)) {
         char* op;
         if(tree.op == op_neg || tree.op == op_sub) op = "-";
-        if(tree.op == op_pow) op = "^";
-        if(tree.op == op_mod) op = "%";
-        if(tree.op == op_mult) op = "*";
-        if(tree.op == op_div) op = "/";
-        if(tree.op == op_add) op = "+";
-        if(tree.branch == NULL) {
+        else if(tree.op == op_pow) op = "^";
+        else if(tree.op == op_mod) op = "%";
+        else if(tree.op == op_mult) op = "*";
+        else if(tree.op == op_div) op = "/";
+        else if(tree.op == op_add) op = "+";
+        else if(tree.op == op_equal) op = "==";
+        else if(tree.op == op_not_equal) op = "!=";
+        else if(tree.op == op_gt) op = ">";
+        else if(tree.op == op_lt) op = "<";
+        else if(tree.op == op_gt_equal) op = ">=";
+        else if(tree.op == op_lt_equal) op = "<=";
+        else if(tree.branch == NULL) {
             char* out = calloc(10, 1);
             if(out == NULL) { error(mallocError);return NULL; }
             snprintf(out, 10, "NULL%sNULL", op);
@@ -293,7 +299,7 @@ char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
         char* two = "";
         if(tree.op != op_neg) two = treeToString(tree.branch[1], true, argNames, localVars);
         //Allocate string
-        int len = strlen(one) + strlen(two) + 2 + bracket * 2;
+        int len = strlen(one) + strlen(two) + 3 + bracket * 2;
         char* out = calloc(len, 1);
         if(out == NULL) { error(mallocError);return NULL; }
         //Print -(one) if tree.op==op_neg, or (one op two) otherwise

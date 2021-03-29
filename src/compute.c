@@ -523,6 +523,51 @@ Value valAbs(Value one) {
     }
     return NULLVAL;
 }
+bool valEqual(Value one, Value two) {
+    if(one.type != two.type) return false;
+    if(one.type == value_num) {
+        if(one.r != two.r) return false;
+        if(one.i != two.i) return false;
+        if(one.u != two.u) return false;
+        return true;
+    }
+    if(one.type == value_vec) {
+        if(one.vec.height != two.vec.height) return false;
+        if(one.vec.total != two.vec.total) return false;
+        for(int i = 0;i < one.vec.total;i++) {
+            Number oneVal = one.vec.val[i];
+            Number twoVal = two.vec.val[i];
+            if(oneVal.r != twoVal.r) return false;
+            if(oneVal.i != twoVal.i) return false;
+            if(oneVal.u != twoVal.u) return false;
+        }
+        return true;
+    }
+    return false;
+}
+//Return the sum of all components. 3+4i will return 7, <10,4> will return 14
+double flattenVal(Value one) {
+    if(one.type==value_num) {
+        return one.r+one.i;
+    }
+    if(one.type==value_vec) {
+        double total=0;
+        for(int i=0;i<one.vec.total;i++) {
+            total+=one.vec.val[i].r;
+            total+=one.vec.val[i].i;
+        }
+        return total;
+    }
+    return 0;
+}
+int valCompare(Value one, Value two) {
+    double oneAbs = flattenVal(one);
+    double twoAbs = flattenVal(two);
+    if(oneAbs < twoAbs) return -1;
+    if(oneAbs > twoAbs) return 1;
+    if(valEqual(one, two)) return 0;
+    return 2;
+}
 #pragma endregion
 Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
     if(tree.optype == optype_builtin) {
@@ -820,7 +865,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
             return NULLVAL;
         }
         //Rounding and conditionals
-        if(tree.op < 59) {
+        if(tree.op < 63) {
             if(tree.op >= op_round && tree.op <= op_ceil) {
                 double (*roundType)(double);
                 if(tree.op == op_round) roundType = &round;
@@ -887,37 +932,25 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     return one;
                 }
             }
-            int freeType = 0;
-            if(one.type != two.type) freeType = valueConvert(op_add, &one, &two);
-            if(tree.op == op_equal) {
-                if(one.type == value_num) {
-                    if(one.r == two.r && one.r == two.r)
-                        return newValNum(1, 0, 0);
-                    else
-                        return newValNum(0, 0, 0);
-                }
-                if(one.type == value_vec) {
-                    if(one.vec.width != two.vec.width || one.vec.height != two.vec.height) {
-                        freeValue(one);
-                        freeValue(two);
-                        return newValNum(0, 0, 0);
-                    }
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        if(one.r != two.r || one.i != two.i) {
-                            freeValue(one);
-                            freeValue(two);
-                            return newValNum(0, 0, 0);
-                        }
-                    }
-                    freeValue(one);
-                    freeValue(two);
-                    return newValNum(1, 0, 0);
-                }
+            //Comparisons
+            if(tree.op < 59) {
+                int cmp = valCompare(one, two);
+                freeValue(one);
+                freeValue(two);
+                //Equal
+                if(cmp == 0 && (tree.op == op_equal || tree.op == op_lt_equal || tree.op == op_gt_equal)) return newValNum(1, 0, 0);
+                //Not equal
+                if(cmp != 0 && tree.op == op_not_equal) return newValNum(1, 0, 0);
+                //Greater than
+                if(cmp == 1 && (tree.op == op_gt || tree.op == op_gt_equal)) return newValNum(1, 0, 0);
+                //Less than
+                if(cmp == -1 && (tree.op == op_lt || tree.op == op_lt_equal)) return newValNum(1, 0, 0);
+                //Else return 0
+                return newValNum(0, 0, 0);
             }
-            if(tree.op == op_min || tree.op == op_max || tree.op == op_grthan) {
+            if(one.type != two.type) valueConvert(op_add, &one, &two);
+            if(tree.op == op_min || tree.op == op_max) {
                 if(one.type == value_num) {
-                    if(tree.op == op_grthan) return newValNum(one.r > two.r ? 1 : 0, 0, 0);
                     if(one.r > two.r)
                         return tree.op == op_max ? one : two;
                     else
@@ -935,13 +968,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                         Number twoNum = NULLNUM;
                         if(i < one.vec.width && j < one.vec.height) oneNum = one.vec.val[i + j * one.vec.width];
                         if(i < two.vec.width && j < two.vec.height) twoNum = two.vec.val[i + j * two.vec.width];
-                        if(tree.op == op_grthan) {
-                            out.vec.val[i + j * width] = newNum(oneNum.r > twoNum.r ? 1 : 0, 0, 0);
-                        }
-                        else {
-                            if((oneNum.r > twoNum.r) ^ (tree.op == op_max)) out.vec.val[i + j * width] = twoNum;
-                            else out.vec.val[i + j * width] = oneNum;
-                        }
+                        if((oneNum.r > twoNum.r) ^ (tree.op == op_max)) out.vec.val[i + j * width] = twoNum;
+                        else out.vec.val[i + j * width] = oneNum;
                     }
                     freeValue(one);
                     freeValue(two);

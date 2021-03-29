@@ -201,10 +201,17 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                 else if(opStr[0] == '/');
                 else if(opStr[0] == '^');
                 else if(opStr[0] == '%');
+                else if(opStr[0] == '=');
+                else if(opStr[0] == '>');
+                else if(opStr[0] == '<');
                 else isValid = false;
             }
             else if(opLen == 2) {
                 if(opStr[0] == '*' && opStr[1] == '*');
+                else if(opStr[0] == '=' && opStr[1] == '=');
+                else if(opStr[0] == '!' && opStr[1] == '=');
+                else if(opStr[0] == '>' && opStr[1] == '=');
+                else if(opStr[0] == '<' && opStr[1] == '=');
                 else isValid = false;
             }
             else isValid = false;

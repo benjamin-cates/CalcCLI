@@ -72,7 +72,13 @@ int nextSection(const char* eq, int start, int* end, int base) {
     //Vectors
     if(eq[start] == '<') {
         *end = findNext(eq, start, '>');
-        if(*end == -1) *end = strlen(eq);
+        //Less than
+        if(*end == -1) {
+            *end = start;
+            if(eq[(*end) + 1] == '=') (*end)++;
+            if(eq[(*end) + 1] == '-') (*end)++;
+            return sec_operator;
+        }
         return sec_vector;
     }
     //Numbers
@@ -140,7 +146,7 @@ int nextSection(const char* eq, int start, int* end, int base) {
         return sec_variable;
     }
     //Operators
-    if((eq[start] >= '*' && eq[start] <= '/') || eq[start] == '%' || eq[start] == '^') {
+    if((eq[start] >= '*' && eq[start] <= '/') || eq[start] == '%' || eq[start] == '^' || eq[start] == '!' || eq[start] == '>' || eq[start] == '=') {
         int next = start;
         while(eq[++next]) {
             //Break on period
@@ -150,7 +156,10 @@ int nextSection(const char* eq, int start, int* end, int base) {
             //Multiply, divide, add, subtract
             if(eq[next] >= '*' && eq[next] <= '/') continue;
             //Modulo and power
-            if(eq[next] == '%' && eq[next] == '^') continue;
+            if(eq[next] == '%' || eq[next] == '^') continue;
+            //Comparisons
+            if(eq[next] == '=') continue;
+            if(eq[next] == '>') continue;
             break;
         }
         *end = next - 1;
@@ -375,22 +384,34 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 sectionLen -= 1;
             }
             int op = 0;
-            if(section[0] == '*' && section[1] == '*' && sectionLen == 2) op = op_pow;
-            else if(sectionLen != 1) {
-                error("operator '%s' not found", section);
-                goto error;
+            if(sectionLen == 2) {
+                if(section[0] == '*' && section[1] == '*') op = op_pow;
+                else if(section[0] == '=' && section[1] == '=') op = op_equal;
+                else if(section[0] == '>' && section[1] == '=') op = op_gt_equal;
+                else if(section[0] == '<' && section[1] == '=') op = op_lt_equal;
+                else if(section[0] == '!' && section[1] == '=') op = op_not_equal;
             }
-            else if(section[0] == '+') op = op_add;
-            else if(section[0] == '-') op = op_sub;
-            else if(section[0] == '*') op = op_mult;
-            else if(section[0] == '/') op = op_div;
-            else if(section[0] == '%') op = op_mod;
-            else if(section[0] == '^') op = op_pow;
+            if(sectionLen == 1) {
+                if(section[0] == '+') op = op_add;
+                else if(section[0] == '-') op = op_sub;
+                else if(section[0] == '*') op = op_mult;
+                else if(section[0] == '/') op = op_div;
+                else if(section[0] == '%') op = op_mod;
+                else if(section[0] == '^') op = op_pow;
+                else if(section[0] == '>') op = op_gt;
+                else if(section[0] == '<') op = op_lt;
+                else if(section[0] == '=') op = op_equal;
+            }
             if(op == 0) {
                 error("operator '%s' not found", section);
                 goto error;
             }
             ops[i] = newOp(NULL, 0, op, optype_builtin);
+            int prevOp = ops[i - 1].op;
+            if(i != 0 && ops[i - 1].argCount == 0 && ((prevOp >= op_neg && prevOp <= op_sub) || (prevOp >= op_equal && prevOp <= op_gt_equal))) {
+                error("cannot combine two different operators");
+                goto error;
+            }
         }
         if(type == sec_vector) {
             int commas[sectionLen];
@@ -507,8 +528,10 @@ error:
     for(i = 1; i < sectionCount; i++) {
         ops[i] = ops[i + offset];
         //Check if ineligible
-        if(ops[i].op >= op_pow && ops[i].op <= op_sub && ops[i].argCount == 0) continue;
-        if(ops[i - 1].op >= op_pow && ops[i - 1].op <= op_sub && ops[i - 1].argCount == 0) continue;
+        int op = ops[i].op;
+        int prevOp = ops[i - 1].op;
+        if(((op >= op_pow && op <= op_sub) || (op >= op_equal && op <= op_gt_equal)) && ops[i].argCount == 0 && ops[i].optype == optype_builtin) continue;
+        if(((prevOp >= op_pow && prevOp <= op_sub) || (prevOp >= op_equal && prevOp <= op_gt_equal)) && ops[i - 1].argCount == 0 && ops[i - 1].optype == optype_builtin) continue;
         //Combine them
         ops[i - 1] = newOp(allocArgs(ops[i - 1], ops[i], 0, 0), 2, op_mult, 0);
         offset++;
@@ -517,7 +540,7 @@ error:
     }
     ops[i] = ops[i + offset];
     //Condense operations: ^%*/+-
-    for(i = 0; i < 3; i++) {
+    for(i = 0; i < 4; i++) {
         offset = 0;
         int j;
         for(j = 0; j < sectionCount; j++) {
@@ -527,6 +550,7 @@ error:
             if(i == 0) if(op != op_pow) continue;
             if(i == 1) if(op != op_mod && op != op_mult && op != op_div) continue;
             if(i == 2) if(op != op_add && op != op_sub) continue;
+            if(i == 3) if(op < op_equal || op > op_gt_equal) continue;
             //Confirm that current item is a builtin operation
             if(ops[j].optype != optype_builtin || ops[j].argCount != 0) continue;
             //Check for missing argument

@@ -10,7 +10,7 @@ double timer = 0;
 double printCommands = 0;
 double seed = 0;
 double estimatedTime = 3;
-double useColors=1;
+double useColors = 1;
 const struct CommandArg {
     const char* name;
     double* location;
@@ -123,17 +123,18 @@ char* randomEquation(int length, int base, bool isSquare) {
     //Operators
     if(type == 3) {
         //Operator
-        char operator[4];
-        memset(operator,0, 4);
-        int op = rand();
-        operator[0] = ("+-*/^%")[op % 6];
-        if(op % 12 > 5) operator[1] = '-';
+        const char* operators[] = { "+","-","*","/","^","%","=","==","!=",">","<",">=","<=",
+        "+-","--","*-","/-","^-","%-","=-","==-","!=-",">-","<-",">=-","<=-" };
+        int op = rand() % (sizeof(operators) / sizeof(char*));
+        bool useParenthesis = (op % 13 >= 9 && op % 13 <= 12);
         char* p1 = randomEquation(length - 1, base, isSquare);
         char* p2 = randomEquation(length - 1, base, isSquare);
-        char* out = calloc(strlen(p1) + strlen(operator) + strlen(p2) + 1, 1);
+        char* out = calloc(strlen(p1) + strlen(operators[op]) + strlen(p2) + 1 + useParenthesis * 2, 1);
+        if(useParenthesis) strcat(out, "(");
         strcat(out, p1);
-        strcat(out, operator);
+        strcat(out, operators[op]);
         strcat(out, p2);
+        if(useParenthesis) strcat(out, ")");
         free(p1);
         free(p2);
         return out;
@@ -267,10 +268,10 @@ void test_standard() {
         "0e5",
         "run(n=>{returnn+1},2)",
         "run((a,b)=>{out=0;y=5;while(equal(equal(y,10),0)) {y=y+1;out=out+a+b+y};return out},2,3)",
-        "run(n=>{if(equal(n,5)) return 10;else return 0},5)",
-        "run(n=>{if(equal(n,5)) return 10;else return 0},2)",
+        "run(n=>{if(n==5) return 10;else return 0},5)",
+        "run(n=>{if(n=5) return 10;else return 0},2)",
         "run(n=>{out=0;while(1) {if(1)break;out=1};return out;},1)",
-        "run(n=>{out=0;while(grthan(rand,0.3)) {if(1)continue;out=1};return out;},1)",
+        "run(n=>{out=0;while(rand>0.3) {if(1)continue;out=1};return out;},1)",
     };
     const Number regularTestResults[] = {
         {1.0,0.0,0},
@@ -333,7 +334,7 @@ void test_standard() {
 }
 void test_zeroes() {
     const char* zeroTests[] = {
-        "i-i", "neg(1)+1", "-1+1", "pow(10,0)-1", "2^0-1", "mod(10,5)", "10%5", "mult(0,10)", "0*10", "div(10,10)-1", "10/10-1", "add(neg(1),1)", "sub(10.5,10.5)", "sin(0)", "cos(0)-1", "floor(tan(1.56))-92", "csc(pi/2)-1", "sec(pi)+1", "floor(1/cot(1.56))-92", "floor(sinh(10.3))-14866", "cosh(0)-1", "tanh(0)", "asin(1)-pi/2", "acos(1)", "atan(1e50)-pi/2", "acsc(-1)+pi/2", "asec(1)", "acot(1)-pi/4", "asinh(sinh(1))-1", "acosh(cosh(1))-1", "round(atanh(tanh(1)))-1", "sqrt(4)-2", "round(cbrt(8))-2", "exp(ln(2))-2", "ln(exp(2))-2", "round(logten(1000))-3", "round(log(1000,10))-3", "round(fact(3))-6", "sgn(i)-i", "abs(-i)-1", "arg(i)-pi/2", "round(0.5)-1", "floor(0.5)", "ceil(0.3)-1", "getr(i)", "geti(10.5[m])", "getu([km])/[m]-1", "grthan(10,4)-1", "equal(10.3,10.3)-1", "min(4,5)-4", "min(5,4)-4", "max(5,4)-5", "max(4,5)-5", "lerp(-1,1,0.5)", "dist(0,3+4i)-5", "not(1)+2", "and(0,5)", "or(0,5)-5", "xor(5,3)-6", "ls(5,1)-10", "rs(5,1)-2", "floor(1/(pi-3.14))-627", "floor(1/(phi-1.6))-55", "floor(1/(e-2.71))-120", "histnum", "floor(rand)", "run(x=>x+1,-1)", "sum(x=>x,0,10,1)-55", "product(x=>x,1,10,1)-3628800", "width(<>)-1", "height(<10;20>)-2", "length(<1,1,1;1>)-6", "ge(<0,1>,0,0)", "ge(<0,1>,0)", "abs(fill(x=>0,4,4))", "abs(map(<0,1,2,3,4,5>,(v,x)=>v-x))", "det(<0,1;0,2>)", "abs(transpose(<0,0;0>))", "run(n=>{while(1) break;return 2;},0)-2","-1*1-(-1)",
+        "i-i", "neg(1)+1", "-1+1", "pow(10,0)-1", "2^0-1", "mod(10,5)", "10%5", "mult(0,10)", "0*10", "div(10,10)-1", "10/10-1", "add(neg(1),1)", "sub(10.5,10.5)", "sin(0)", "cos(0)-1", "floor(tan(1.56))-92", "csc(pi/2)-1", "sec(pi)+1", "floor(1/cot(1.56))-92", "floor(sinh(10.3))-14866", "cosh(0)-1", "tanh(0)", "asin(1)-pi/2", "acos(1)", "atan(1e50)-pi/2", "acsc(-1)+pi/2", "asec(1)", "acot(1)-pi/4", "asinh(sinh(1))-1", "acosh(cosh(1))-1", "round(atanh(tanh(1)))-1", "sqrt(4)-2", "round(cbrt(8))-2", "exp(ln(2))-2", "ln(exp(2))-2", "round(logten(1000))-3", "round(log(1000,10))-3", "round(fact(3))-6", "sgn(i)-i", "abs(-i)-1", "arg(i)-pi/2", "round(0.5)-1", "floor(0.5)", "ceil(0.3)-1", "getr(i)", "geti(10.5[m])", "getu([km])/[m]-1", "(10>4)-1","(-10>4)", "10!=10","(10=10)-1", "equal(10.3,10.3)-1", "min(4,5)-4", "min(5,4)-4", "max(5,4)-5", "max(4,5)-5", "lerp(-1,1,0.5)", "dist(0,3+4i)-5", "not(1)+2", "and(0,5)", "or(0,5)-5", "xor(5,3)-6", "ls(5,1)-10", "rs(5,1)-2", "floor(1/(pi-3.14))-627", "floor(1/(phi-1.6))-55", "floor(1/(e-2.71))-120", "histnum", "floor(rand)", "run(x=>x+1,-1)", "sum(x=>x,0,10,1)-55", "product(x=>x,1,10,1)-3628800", "width(<>)-1", "height(<10;20>)-2", "length(<1,1,1;1>)-6", "ge(<0,1>,0,0)", "ge(<0,1>,0)", "abs(fill(x=>0,4,4))", "abs(map(<0,1,2,3,4,5>,(v,x)=>v-x))", "det(<0,1;0,2>)", "abs(transpose(<0,0;0>))", "run(n=>{while(1) break;return 2;},0)-2","-1*1-(-1)",
     };
     for(int i = 0;i < sizeof(zeroTests) / sizeof(char*);i++) {
         currentTest = zeroTests[i];
@@ -398,8 +399,8 @@ void test_highlighting() {
         "\5\4\5",
         "\5\1\1\5\6\1\1",
         "\5\1\21\5\6\4\4\4",
-        "\4\5\1\1\13\1\5\13\4\16\16\16\16\5\1\1\5\6\16\16\16\16\5\1\1\5\4",
-        "\1\1\6\16\16\16\16\4\1\1\6\16\16\16\16\5\4\5\6\6\5\21\21\6\21\21\21\5\6\16\16\16\16\5\1\1\1\1\5",
+        "\6\5\1\1\13\1\5\13\4\16\16\16\16\5\1\1\5\6\16\16\16\16\5\1\1\5\6",
+        "\1\1\6\16\16\16\16\4\1\1\6\16\16\16\16\5\6\5\6\6\5\21\21\6\21\21\21\5\6\16\16\16\16\5\1\1\1\1\5",
         "\14\14\14\14",
         "\6\6",
         "\6\6\6",
