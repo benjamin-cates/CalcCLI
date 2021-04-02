@@ -164,7 +164,7 @@ char* getGeneratedPage(struct HelpPage page) {
     if(validType == page_function) {
         for(int i = 0;i < validCount;i++) {
             struct HelpPage page = pages[validPages[i]];
-            strcat(out, "<syntax><help>");
+            strcat(out, "<help><syntax>");
             //Append symbol
             int brac = findNext(page.symbol, 0, '(');
             if(brac == -1) brac = strlen(page.symbol);
@@ -173,10 +173,9 @@ char* getGeneratedPage(struct HelpPage page) {
             memcpy(name, page.symbol, brac);
             name[brac] = 0;
             strcat(out, name);
-            strcat(out, "</help>");
             //Append arguments
             strcat(out, page.symbol + brac);
-            strcat(out, "</syntax> - ");
+            strcat(out, "</syntax></help> - ");
             strcat(out, page.name);
             strcat(out, "<br>");
         }
@@ -184,9 +183,9 @@ char* getGeneratedPage(struct HelpPage page) {
     if(validType == page_unit) {
         for(int i = 0;i < validCount;i++) {
             struct HelpPage page = pages[validPages[i]];
-            strcat(out, "<syntax>[<help>");
+            strcat(out, "<help><syntax>[");
             memcpy(out + strlen(out), page.symbol + 1, strlen(page.symbol) - 2);
-            strcat(out, "</help>]</syntax> - ");
+            strcat(out, "]</syntax></help> - ");
             strcat(out, page.name);
             strcat(out, "<br>");
         }
@@ -194,9 +193,9 @@ char* getGeneratedPage(struct HelpPage page) {
     if(validType == page_command) {
         for(int i = 0;i < validCount;i++) {
             struct HelpPage page = pages[validPages[i]];
-            strcat(out, "<syntax><help>");
+            strcat(out, "<help><syntax>");
             strcat(out, page.symbol);
-            strcat(out, "</help></syntax> - ");
+            strcat(out, "</syntax></help> - ");
             strcat(out, page.name);
             strcat(out, "<br>");
         }
