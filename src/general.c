@@ -517,7 +517,7 @@ char** parseArgumentList(const char* list) {
     int argCount = 1;
     int commaPos[(listLen + 3) / 2];
     commaPos[0] = -1;
-    for(i = 0;i < listLen;i++) {
+    for(i = 0;i < listLen + 1;i++) {
         if(list[i] == ',') {
             commaPos[argCount++] = i;
         }
@@ -535,7 +535,7 @@ char** parseArgumentList(const char* list) {
         out[i] = calloc(commaPos[i + 1] - commaPos[i], 1);
         if(out[i] == NULL) { error(mallocError);return NULL; }
         for(j = commaPos[i] + 1;j < commaPos[i + 1];j++) {
-            if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9')) out[i][stringPos++] = list[j];
+            if((list[j] >= 'a' && list[j] <= 'z') || (list[j] >= '0' && list[j] <= '9') || list[j] == '.' || list[j] == '_' || list[j] == '-') out[i][stringPos++] = list[j];
             else if(list[j] >= 'A' && list[j] <= 'Z') out[i][stringPos++] = list[j] + 32;
             else if(list[j] == '(' || list[j] == ')' || list[j] == ' ' || list[j] == '=' || list[j] == '\0') continue;
             else error("invalid '%c' in argument list", list[j]);
