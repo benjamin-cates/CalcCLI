@@ -514,8 +514,8 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
             memset(out + i, hl_error, end - i);
         }
         else {
-            //Set invalid characters to error
-            memset(out + i, hl_error, end - i);
+            //Highlight as an expression
+            highlightSyntax(eq+i,out+i,args,localVars,10,false);
         }
         //Highlight rest of the statement
         if(isCodeBlock) {
