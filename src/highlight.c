@@ -290,7 +290,7 @@ int highlightArgumentList(char* eq, char* out) {
     }
     bool prevWasComma = true;
     for(;true;i++) {
-        if(eq[i] == '=' && i > endPos) return i;
+        if(eq[i] == '=' && i >= endPos) return i;
         if(eq[i] == 0) return i;
         if(eq[i] == ' ') {
             out[i] = hl_space;
@@ -359,7 +359,7 @@ char* highlightLine(char* eq) {
         }
         if(startsWith(eq, "-def ")) {
             int firstParenth = start;
-            while(eq[firstParenth] != '(' && eq[firstParenth] != 0) firstParenth++;
+            while(eq[firstParenth] != '(' && eq[firstParenth] != 0 && eq[firstParenth] != '=') firstParenth++;
             //Highlight the name
             memset(out + start + 1, hl_custom, firstParenth - start - 1);
             //highlight the argument list and find the equal position
@@ -373,27 +373,29 @@ char* highlightLine(char* eq) {
                 if(eq[next] == '{') {
                     //Find end bracket
                     int endBrac = findNext(eq, next, '}');
-                    bool hasEndBracket = endBrac == -1;
+                    bool hasEndBracket = endBrac != -1;
                     if(hasEndBracket) {
-                        out[next] = hl_error;
-                        endBrac = strlen(eq);
-                    }
-                    else {
                         out[next] = hl_bracket;
                         out[endBrac] = hl_bracket;
                         eq[endBrac] = 0;
                     }
+                    else {
+                        out[next] = hl_error;
+                        endBrac = strlen(eq);
+                    }
                     //Copy content and highlight
-                    int len = next - endBrac - 1;
+                    int len = endBrac - next - 1;
                     char content[len + 1];
                     memcpy(content, eq + next + 1, len);
                     content[len] = 0;
-                    highlightCodeBlock(content, eq + next + 1, args, NULL);
-                    if(hasEndBracket) out[endBrac] = '}';
+                    highlightCodeBlock(content, out + next + 1, args, NULL);
+                    if(hasEndBracket) eq[endBrac] = '}';
                 }
                 else highlightSyntax(eq + eqPos + 1, out + eqPos + 1, args, NULL, 10, false);
                 freeArgList(args);
             }
+            out[eqPos] = hl_command;
+            return out;
         }
         if(startsWith(eq, "-f ") || startsWith(eq, "-help")) {
             return out;
