@@ -472,6 +472,23 @@ void test_singleRandomParse() {
     globalError = false;
     testExpectsErrors = false;
 }
+void test_singleRandomExpressionHighlight() {
+    //Generate a random expression and highlight it. Fail if any characters are red
+    //Generate random expression
+    char* test = randomEquation(2, 10, false);
+    //Color it
+    char colors[strlen(test) + 1];
+    memset(colors, 0, strlen(test) + 1);
+    highlightSyntax(test, colors, NULL, NULL, 10, false);
+    //Check whether they are colored as errors
+    for(int i = 0;i < strlen(test);i++) {
+        //Test if coloring is an error
+        if(colors[i] == 12 || colors[i] == 13 || colors[i] == 4 || colors[i] == 0) {
+            failedTest(testIndex, test, "%s error at position %d", syntaxTypes[colors[i]], i);
+        }
+    }
+    free(test);
+}
 void test_singleRandomCompute() {
     char* test = randomEquation(3, 10, 0);
     currentTest = test;
@@ -505,6 +522,7 @@ const struct Test {
     {&test_units,"units",testtype_constant},
     {&test_highlighting,"highlighting",testtype_constant},
     {&test_help,"help",testtype_constant},
+    {&test_singleRandomExpressionHighlight,"random expression highlighting",testtype_random},
     {&test_singleRandomHighlight,"random highlighting",testtype_random},
     {&test_singleRandomParse,"random parsing",testtype_random},
     {&test_singleRandomCompute,"random computation",testtype_random},
