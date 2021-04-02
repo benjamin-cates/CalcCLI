@@ -395,7 +395,7 @@ char* highlightLine(char* eq) {
                 freeArgList(args);
             }
         }
-        if(startsWith(eq, "-f ")) {
+        if(startsWith(eq, "-f ") || startsWith(eq, "-help")) {
             return out;
         }
         if(startsWith(eq, "-dx ") || startsWith(eq, "-g ")) {

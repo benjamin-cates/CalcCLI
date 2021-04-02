@@ -3,6 +3,7 @@
 #include "../src/functions.h"
 #include "../src/general.h"
 #include "../src/parser.h"
+#include "../src/help.h"
 #include <stdarg.h>
 #include <time.h>
 #pragma region Commandline arguments
@@ -419,6 +420,23 @@ void test_highlighting() {
         free(out);
     }
 }
+void test_help() {
+    for(int i = 0;i < helpPageCount;i++) {
+        struct HelpPage page = pages[i];
+        if(page.content == NULL) failedTest(i, pages[i].name, "page.content was NULL");
+        int contentLength = strlen(page.content);
+        int bracket = 0;
+        for(int j = 0;j < contentLength;j++) {
+            if(page.content[j] == '<') {
+                if(page.content[j + 1] == '/') bracket--;
+                else bracket++;
+                //ignore <br> tags
+                if(memcmp(page.content + j + 1, "br", 2) == 0) bracket--;
+            }
+        }
+        if(bracket != 0) failedTest(i, pages[i].name, "page content has mismatching brackets (%d)", bracket);
+    }
+}
 void test_singleRandomHighlight() {
     char test[50];
     for(int j = 0;j < 49;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
@@ -486,6 +504,7 @@ const struct Test {
     {&test_zeroes,"zeroes",testtype_constant},
     {&test_units,"units",testtype_constant},
     {&test_highlighting,"highlighting",testtype_constant},
+    {&test_help,"help",testtype_constant},
     {&test_singleRandomHighlight,"random highlighting",testtype_random},
     {&test_singleRandomParse,"random parsing",testtype_random},
     {&test_singleRandomCompute,"random computation",testtype_random},

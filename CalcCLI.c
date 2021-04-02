@@ -1,6 +1,7 @@
 #include "src/general.h"
 #include "src/arb.h"
 #include "src/compute.h"
+#include "src/help.h"
 #include "src/functions.h"
 #include "src/parser.h"
 #include <stdarg.h>
@@ -12,6 +13,7 @@
 #if defined __WIN32 || defined _WIN64 || defined _WIN32
 #define USE_CONIO_H
 #endif
+#pragma region Command Line Arguments
 double useColors = 1;
 double rawMode = 0;
 double showHelp = 0;
@@ -32,7 +34,7 @@ void showUsage(char** argv) {
     if(type == NULL || type[0] == 0) {
         printf("Calc is a command line calculator written in C\nTry running:\n\tcalc -h commands\n\tcalc -h functions\n\tcalc -h features\n\tcalc -h args\n\tor calc -h info\nFor a more detailed help page, visit https://unfit-donkey.github.io/CalcForJS.\n");
     }
-    else if(memcmp(type, "args",4)==0) {
+    else if(memcmp(type, "args", 4) == 0) {
         printf("Command line arguments:\n\t--color=x\tWhether to enable colors (0 is disable)\n\t--raw\t\tEnable raw mode\n\t--help\t\tShow help messages\n");
     }
     else if(memcmp(type, "command", 7) == 0) {
@@ -52,12 +54,154 @@ void showUsage(char** argv) {
     }
     exit(0);
 }
+#pragma endregion
 void CLI_cleanup() {
     cleanup();
     if(useColors) printf("\b\b\33[34;1m-quit\33[0m\n");
     else printf("\b\b-quit\n");
     exit(0);
 }
+#pragma region Printing
+void printWithHighlighting(char* str) {
+    const char* colorCodes[] = {
+        "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
+    };
+    int strLen = strlen(str);
+    char* colors = highlightLine(str);
+    int prevColor = 0;
+    printf("\033[0m");
+    for(int i = 0;i < strLen;i++) {
+        if(prevColor != colors[i]) {
+            prevColor = colors[i];
+            printf("\033[0m\033[%sm", colorCodes[prevColor]);
+        }
+        putchar(str[i]);
+    }
+    printf("\033[0m");
+    free(colors);
+}
+void printHTML(char* content) {
+    int contentLen = strlen(content);
+    for(int i = 0;i < contentLen;i++) {
+        if(content[i] == '<') {
+            //Ignore ending tags
+            if(content[i + 1] == '/') {
+                while(content[i] != '>' && content[i] != 0) i++;
+                continue;
+            }
+            int start = i;
+            char tagName[20];
+            while(content[i] != ' ' && content[i] != '>' && content[i] != 0) i++;
+            memcpy(tagName, content + start + 1, i - start - 1);
+            tagName[i - start - 1] = 0;
+            if(strcmp(tagName, "br") == 0 || strcmp(tagName, "br/") == 0) {
+                putchar('\n');
+                continue;
+            }
+            while(content[i] != '>' && content[i] != 0) i++;
+            //Continue if self closing bracket
+            if(tagName[start - i - 1] == '/') continue;
+            // | start     | i      | endTag
+            // < tag       >        </tag>
+            int endTag = i;
+            int bracket = 0;
+            while(true) {
+                if(content[endTag] == 0) break;
+                if(bracket == 0 && content[endTag] == '<' && content[endTag + 1] == '/') break;
+                if(content[endTag] == '<') {
+                    if(content[endTag + 1] == '/') bracket--;
+                    else bracket++;
+                }
+                endTag++;
+            }
+            int len = i - endTag - 1;
+            char* inside = content + i + 1;
+            char oldContent = content[endTag];
+            if(content[endTag] != 0) content[endTag] = 0;
+            if(strcmp(tagName, "syntax") == 0) {
+                removeHTML(inside);
+                //Ignore tags within, then print the syntax highlighted version<tab><tab>
+                printWithHighlighting(inside);
+            }
+            else if(strcmp(tagName, "table") == 0) {
+                putchar('\n');
+                printHTML(inside);
+            }
+            else if(strcmp(tagName, "td") == 0) {
+                printHTML(inside);
+                putchar('\t');
+            }
+            else if(strcmp(tagName, "tr") == 0) {
+                printHTML(inside);
+                putchar('\n');
+            }
+            else if(strcmp(tagName, "h3") == 0 || strcmp(tagName, "h2") == 0) {
+                putchar('\n');
+                if(useColors) printf("\033[36;1m");
+                printHTML(inside);
+                if(useColors) printf("\033[0m");
+                putchar('\n');
+            }
+            else if(strcmp(tagName, "ul") == 0) {
+                putchar('\n');
+                printHTML(inside);
+
+            }
+            else if(strcmp(tagName, "li") == 0) {
+                if(useColors) printf("\033[34;1m");
+                printf("- ");
+                if(useColors) printf("\033[0m");
+                printHTML(inside);
+                putchar('\n');
+            }
+            else {
+                printHTML(inside);
+                // ignore a, help, em, and strong
+            }
+            if(oldContent != 0) content[endTag] = oldContent;
+            i = endTag;
+            while(content[i] != '>' && content[i] != 0) i++;
+        }
+        else if(content[i] == '&') {
+            if(memcmp(content + i + 1, "nbsp;", 5) == 0) {
+                putchar(' ');
+                i += 5;
+            }
+            else if(memcmp(content + i + 1, "gt;", 3) == 0) {
+                putchar('>');
+                i += 3;
+            }
+            else if(memcmp(content + i + 1, "lt;", 3) == 0) {
+                putchar('<');
+                i += 3;
+            }
+            else putchar(content[i]);
+        }
+        else putchar(content[i]);
+    }
+}
+void printHelpPage(struct HelpPage page) {
+    if(useColors) printf("\033[32;1m");
+    printf("%s", page.name);
+    if(useColors) printf("\033[0m");
+    if(page.symbol) printf(" - %s", page.symbol);
+    printf("\n");
+    //Generated help pages
+    if(page.type == 8) {
+        char* content=getGeneratedPage(page);
+        printHTML(content);
+        putchar('\n');
+        free(content);
+    }
+    else {
+        char contentCopy[strlen(page.content) + 1];
+        strcpy(contentCopy, page.content);
+        printHTML(contentCopy);
+        printf("\n");
+    }
+}
+#pragma endregion
+#pragma region Stdin Reading
 char* readLineRaw() {
     char* out = calloc(10, 1);
     if(out == NULL) { error(mallocError);return NULL; }
@@ -135,24 +279,6 @@ void disableRawMode() {
 }
 #endif
 #ifdef USE_FANCY_INPUT
-void printWithHighlighting(char* str) {
-    const char* colorCodes[] = {
-        "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
-    };
-    int strLen = strlen(str);
-    char* colors = highlightLine(str);
-    int prevColor = 0;
-    printf("\033[0m");
-    for(int i = 0;i < strLen;i++) {
-        if(prevColor != colors[i]) {
-            prevColor = colors[i];
-            printf("\033[0m\033[%sm", colorCodes[prevColor]);
-        }
-        putchar(str[i]);
-    }
-    printf("\033[0m");
-    free(colors);
-}
 void printInput(char* string, int cursorPos) {
     //Clear old input
     printf("\0338\033[J\r");
@@ -359,6 +485,7 @@ char* readLine(bool erasePrevious) {
     return readLineRaw();
 };
 #endif
+#pragma endregion
 void error(const char* format, ...) {
     if(ignoreError) return;
     //Print error
@@ -503,6 +630,47 @@ void runLine(char* input) {
                 else printf("%s\n", output);
             }
             free(output);
+        }
+        else if(startsWith(input, "-help")) {
+            if(input[5] != ' ') {
+                printf("Search the help pages with the -help command. Try \"-help getting started for a basic guide.\n");
+                return;
+            }
+            //Get search results
+            char* search = input + 6;
+            int* searchResults = searchHelpPages(search);
+            int decidedSearch = -1;
+            if(searchResults[0] == -1) {
+                error("No search results for '%s'", search);
+                return;
+            }
+            else if(searchResults[1] == -1) {
+                decidedSearch = searchResults[0];
+            }
+            else {
+                //print results and give an option
+                //print in reverse order and number them (maximum of 10 options)
+                int resultCount = 0;
+                while(searchResults[resultCount] != -1) resultCount++;
+                if(resultCount > 10) resultCount = 10;
+                for(int i = resultCount - 1;i >= 0;i--) {
+                    struct HelpPage page = pages[searchResults[i]];
+                    printf("%d: %s", i, page.name);
+                    if(page.symbol != NULL) printf(" - %s", page.symbol);
+                    printf("\n");
+                }
+                //Prompt for selected page
+                printf("Select a page => ");
+                int selectionId = readCharacter();
+                printf("\n");
+                if(selectionId < '0' || selectionId >= '0' + resultCount) {
+                    error("Input out of range");
+                    return;
+                }
+                decidedSearch = searchResults[selectionId - '0'];
+            }
+            //Print selected help page
+            printHelpPage(pages[decidedSearch]);
         }
         else if(startsWith(input, "-g ")) {
             //Graph

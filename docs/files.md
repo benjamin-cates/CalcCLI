@@ -15,6 +15,9 @@ The CalcCLI source code is split into several different files under the `src/` d
 ## general.c
 `general.c` contains much of the commonly used code, including: `startup` and `cleanup`, constructors, freers, copiers, arguments lists, global variables, and commonly used functions like `calculate` and `recalloc`.
 
+## help.c
+`help.c` contains basic functions for handling help pages and also contains all of the metadata and content for the help pages. This file does not have any dependents.
+
 ## highlight.c
 `highlight.c` is solely composed of functions that return a color map in exchange for an expression. Some functions return an allocated string, and others accept a pointer to an empty string that is equal in length to the expression.
 
