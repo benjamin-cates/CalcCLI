@@ -547,14 +547,14 @@ bool valEqual(Value one, Value two) {
 }
 //Return the sum of all components. 3+4i will return 7, <10,4> will return 14
 double flattenVal(Value one) {
-    if(one.type==value_num) {
-        return one.r+one.i;
+    if(one.type == value_num) {
+        return one.r + one.i;
     }
-    if(one.type==value_vec) {
-        double total=0;
-        for(int i=0;i<one.vec.total;i++) {
-            total+=one.vec.val[i].r;
-            total+=one.vec.val[i].i;
+    if(one.type == value_vec) {
+        double total = 0;
+        for(int i = 0;i < one.vec.total;i++) {
+            total += one.vec.val[i].r;
+            total += one.vec.val[i].i;
         }
         return total;
     }
@@ -1123,6 +1123,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
             freeValue(loopArgValues[2]);
             Value out;
             double i;
+            int loopCount = 0;
             if((loopArgs[1] - loopArgs[1]) > loopArgs[2] * 100 || loopArgs[1] < loopArgs[0])
                 return NULLVAL;
             if(tree.op == op_sum) {
@@ -1135,6 +1136,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     freeValue(out);
                     freeValue(current);
                     out = new;
+                    loopCount++;
+                    if(loopCount > 100000) { error("infinite loop detected");return NULLVAL; }
                 }
             }
             if(tree.op == op_product) {
@@ -1147,6 +1150,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     freeValue(out);
                     freeValue(current);
                     out = new;
+                    loopCount++;
+                    if(loopCount > 100000) { error("infinite loop detected");return NULLVAL; }
                 }
             }
             freeValue(one);
