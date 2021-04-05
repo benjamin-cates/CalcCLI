@@ -540,7 +540,7 @@ char** parseArgumentList(const char* list) {
             else if(list[j] == '(' || list[j] == ')' || list[j] == ' ' || list[j] == '=' || list[j] == '\0') continue;
             else error("invalid '%c' in argument list", list[j]);
         }
-        if(out[i][0] < 'a') error("argument name '%s' starts with a numeral", out[i]);
+        if(out[i][0] < 'a' && out[i][0] != '_') error("argument name '%s' starts with a numeral", out[i]);
         if(globalError && !ignoreError) {
             for(;i >= 0;i--) free(out[i]);
             free(out);
