@@ -80,7 +80,7 @@ char* randomEquation(int length, int base, bool isSquare) {
     if(type == 1) {
         //Variable
         int id = sortedBuiltin[rand() % sortedBuiltinLen];
-        int argCount = stdfunctions[id].argCount;
+        int argCount = strlen(stdfunctions[id].inputs);
         if(argCount == 0) {
             char* out = calloc(stdfunctions[id].nameLen + 1, 1);
             memcpy(out, stdfunctions[id].name, stdfunctions[id].nameLen);

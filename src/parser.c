@@ -283,7 +283,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 error("variable '%s' not found", section);
                 goto error;
             }
-            if(op.optype == 0 && stdfunctions[op.op].argCount != 0) {
+            if(op.optype == 0 && stdfunctions[op.op].inputs[0] & 0b11111110 != 0) {
                 error("no arguments for '%s'", section);
                 goto error;
             }
@@ -319,16 +319,18 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             commas[commaCount + 1] = sectionLen - 1;
             //Check for wrong number of arguments
             int argCount = commaCount + 1;
-            if(op.optype == 0 && stdfunctions[op.op].argCount != argCount) {
-                if(op.op == op_run);
-                else if(op.op == op_fill && argCount == 3);
-                else if(op.op == op_ge && argCount == 2);
-                else {
-                    error("wrong number of arguments for '%s'", section);
-                    return NULLOPERATION;
+            if(op.optype == 0) {
+                int builtinArgCount = strlen(stdfunctions[op.op].inputs);
+                if(builtinArgCount < argCount && op.op != op_run) {
+                    error("too many arguments for '%s'", section);
+                    goto error;
+                }
+                if(builtinArgCount > argCount && stdfunctions[op.op].inputs[argCount - 1] & 1 != 1) {
+                    error("too few arguments for '%s'", section);
+                    goto error;
                 }
             }
-            if(op.optype == 1 && customfunctions[op.op].argCount != argCount) {
+            else if(op.optype == 1 && customfunctions[op.op].argCount != argCount) {
                 error("wrong number of arguments for '%s'", section);
                 return NULLOPERATION;
             }

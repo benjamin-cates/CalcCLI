@@ -451,7 +451,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
         //This loop parses each statement separated by ;
         char* type = eq + i;
         bool isCodeBlock = false;
-        int end = findNext(eq, i + 1, ';');
+        int end = findNext(eq, i, ';');
         bool endIsNull = end == -1;
         if(endIsNull) end = strlen(eq);
         else eq[end] = 0;
@@ -461,7 +461,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
             memset(out + i, hl_localvar, isEqual);
             out[i + isEqual] = hl_command;
             memcpy(name, eq + i, isEqual);
-            i = isEqual + 1;
+            i += isEqual + 1;
             highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
             argListAppend(&localVarCopy, name, &localVarSize);
         }
@@ -515,7 +515,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
         }
         else {
             //Highlight as an expression
-            highlightSyntax(eq+i,out+i,args,localVars,10,false);
+            highlightSyntax(eq + i, out + i, args, localVars, 10, false);
         }
         //Highlight rest of the statement
         if(isCodeBlock) {

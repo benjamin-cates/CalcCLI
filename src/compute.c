@@ -701,168 +701,125 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 return NULLVAL;
             }
         }
-        Value one, two;
-        if(tree.argCount > 0) {
-            one = computeTree(tree.branch[0], args, argLen, localVars);
-            if(one.type == value_func && tree.optype == optype_builtin) {
-                if(tree.op != op_run && tree.op != op_sum && tree.op != op_product && tree.op != op_fill) {
-                    error("functions cannot be passed to %s", stdfunctions[tree.op].name);
-                    freeValue(one);
-                    return NULLVAL;
-                }
+        //Prevent name conflict
+        const Value* arguments = args;
+        Value out = NULLVAL;
+        //Compute each branch
+        Value args[tree.argCount];
+        memset(args, 0, sizeof(args));
+        const unsigned char* acceptableArgs = stdfunctions[tree.op].inputs;
+        for(int i = 0;i < tree.argCount;i++) {
+            const char* type[] = { "number","vector","anonymous function","arbitrary-precision number" };
+            args[i] = computeTree(tree.branch[i], arguments, argLen, localVars);
+            if(globalError) goto ret;
+            if((acceptableArgs[i] & (2 << args[i].type)) == 0) {
+                if(tree.op == op_run && i != 0) continue;
+                error("Invalid %s in call to %s", type[args[i].type], stdfunctions[tree.op].name);
+                goto ret;
             }
         }
-        if(tree.argCount > 1) {
-            two = computeTree(tree.branch[1], args, argLen, localVars);
-            if(two.type == value_func && tree.optype == optype_builtin && tree.op != op_map) {
-                if(tree.op != op_run && tree.op != op_sum && tree.op != op_product) {
-                    error("cannot run %s with a function as an argument", stdfunctions[tree.op].name);
-                    freeValue(two);
-                    return NULLVAL;
-                }
-            }
-        }
-        if(globalError)
-            return NULLVAL;
         //Basic operators
         if(tree.op < 9) {
-            if(tree.op == op_i)
-                return newValNum(0, 1, 0);
-            Value out;
-            if(tree.op == op_neg) out = valNegate(one);
-            if(tree.op == op_pow) out = DivPowMod(&compPower, one, two, 0);
-            if(tree.op == op_mod) out = DivPowMod(&compModulo, one, two, 1);
-            if(tree.op == op_div) out = DivPowMod(&compDivide, one, two, 1);
-            if(tree.op == op_mult) out = valMult(one, two);
-            if(tree.op == op_add) out = valAdd(one, two);
-            if(tree.op == op_sub) {
-                Value negative = valNegate(two);
-                out = valAdd(one, negative);
+            if(tree.op == op_i) out = newValNum(0, 1, 0);
+            else if(tree.op == op_neg) out = valNegate(args[0]);
+            else if(tree.op == op_pow) out = DivPowMod(&compPower, args[0], args[1], 0);
+            else if(tree.op == op_mod) out = DivPowMod(&compModulo, args[0], args[1], 1);
+            else if(tree.op == op_div) out = DivPowMod(&compDivide, args[0], args[1], 1);
+            else if(tree.op == op_mult) out = valMult(args[0], args[1]);
+            else if(tree.op == op_add) out = valAdd(args[0], args[1]);
+            else if(tree.op == op_sub) {
+                Value negative = valNegate(args[1]);
+                out = valAdd(args[0], negative);
                 freeValue(negative);
             }
-            freeValue(one);
-            if(tree.argCount > 1) freeValue(two);
-            return out;
+            goto ret;
         }
         //Trigonometric functions
         if(tree.op < 30) {
-            if(one.type == value_num) {
-                Value out;
-                out.type = one.type;
-                out.num = compTrig(tree.op, one.num);
-                return out;
+            if(args[0].type == value_num) {
+                out.type = args[0].type;
+                out.num = compTrig(tree.op, args[0].num);
             }
-            if(one.type == value_vec) {
-                int i;
-                for(i = 0;i < one.vec.total;i++) {
-                    one.vec.val[i] = compTrig(tree.op, one.vec.val[i]);
+            else if(args[0].type == value_vec) {
+                out = args[0];
+                args[0] = NULLVAL;
+                for(int i = 0;i < args[0].vec.total;i++) {
+                    out.vec.val[i] = compTrig(tree.op, out.vec.val[i]);
                 }
-                return one;
             }
+            goto ret;
         }
         //Log, arg, and abs
         if(tree.op < 46) {
-            if(tree.op == op_sqrt || tree.op == op_cbrt) {
-                double pow = (tree.op == op_sqrt) ? 1.0 / 2.0 : 1.0 / 3.0;
-                Value out = valPower(one, newValNum(pow, 0, 0));
-                freeValue(one);
-                return out;
-            }
+            if(tree.op == op_sqrt) out = valPower(args[0], newValNum(1.0 / 2, 0, 0));
+            if(tree.op == op_cbrt) out = valPower(args[0], newValNum(1.0 / 3, 0, 0));
             if(tree.op == op_exp) {
-                if(one.type == value_num) {
-                    double expr = exp(one.r);
-                    one.r = expr * cos(one.i);
-                    one.i = expr * sin(one.i);
-                    return one;
+                if(args[0].type == value_num) {
+                    double expr = exp(args[0].r);
+                    out.r = expr * cos(args[0].i);
+                    out.i = expr * sin(args[0].i);
                 }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        double expr = exp(one.vec.val[i].r);
-                        one.vec.val[i].r = expr * cos(one.vec.val[i].i);
-                        one.vec.val[i].i = expr * sin(one.vec.val[i].i);
-                    }
-                    return one;
-                }
-            }
-            if(tree.op == op_ln) {
-                Value out = valLn(one);
-                freeValue(one);
-                return out;
-            }
-            if(tree.op == op_logten) {
-                double logten = 1 / log(10);
-                Value out = valLn(one);
-                if(one.type == value_num) {
-                    out.r *= logten;
-                    out.i *= logten;
-                }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < out.vec.total;i++) {
-                        out.vec.val[i].r *= logten;
-                        out.vec.val[i].i *= logten;
+                if(args[0].type == value_vec) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(int i = 0;i < args[0].vec.total;i++) {
+                        double expr = exp(out.vec.val[i].r);
+                        out.vec.val[i].r = expr * cos(out.vec.val[i].i);
+                        out.vec.val[i].i = expr * sin(out.vec.val[i].i);
                     }
                 }
-                freeValue(one);
-                return out;
             }
+            if(tree.op == op_ln) out = valLn(args[0]);
+            if(tree.op == op_logten) out = valMult(valLn(args[0]), newValNum(1 / log(10), 0, 0));
             if(tree.op == op_log) {
-                Value LnOne = valLn(one);
-                Value LnTwo = valLn(two);
-                Value out = valDivide(LnOne, LnTwo);
-                freeValue(LnOne);
-                freeValue(LnTwo);
-                return out;
+                Value LnArg = valLn(args[0]);
+                Value LnBase = valLn(args[1]);
+                out = valDivide(LnArg, LnBase);
+                freeValue(LnArg);
+                freeValue(LnBase);
             }
             if(tree.op == op_fact) {
-                if(one.type == value_num) {
-                    one.r += 1;
-                    one.num = compGamma(one.num);
-                    return one;
+                if(args[0].type == value_num) {
+                    args[0].r += 1;
+                    out.num = compGamma(args[0].num);
                 }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        one.vec.val[i].r += 1;
-                        one.vec.val[i] = compGamma(one.vec.val[i]);
+                if(args[0].type == value_vec) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(int i = 0;i < out.vec.total;i++) {
+                        out.vec.val[i].r += 1;
+                        out.vec.val[i] = compGamma(out.vec.val[i]);
                     }
-                    return one;
                 }
             }
             if(tree.op == op_sgn) {
-                Value abs = valAbs(one);
-                Value out = valDivide(one, abs);
+                Value abs = valAbs(args[0]);
+                out = valDivide(args[0], abs);
                 freeValue(abs);
-                freeValue(one);
-                return out;
             }
-            if(tree.op == op_abs) {
-                Value out = valAbs(one);
-                freeValue(one);
-                return out;
-            }
+            if(tree.op == op_abs) out = valAbs(args[0]);
             if(tree.op == op_arg) {
-                if(one.type == value_num) {
-                    Value out;
-                    out.type = value_num;
-                    out.r = atan2(one.i, one.r);
+                if(args[0].type == value_num) {
+                    out.r = atan2(args[0].i, args[0].r);
                     //The builtin atan2 is wrong for this edge case
-                    if(one.i == 0 && one.r < 0) out.r = M_PI;
+                    if(args[0].i == 0 && args[0].r < 0) out.r = M_PI;
                     out.i = 0;
-                    out.u = one.u;
-                    return out;
+                    out.u = args[0].u;
                 }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        one.vec.val[i].r = atan2(one.vec.val[i].i, one.vec.val[i].r);
-                        one.vec.val[i].i = 0;
+                if(args[0].type == value_vec) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(int i = 0;i < out.vec.total;i++) {
+                        Number num = out.vec.val[i];
+                        out.vec.val[i].r = atan2(num.i, num.r);
+                        //The builtin atan2 is wrong for this edge case
+                        if(num.i == 0 && num.r < 0) out.vec.val[i].r = M_PI;
+                        out.vec.val[i].i = 0;
+                        out.vec.val[i].u = num.u;
                     }
-                    return one;
                 }
             }
-            return NULLVAL;
+            goto ret;
         }
         //Rounding and conditionals
         if(tree.op < 63) {
@@ -871,109 +828,97 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 if(tree.op == op_round) roundType = &round;
                 if(tree.op == op_floor) roundType = &floor;
                 if(tree.op == op_ceil) roundType = &ceil;
-                if(one.type == value_num) {
-                    one.r = (*roundType)(one.r);
-                    one.i = (*roundType)(one.i);
-                    return one;
+                out = args[0];
+                args[0] = NULLVAL;
+                if(args[0].type == value_num) {
+                    out.r = (*roundType)(out.r);
+                    out.i = (*roundType)(out.i);
                 }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        one.vec.val[i].r = (*roundType)(one.vec.val[i].r);
-                        one.vec.val[i].i = (*roundType)(one.vec.val[i].i);
+                if(args[0].type == value_vec) {
+                    for(int i = 0;i < out.vec.total;i++) {
+                        out.vec.val[i].r = (*roundType)(out.vec.val[i].r);
+                        out.vec.val[i].i = (*roundType)(out.vec.val[i].i);
                     }
-                    return one;
                 }
+                goto ret;
             }
             if(tree.op == op_getr) {
-                if(one.type == value_num) {
-                    one.i = 0;
-                    one.u = 0;
-                    return one;
-                }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        one.vec.val[i].i = 0;
-                        one.vec.val[i].u = 0;
+                if(args[0].type == value_num) out.r = args[0].r;
+                if(args[0].type == value_vec) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(int i = 0;i < out.vec.total;i++) {
+                        out.vec.val[i].i = 0;
+                        out.vec.val[i].u = 0;
                     }
-                    return one;
                 }
+                goto ret;
             }
             if(tree.op == op_geti) {
-                if(one.type == value_num) {
-                    one.r = one.i;
-                    one.i = 0;
-                    one.u = 0;
-                    return one;
-                }
-                if(one.type == value_vec) {
-                    int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        one.vec.val[i].r = one.vec.val[i].i;
-                        one.vec.val[i].i = 0;
-                        one.vec.val[i].u = 0;
+                if(args[0].type == value_num) out.r = args[0].i;
+                if(args[0].type == value_vec) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(int i = 0;i < out.vec.total;i++) {
+                        out.vec.val[i].r = out.vec.val[i].i;
+                        out.vec.val[i].i = 0;
+                        out.vec.val[i].u = 0;
                     }
-                    return one;
                 }
+                goto ret;
             }
             if(tree.op == op_getu) {
-                if(one.type == value_num) {
-                    one.r = 1;
-                    one.i = 0;
-                    return one;
+                if(args[0].type == value_num) {
+                    out.r = 1;
+                    out.u = args[0].u;
                 }
-                if(one.type == value_vec) {
+                if(args[0].type == value_vec) {
                     int i;
-                    for(i = 0;i < one.vec.total;i++) {
-                        one.vec.val[i].r = 1;
-                        one.vec.val[i].i = 0;
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(i = 0;i < out.vec.total;i++) {
+                        out.vec.val[i].r = 1;
+                        out.vec.val[i].i = 0;
                     }
-                    return one;
                 }
+                goto ret;
             }
             //Comparisons
             if(tree.op < 59) {
-                int cmp = valCompare(one, two);
-                freeValue(one);
-                freeValue(two);
+                int cmp = valCompare(args[0], args[1]);
                 //Equal
-                if(cmp == 0 && (tree.op == op_equal || tree.op == op_lt_equal || tree.op == op_gt_equal)) return newValNum(1, 0, 0);
+                if(cmp == 0 && (tree.op == op_equal || tree.op == op_lt_equal || tree.op == op_gt_equal)) out.r = 1;
                 //Not equal
-                if(cmp != 0 && tree.op == op_not_equal) return newValNum(1, 0, 0);
+                if(cmp != 0 && tree.op == op_not_equal) out.r = 1;
                 //Greater than
-                if(cmp == 1 && (tree.op == op_gt || tree.op == op_gt_equal)) return newValNum(1, 0, 0);
+                if(cmp == 1 && (tree.op == op_gt || tree.op == op_gt_equal)) out.r = 1;
                 //Less than
-                if(cmp == -1 && (tree.op == op_lt || tree.op == op_lt_equal)) return newValNum(1, 0, 0);
-                //Else return 0
-                return newValNum(0, 0, 0);
+                if(cmp == -1 && (tree.op == op_lt || tree.op == op_lt_equal)) out.r = 1;
+                goto ret;
             }
-            if(one.type != two.type) valueConvert(op_add, &one, &two);
+            if(args[0].type != args[1].type) valueConvert(op_add, args, args + 1);
             if(tree.op == op_min || tree.op == op_max) {
-                if(one.type == value_num) {
-                    if(one.r > two.r)
-                        return tree.op == op_max ? one : two;
-                    else
-                        return tree.op == op_max ? two : one;
+                if(args[0].type == value_num) {
+                    bool isGreater = args[0].r > args[1].r;
+                    bool expectsGreater = tree.op == op_max;
+                    if(isGreater ^ expectsGreater) out = args[1];
+                    else out = args[0];
                 }
-                if(one.type == value_vec) {
-                    int width = one.vec.width > two.vec.width ? one.vec.width : two.vec.width;
-                    int height = one.vec.height > two.vec.height ? one.vec.height : two.vec.height;
-                    Value out;
+                if(args[0].type == value_vec) {
+                    Vector one = args[0].vec;
+                    Vector two = args[1].vec;
+                    int width = one.width > two.width ? one.width : two.width;
+                    int height = one.height > two.height ? one.height : two.height;
                     out.type = value_vec;
                     out.vec = newVec(width, height);
-                    int i, j;
-                    for(i = 0;i < width;i++) for(j = 0;j < height;j++) {
+                    for(int i = 0;i < width;i++) for(int j = 0;j < height;j++) {
                         Number oneNum = NULLNUM;
                         Number twoNum = NULLNUM;
-                        if(i < one.vec.width && j < one.vec.height) oneNum = one.vec.val[i + j * one.vec.width];
-                        if(i < two.vec.width && j < two.vec.height) twoNum = two.vec.val[i + j * two.vec.width];
+                        if(i < one.width && j < one.height) oneNum = one.val[i + j * one.width];
+                        if(i < two.width && j < two.height) twoNum = two.val[i + j * two.width];
                         if((oneNum.r > twoNum.r) ^ (tree.op == op_max)) out.vec.val[i + j * width] = twoNum;
                         else out.vec.val[i + j * width] = oneNum;
                     }
-                    freeValue(one);
-                    freeValue(two);
-                    return out;
                 }
             }
             if(tree.op == op_lerp) {
@@ -981,163 +926,115 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 Value c = computeTree(tree.branch[2], args, argLen, localVars);
                 Value negativeC = valNegate(c);
                 Value oneSubC = valAdd(newValNum(1, 0, 0), negativeC);
-                Value cTimesTwo = valMult(c, two);
-                Value oneSubCTimesTwo = valMult(oneSubC, one);
+                Value cTimesTwo = valMult(c, args[1]);
+                Value oneSubCTimesTwo = valMult(oneSubC, args[0]);
                 Value out = valAdd(cTimesTwo, oneSubCTimesTwo);
                 freeValue(c);
                 freeValue(negativeC);
                 freeValue(oneSubC);
                 freeValue(cTimesTwo);
                 freeValue(oneSubCTimesTwo);
-                freeValue(one);
-                freeValue(two);
-                return out;
             }
             if(tree.op == op_dist) {
-                if(one.type == value_num) return newValNum(sqrt(pow(fabs(one.r - two.r), 2) + pow(fabs(one.i - two.i), 2)), 0, 0);
-                if(one.type == value_vec) {
+                if(args[0].type == value_num) out = newValNum(sqrt(pow(fabs(args[0].r - args[1].r), 2) + pow(fabs(args[0].i - args[1].i), 2)), 0, 0);
+                if(args[0].type == value_vec) {
                     int i;
-                    int length = one.vec.total > two.vec.total ? one.vec.total : two.vec.total;
-                    double out = 0;
+                    Vector one = args[0].vec;
+                    Vector two = args[1].vec;
+                    int length = one.total > two.total ? one.total : two.total;
                     for(i = 0;i < length;i++) {
                         Number oneNum, twoNum;
-                        if(i < one.vec.total) oneNum = one.vec.val[i];
+                        if(i < one.total) oneNum = one.val[i];
                         else oneNum = NULLNUM;
-                        if(i < two.vec.total) twoNum = two.vec.val[i];
+                        if(i < two.total) twoNum = two.val[i];
                         else twoNum = NULLNUM;
-                        out += pow(oneNum.r - twoNum.r, 2) + pow(oneNum.i - twoNum.i, 2);
+                        out.r += pow(oneNum.r - twoNum.r, 2) + pow(oneNum.i - twoNum.i, 2);
                     }
-                    freeValue(one);
-                    freeValue(two);
-                    return newValNum(sqrt(out), 0, 0);
                 }
             }
+            goto ret;
         }
         //Binary Operations
         if(tree.op < 72) {
             if(tree.op == op_not) {
-                if(one.type == value_num) {
-                    Value out;
-                    out.type = value_num;
-                    out.num = compBinNot(one.num);
-                    return out;
+                if(args[0].type == value_num) out.num = compBinNot(args[0].num);
+                if(args[0].type == value_vec) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                    for(int i = 0;i < out.vec.total;i++) out.vec.val[i] = compBinNot(out.vec.val[i]);
                 }
-                if(one.type == value_vec) {
-                    Value out;
-                    out.type = value_vec;
-                    out.vec = one.vec;
-                    out.vec.val = malloc(one.vec.total * sizeof(Number));
-                    for(int i = 0;i < one.vec.total;i++) out.vec.val[i] = compBinNot(one.vec.val[i]);
-                    freeValue(one);
-                    return out;
-                }
-                freeValue(one);
-                return NULLVAL;
+                goto ret;
             }
             //Apply the binary operations properly with vectors
             const Number(*funcs[])(Number, Number) = { &compBinAnd,&compBinOr,&compBinXor,&compBinLs,&compBinRs };
-            Value out = DivPowMod(funcs[tree.op - op_and], one, two, op_div);
-            freeValue(one);
-            freeValue(two);
-            return out;
+            out = DivPowMod(funcs[tree.op - op_and], args[0], args[1], op_div);
+            goto ret;
         }
         //Constants
         if(tree.op < 88) {
-            if(tree.op == op_pi)
-                return newValNum(3.1415926535897932, 0, 0);
-            if(tree.op == op_e)
-                return newValNum(2.718281828459045, 0, 0);
-            if(tree.op == op_phi)
-                return newValNum(1.618033988749894, 0, 0);
-            if(tree.op == op_ans) {
+            if(tree.op == op_pi) out = newValNum(3.1415926535897932, 0, 0);
+            else if(tree.op == op_e) out = newValNum(2.718281828459045, 0, 0);
+            else if(tree.op == op_phi) out = newValNum(1.618033988749894, 0, 0);
+            else if(tree.op == op_ans) {
                 if(historyCount == 0) {
                     error("no previous answer", NULL);
-                    return NULLVAL;
+                    goto ret;
                 }
-                return copyValue(history[historyCount - 1]);
+                out = copyValue(history[historyCount - 1]);
             }
-            if(tree.op == op_hist) {
-                int i = (int)floor(getR(one));
-                freeValue(one);
+            else if(tree.op == op_hist) {
+                int i = (int)floor(getR(args[0]));
                 if(i < 0) {
                     if(i < -historyCount) {
                         error("history too short", NULL);
-                        return NULLVAL;
+                        goto ret;
                     }
-                    return copyValue(history[historyCount - i]);
+                    out = copyValue(history[historyCount - i]);
                 }
                 if(i >= historyCount) {
                     error("history too short", NULL);
-                    return NULLVAL;
+                    goto ret;
                 }
-                return copyValue(history[i]);
+                out = copyValue(history[i]);
             }
-            if(tree.op == op_histnum)
-                return newValNum(historyCount, 0, 0);
-            if(tree.op == op_rand)
-                return newValNum((double)rand() / RAND_MAX, 0, 0);
+            else if(tree.op == op_histnum) out = newValNum(historyCount, 0, 0);
+            else if(tree.op == op_rand) out = newValNum((double)rand() / RAND_MAX, 0, 0);
+            goto ret;
         }
         //Run, Sum, and Product
         if(tree.op < 93) {
-            if(one.type != value_func) {
-                error("first argument of %s is not a function", stdfunctions[tree.op].name);
-                if(tree.argCount > 0) freeValue(one);
-                if(tree.argCount > 1) freeValue(two);
-                return NULLVAL;
-            }
             if(tree.op == op_run) {
                 int argCount = tree.argCount - 1;
-                int requiredArgs = argListLen(one.argNames);
+                int requiredArgs = argListLen(args[0].argNames);
                 if(argCount < requiredArgs) {
                     error("not enough args in run function");
-                    freeValue(one);
-                    if(tree.argCount > 1) freeValue(two);
-                    return NULLVAL;
+                    goto ret;
                 }
-                Value inputs[tree.argCount];
-                memset(inputs, 0, sizeof(Value) * tree.argCount);
-                if(inputs == NULL) { error(mallocError);return NULLVAL; }
-                inputs[0] = two;
-                int i;
-                for(i = 1;i < argCount;i++) {
-                    inputs[i] = computeTree(tree.branch[i + 1], args, argLen, localVars);
-                }
-                Value out = runAnonymousFunction(one, inputs);
-                for(i = 0;i < argCount;i++) freeValue(inputs[i]);
-                freeValue(one);
-                return out;
+                out = runAnonymousFunction(args[0], args + 1);
+                goto ret;
             }
             Value tempArgs[2];
-            memset(tempArgs, 0, (argLen + 1) * sizeof(Number));
-            if(args != NULL) memcpy(tempArgs, args, sizeof(Number) * argLen);
-            Value loopArgValues[3];
-            loopArgValues[0] = two;
-            loopArgValues[1] = computeTree(tree.branch[2], args, argLen, localVars);
-            loopArgValues[2] = computeTree(tree.branch[3], args, argLen, localVars);
+            memset(tempArgs, 0, sizeof(tempArgs));
             double loopArgs[3];
-            loopArgs[0] = getR(loopArgValues[0]);
-            loopArgs[1] = getR(loopArgValues[1]);
-            loopArgs[2] = getR(loopArgValues[2]);
-            freeValue(loopArgValues[0]);
-            freeValue(loopArgValues[1]);
-            freeValue(loopArgValues[2]);
-            Value out;
+            loopArgs[0] = getR(args[1]);
+            loopArgs[1] = getR(args[2]);
+            loopArgs[2] = getR(args[3]);
             double i;
             int loopCount = 0;
-            if((loopArgs[1] - loopArgs[1]) > loopArgs[2] * 100 || loopArgs[1] < loopArgs[0])
-                return NULLVAL;
             if(tree.op == op_sum) {
                 out = newValNum(0, 0, 0);
                 tempArgs[0] = newValNum(0, 0, 0);
                 for(i = loopArgs[0];i <= loopArgs[1];i += loopArgs[2]) {
                     tempArgs[0].r = i;
-                    Value current = runAnonymousFunction(one, tempArgs);
+                    tempArgs[1].r = loopCount;
+                    Value current = runAnonymousFunction(args[0], tempArgs);
                     Value new = valAdd(out, current);
                     freeValue(out);
                     freeValue(current);
+                    if(globalError) { freeValue(new);goto ret; }
                     out = new;
                     loopCount++;
-                    if(loopCount > 100000) { error("infinite loop detected");return NULLVAL; }
+                    if(loopCount > 100000) { error("infinite loop detected");goto ret; }
                 }
             }
             if(tree.op == op_product) {
@@ -1145,150 +1042,117 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 tempArgs[0] = newValNum(0, 0, 0);
                 for(i = loopArgs[0]; i <= loopArgs[1];i += loopArgs[2]) {
                     tempArgs[0].r = i;
-                    Value current = runAnonymousFunction(one, tempArgs);
+                    tempArgs[1].r = loopCount;
+                    Value current = runAnonymousFunction(args[0], tempArgs);
                     Value new = valMult(out, current);
                     freeValue(out);
                     freeValue(current);
+                    if(globalError) { freeValue(new);goto ret; }
                     out = new;
                     loopCount++;
-                    if(loopCount > 100000) { error("infinite loop detected");return NULLVAL; }
+                    if(loopCount > 100000) { error("infinite loop detected");goto ret; }
                 }
             }
-            freeValue(one);
-            return out;
+            goto ret;
         }
         //Matrix functions
         if(tree.op < 107) {
             if(tree.op == op_fill) {
-                int width = getR(two);
-                freeValue(two);
+                int width = getR(args[1]);
                 int height = 1;
-                if(tree.argCount > 2) {
-                    Value three = computeTree(tree.branch[2], args, argLen, localVars);
-                    height = getR(three);
-                    freeValue(three);
-                }
+                if(tree.argCount > 2) height = getR(args[2]);
                 if(width * height >= 0x7FFF || width * height < 0) {
                     if(width * height > 0) error("vector size too large");
                     else error("vector size cannot be negative");
-                    freeValue(one);
-                    return NULLVAL;
+                    goto ret;
                 }
-                int i, j;
-                Value out;
+                out;
                 out.type = value_vec;
                 out.vec = newVec(width, height);
-                if(one.type == value_func) {
+                if(args[0].type == value_func) {
                     Value funcArgs[3];
                     funcArgs[0] = NULLVAL;
                     funcArgs[1] = NULLVAL;
                     funcArgs[2] = NULLVAL;
-                    for(j = 0;j < height;j++) for(i = 0;i < width;i++) {
+                    for(int j = 0;j < height;j++) for(int i = 0;i < width;i++) {
                         funcArgs[0].r = i;
                         funcArgs[1].r = j;
                         funcArgs[2].r = i + j * width;
-                        Value cell = runAnonymousFunction(one, funcArgs);
+                        Value cell = runAnonymousFunction(args[0], funcArgs);
                         out.vec.val[i + j * width] = getNum(cell);
                         freeValue(cell);
-                        if(globalError) return NULLVAL;
+                        if(globalError) goto ret;
                     }
                 }
-                if(one.type == value_vec || one.type == value_num) {
-                    for(j = 0;j < height;j++) for(i = 0;i < width;i++) {
-                        out.vec.val[i + j * width] = getNum(one);
+                if(args[0].type == value_vec || args[0].type == value_num) {
+                    Number num = getNum(args[0]);
+                    for(int j = 0;j < height;j++) for(int i = 0;i < width;i++) {
+                        out.vec.val[i + j * width] = num;
                     }
                 }
-                freeValue(one);
-                return out;
             }
-            if(tree.op == op_map) {
-                if(one.type == value_num) {
-                    one = newValMatScalar(value_vec, one.num);
+            else if(tree.op == op_map) {
+                if(args[0].type == value_num) {
+                    args[0] = newValMatScalar(value_vec, args[0].num);
                 }
-                if(two.type != value_func) {
-                    error("second argument of map must be a function");
-                    freeValue(one);
-                    freeValue(two);
-                    return NULLVAL;
-                }
-                Value out;
                 out.type = value_vec;
-                out.vec = newVec(one.vec.width, one.vec.height);
+                out.vec = newVec(args[0].vec.width, args[0].vec.height);
                 Value funcArgs[5];
                 funcArgs[0] = NULLVAL;
                 funcArgs[1] = NULLVAL;
                 funcArgs[2] = NULLVAL;
                 funcArgs[3] = NULLVAL;
-                funcArgs[4] = one;
+                funcArgs[4] = args[0];
                 int i, j;
-                for(j = 0;j < one.vec.height;j++) for(i = 0;i < one.vec.width;i++) {
-                    funcArgs[0].num = one.vec.val[i + j * one.vec.width];
-                    funcArgs[1].r = i;
-                    funcArgs[2].r = j;
-                    funcArgs[3].r = i + j * one.vec.width;
-                    Value cell = runAnonymousFunction(two, funcArgs);
-                    out.vec.val[i + j * one.vec.width] = getNum(cell);
+                for(int i = 0;i < args[0].vec.total;i++) {
+                    funcArgs[0].num = args[0].vec.val[i];
+                    funcArgs[1].r = i % args[0].vec.width;
+                    funcArgs[2].r = i / args[0].vec.width;
+                    funcArgs[3].r = i;
+                    Value cell = runAnonymousFunction(args[1], funcArgs);
+                    out.vec.val[i] = getNum(cell);
                     freeValue(cell);
                 }
-                freeValue(one);
-                freeValue(two);
-                return out;
             }
-            if(tree.op == op_det) {
-                if(one.type == value_num) {
-                    one = newValMatScalar(value_vec, one.num);
+            else if(tree.op == op_det) {
+                if(args[0].type == value_num) {
+                    args[0] = newValMatScalar(value_vec, args[0].num);
                 }
-                if(one.type == value_vec) {
-                    if(one.vec.width != one.vec.height) {
-                        freeValue(one);
-                        error("Cannot calculate determinant of non-square matrix", NULL);
-                        return NULLVAL;
-                    }
-                    Value out;
-                    out.type = value_num;
-                    out.num = determinant(one.vec);
-                    freeValue(one);
-                    return out;
+                if(args[0].vec.width != args[0].vec.height) {
+                    error("Cannot calculate determinant of non-square matrix", NULL);
+                    goto ret;
                 }
+                out.num = determinant(args[0].vec);
             }
-            if(tree.op == op_transpose) {
-                if(one.type == value_num) one = newValMatScalar(value_vec, one.num);
-                Value out;
+            else if(tree.op == op_transpose) {
+                if(args[0].type == value_num) args[0] = newValMatScalar(value_vec, args[0].num);
                 out.type = value_vec;
-                out.vec = transpose(one.vec);
-                freeValue(one);
-                return out;
+                out.vec = transpose(args[0].vec);
             }
-            if(tree.op == op_mat_mult) {
-                if(one.type == value_num) one = newValMatScalar(value_vec, one.num);
-                if(two.type == value_num) two = newValMatScalar(value_vec, two.num);
-                if(one.vec.width != two.vec.height) {
-                    error("Matrix size error in mat_mult", NULL);
-                    freeValue(one);
-                    freeValue(two);
-                    return NULLVAL;
+            else if(tree.op == op_mat_mult) {
+                if(args[0].type == value_num) args[0] = newValMatScalar(value_vec, args[0].num);
+                if(args[1].type == value_num) args[1] = newValMatScalar(value_vec, args[1].num);
+                if(args[0].vec.width != args[1].vec.height) {
+                    error("matrix size error in mat_mult", NULL);
+                    goto ret;
                 }
-                Value out;
                 out.type = value_vec;
-                out.vec = matMult(one.vec, two.vec);
-                freeValue(one);
-                freeValue(two);
-                return out;
+                out.vec = matMult(args[0].vec, args[1].vec);
             }
-            if(tree.op == op_mat_inv) {
-                if(one.type == value_num) one = newValMatScalar(value_vec, one.num);
-                if(one.vec.width != one.vec.height) {
-                    freeValue(one);
+            else if(tree.op == op_mat_inv) {
+                if(args[0].type == value_num) args[0] = newValMatScalar(value_vec, args[0].num);
+                if(args[0].vec.width != args[0].vec.height) {
                     error("cannot take inverse of non-square matrix");
-                    return NULLVAL;
+                    goto ret;
                 }
-                Value out;
                 out.type = value_vec;
-                out.vec = matInv(one.vec);
-                freeValue(one);
-                return out;
+                out.vec = matInv(args[0].vec);
             }
+            goto ret;
         }
+    ret:
+        for(int i = 0;i < tree.argCount;i++) freeValue(args[i]);
+        return out;
     }
     if(tree.optype == optype_argument) {
         if(tree.op >= argLen) error("argument error", NULL);

@@ -191,9 +191,9 @@ typedef struct Function {
  * @param name Name of the function
  */
 struct stdFunction {
-    const int argCount;
     const int nameLen;
     const char* name;
+    const unsigned char inputs[5];
 };
 /**
  * Stores information about an optionally included function
