@@ -13,6 +13,7 @@
 #if defined __WIN32 || defined _WIN64 || defined _WIN32
 #define USE_CONIO_H
 #endif
+char* currentInput=NULL;
 #pragma region Command Line Arguments
 double useColors = 1;
 double rawMode = 0;
@@ -56,6 +57,7 @@ void showUsage(char** argv) {
 }
 #pragma endregion
 void CLI_cleanup() {
+    free(currentInput);
     cleanup();
     if(useColors) printf("\b\b\33[34;1m-quit\33[0m\n");
     else printf("\b\b-quit\n");
@@ -238,9 +240,9 @@ void disableUnixRawRead() {
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 }
 void enableUnixRawRead() {
-    atexit(disableUnixRawRead);
     struct termios raw;
     tcgetattr(STDIN_FILENO, &orig_termios);
+    atexit(disableUnixRawRead);
     raw = orig_termios;
     raw.c_lflag &= ~(ECHO | ICANON);
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
@@ -295,6 +297,7 @@ void printInput(char* string, int cursorPos) {
 char* readLine(bool erasePrevious) {
     if(rawMode) return readLineRaw();
     char* input = calloc(11, 1);
+    currentInput=input;
     if(input == NULL) { error(mallocError);return NULL; }
     int strLenAllocated = 10;
     int strLen = 0;
@@ -1015,6 +1018,7 @@ int main(int argc, char** argv) {
         if(input == NULL) break;
         globalError = false;
         runLine(input);
+        currentInput=NULL;
         free(input);
     }
     cleanup();
