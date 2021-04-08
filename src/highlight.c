@@ -463,6 +463,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
             memset(out + i, hl_localvar, isEqual);
             out[i + isEqual] = hl_command;
             memcpy(name, eq + i, isEqual);
+            lowerCase(name);
             i += isEqual + 1;
             highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
             argListAppend(&localVarCopy, name, &localVarSize);
@@ -517,7 +518,7 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
         }
         else {
             //Highlight as an expression
-            highlightSyntax(eq + i, out + i, args, localVars, 10, false);
+            highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
         }
         //Highlight rest of the statement
         if(isCodeBlock) {
