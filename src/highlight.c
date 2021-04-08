@@ -242,7 +242,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                         if(ch == '<') endType = '>';
                         newEnd = findNext(eq, newEnd, endType);
                         if(newEnd == -1) {
-                            newEnd = strlen(eq) - 1;
+                            newEnd = strlen(eq);
                             break;
                         }
                     }
