@@ -223,12 +223,13 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             out[eqPos] = hl_operator;
             out[eqPos + 1] = hl_operator;
             ignoreError = true;
-            char** args = parseArgumentList(eq + start);
+            char** newArgs = parseArgumentList(eq + start);
             ignoreError = false;
             if(globalError) {
-                args = NULL;
+                newArgs = NULL;
                 globalError = false;
             }
+            char** mergedArgs = mergeArgList(args, newArgs);
             if(type == sec_anonymousFunction) {
                 //Find the acutal end of the statement
                 int newEnd = eqPos + 2;
@@ -251,7 +252,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                 }
                 char endChar = eq[newEnd];
                 eq[newEnd] = 0;
-                highlightSyntax(eq + eqPos + 2, out + eqPos + 2, args, NULL, 10, false);
+                highlightSyntax(eq + eqPos + 2, out + eqPos + 2, mergedArgs, NULL, 10, false);
                 eq[newEnd] = endChar;
                 end = newEnd - 1;
             }
@@ -267,10 +268,11 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                     eq[end] = 0;
                 }
                 else out[startBracket] = hl_error;
-                highlightCodeBlock(eq + startBracket + 1, out + startBracket + 1, args, NULL);
+                highlightCodeBlock(eq + startBracket + 1, out + startBracket + 1, mergedArgs, NULL);
                 if(isEndBracket) eq[end] = '}';
             }
-            freeArgList(args);
+            freeArgList(newArgs);
+            free(mergedArgs);
         }
         start = end + 1;
         if(eq[end] == 0) break;
