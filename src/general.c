@@ -101,23 +101,15 @@ int findNext(const char* str, int start, char find) {
             brackets[bracket] = ch;
             bracket++;
         }
-        if(ch == ')') {
+        if(ch == ')' || ch == ']' || ch == '}') {
+            char oppoChar = ch == ')' ? '(' : (ch == ']' ? '[' : '{');
             int j = bracket - 1;
-            for(;j > 0;j--) if(brackets[j] == '(') break;
-            if(j == 0 && brackets[0] != '(') bracket = j + 1;
-            else bracket = j;
-        }
-        if(ch == ']') {
-            int j = bracket - 1;
-            for(;j > 0;j--) if(brackets[j] == '[') break;
-            if(j == 0 && brackets[0] != '[') bracket = j + 1;
-            else bracket = j;
-        }
-        if(ch == '}') {
-            int j = bracket - 1;
-            for(;j > 0;j--) if(brackets[j] == '{') break;
-            if(j == 0 && brackets[0] != '{') bracket = j + 1;
-            else bracket = j;
+            for(;j > 0;j--) if(brackets[j] == oppoChar) break;
+            if(j == 0 && brackets[0] != oppoChar) bracket = 1;
+            else {
+                bracket = j;
+                if(bracket < 0) bracket = 0;
+            }
         }
         if(ch == '>' && i != 0 && str[i - 1] != '=') {
             if(bracket != 0 && brackets[bracket - 1] == '<') bracket--;
