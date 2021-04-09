@@ -452,6 +452,7 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
         if(eqPos != 0) {
             char* name = calloc(eqPos + 1, 1);
             memcpy(name, section, eqPos);
+            lowerCase(name);
             if(*localVarSize == (*localVarCount) - 1) {
                 *localVars = recalloc(*localVars, localVarSize, 5, sizeof(char*));
             }
