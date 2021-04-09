@@ -831,11 +831,11 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 if(tree.op == op_ceil) roundType = &ceil;
                 out = args[0];
                 args[0] = NULLVAL;
-                if(args[0].type == value_num) {
+                if(out.type == value_num) {
                     out.r = (*roundType)(out.r);
                     out.i = (*roundType)(out.i);
                 }
-                if(args[0].type == value_vec) {
+                if(out.type == value_vec) {
                     for(int i = 0;i < out.vec.total;i++) {
                         out.vec.val[i].r = (*roundType)(out.vec.val[i].r);
                         out.vec.val[i].i = (*roundType)(out.vec.val[i].i);
