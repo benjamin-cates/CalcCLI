@@ -226,6 +226,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             char** newArgs = parseArgumentList(eq + start);
             ignoreError = false;
             if(globalError) {
+                freeArgList(newArgs);
                 newArgs = NULL;
                 globalError = false;
             }

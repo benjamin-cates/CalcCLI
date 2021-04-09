@@ -640,7 +640,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 x = getR(xVal);
                 freeValue(xVal);
                 if(x < 0 || y < 0) return NULLVAL;
-                Value vec;
+                Value vec = NULLVAL;
                 bool freeVec = false;
                 if(tree.branch[0].optype == optype_builtin && tree.branch[0].op == op_vector) {
                     int width = tree.branch[0].argWidth;
@@ -676,7 +676,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     vec = history[i];
                 }
                 else if(tree.branch[0].optype == optype_builtin && tree.branch[0].op == op_ans) {
-                    vec = history[historyCount - 1];
+                    if(historyCount!=0) vec = history[historyCount - 1];
                 }
                 else {
                     freeVec = true;
@@ -701,8 +701,8 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                         if(x >= width || y >= vec.vec.height) return NULLVAL;
                     return out;
                 }
-                return NULLVAL;
                 if(freeVec) freeValue(vec);
+                return NULLVAL;
             }
         }
         //Prevent name conflict
@@ -932,7 +932,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 Value oneSubC = valAdd(newValNum(1, 0, 0), negativeC);
                 Value cTimesTwo = valMult(c, args[1]);
                 Value oneSubCTimesTwo = valMult(oneSubC, args[0]);
-                Value out = valAdd(cTimesTwo, oneSubCTimesTwo);
+                out = valAdd(cTimesTwo, oneSubCTimesTwo);
                 freeValue(c);
                 freeValue(negativeC);
                 freeValue(oneSubC);

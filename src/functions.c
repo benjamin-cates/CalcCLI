@@ -564,6 +564,7 @@ const FunctionReturn return_null = { 0,0 };
 const FunctionReturn return_break = { 2,0 };
 const FunctionReturn return_continue = { 3,0 };
 FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int* localVarCount, int* localVarSize) {
+    int localVarCountPrev = *localVarCount;
     if(func.localVarCount != 0) *localVars = recalloc(*localVars, localVarSize, func.localVarCount, sizeof(Value));
     bool prevIf = false;
     FunctionReturn toReturn = return_null;
@@ -661,6 +662,9 @@ FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Valu
             toReturn = return_continue;
             break;
         }
+    }
+    for(int i = 0;i < func.localVarCount;i++) {
+        freeValue((*localVars)[localVarCountPrev + i]);
     }
     //Free localvariables
     return toReturn;

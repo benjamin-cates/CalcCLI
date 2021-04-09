@@ -365,7 +365,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         if(type == sec_square) {
             section[sectionLen - 1] = '\0';
             ops[i] = generateTree(section + 1, argNames, localVars, useUnits ? base : 10);
-            if(globalError) goto error;
+            if(globalError) { freeTree(ops[i]);goto error; }
         }
         if(type == sec_squareWithBase) {
             //Find underscore
@@ -487,13 +487,13 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             ops[i] = NULLOPERATION;
             ops[i].optype = optype_anon;
             ops[i].argNames = argList;
-            ops[i].code = malloc(sizeof(CodeBlock));
             Tree func = generateTree(section + eqPos + 2, argListMerged, NULL, useUnits ? base : 0);
             free(argListMerged);
             if(globalError) {
                 freeArgList(argList);
                 goto error;
             }
+            ops[i].code = malloc(sizeof(CodeBlock));
             *(ops[i].code) = codeBlockFromTree(func);
             ops[i].argCount = argListLen(argList);
             ops[i].argWidth = argListLen(argNames);
@@ -544,6 +544,8 @@ error:
             //Check for missing argument
             if(j == 0 || j == sectionCount - 1) {
                 error("missing argument in operation", NULL);
+                for(int x = j + 1;x < sectionCount;x++) ops[x] = ops[x + offset];
+                for(int x = 0;x < sectionCount;x++) freeTree(ops[x]);
                 return NULLOPERATION;
             }
             //Combine previous and next, set offset
@@ -569,6 +571,11 @@ error:
             }
             ops[j] = ops[j + offset];
         }
+    }
+    if(sectionCount != 1) {
+        error("internal argument compile (%d)", sectionCount);
+        for(int i = 0;i < sectionCount;i++) freeTree(ops[i]);
+        return NULLOPERATION;
     }
     return ops[0];
 }
