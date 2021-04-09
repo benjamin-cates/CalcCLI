@@ -464,11 +464,9 @@ void test_singleRandomParse() {
     for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
     test[9] = '\0';
     //Test parsing and computing
-    Value val = calculate(test, 0);
-    freeValue(val);
-    globalError = false;
-    //Test highlighting
-    free(highlightLine(test));
+    inputClean(test);
+    Tree tree = generateTree(test, NULL, NULL, 0);
+    freeTree(tree);
     globalError = false;
     testExpectsErrors = false;
 }
