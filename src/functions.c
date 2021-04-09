@@ -526,13 +526,13 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
             continue;
         }
         if(startsWith(section, "break")) {
-            if(semicolons[i + 1] != 5) error("unexpected '%s' after break", section + 5);
+            if(semicolons[i + 1] != semicolons[i] + 6) error("unexpected '%s' after break", section + 5);
             if(i != semicolonId - 1) error("illegal statements after break");
             if(globalError) break;
             list[i].id = action_break;
         }
         else if(startsWith(section, "continue")) {
-            if(semicolons[i + 1] != 8) error("unexpected '%s' after continue", section + 8);
+            if(semicolons[i + 1] != semicolons[i] + 9) error("unexpected '%s' after continue", section + 8);
             if(i != semicolonId - 1) error("illegal statements after continue");
             if(globalError) break;
             list[i].id = action_continue;
