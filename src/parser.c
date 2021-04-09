@@ -89,15 +89,20 @@ int nextSection(const char* eq, int start, int* end, int base) {
         //Parse the base
         int maxChar = 'A' + base - 10;
         if(eq[start] == '0') {
-            int next = start;
-            while(eq[++next] == ' ');
+            int next = start + 1;
+            while(eq[next] == ' ') next++;
             char baseChar = eq[next];
             if(baseChar >= 'A' && baseChar <= 'Z') baseChar -= 32;
             if(baseChar == 'x' || baseChar == 'b' || baseChar == 'd' || baseChar == 'o' || baseChar == 't') {
                 if(baseChar == 'x') maxChar = 'F' + 1;
                 else maxChar = 'A';
-                while(eq[++next] == ' ');
+                next++;
+                while(eq[next] == ' ') next++;
                 start = next;
+                if(eq[start] == 0) {
+                    *end = start;
+                    return sec_number;
+                }
             }
         }
         *end = start;
