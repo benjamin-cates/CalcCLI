@@ -583,10 +583,11 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 for(i = 0;i < vec.total;i++) {
                     Value cell = computeTree(tree.branch[i], args, argLen, localVars);
                     if(cell.type == value_num) vec.val[i] = cell.num;
-                    if(cell.type == value_vec) {
+                    else if(cell.type == value_vec) {
                         vec.val[i] = cell.vec.val[0];
-                        freeValue(cell);
                     }
+                    else vec.val[i]=NULLNUM;
+                    freeValue(cell);
                 }
                 Value out;
                 out.type = value_vec;
