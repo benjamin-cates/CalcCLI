@@ -291,7 +291,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                 error("variable '%s' not found", section);
                 goto error;
             }
-            if(op.optype == 0 && stdfunctions[op.op].inputs[0] & 0b11111110 != 0) {
+            if(op.optype == 0 && (stdfunctions[op.op].inputs[0] & 1) == 0 && stdfunctions[op.op].inputs[0] != 0) {
                 error("no arguments for '%s'", section);
                 goto error;
             }
@@ -333,7 +333,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
                     error("too many arguments for '%s'", section);
                     goto error;
                 }
-                if(builtinArgCount > argCount && stdfunctions[op.op].inputs[argCount - 1] & 1 != 1) {
+                if(builtinArgCount > argCount && (stdfunctions[op.op].inputs[argCount] & 1) != 1) {
                     error("too few arguments for '%s'", section);
                     goto error;
                 }
