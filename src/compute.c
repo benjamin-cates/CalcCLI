@@ -586,7 +586,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     else if(cell.type == value_vec) {
                         vec.val[i] = cell.vec.val[0];
                     }
-                    else vec.val[i]=NULLNUM;
+                    else vec.val[i] = NULLNUM;
                     freeValue(cell);
                 }
                 Value out;
@@ -622,10 +622,12 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                         if(tree.op == op_height) return newValNum(vec.vec.height, 0, 0);
                         if(tree.op == op_length) return newValNum(vec.vec.total, 0, 0);
                     }
+                    if(freeVec) freeValue(vec);
                 }
                 if(tree.op == op_width) return newValNum(width, 0, 0);
                 if(tree.op == op_height) return newValNum(height, 0, 0);
                 if(tree.op == op_length) return newValNum(width * height, 0, 0);
+                if(freeVec) freeValue(vec);
             }
             if(tree.op == op_ge) {
                 int x = 0, y = 0;
@@ -700,6 +702,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     return out;
                 }
                 return NULLVAL;
+                if(freeVec) freeValue(vec);
             }
         }
         //Prevent name conflict
