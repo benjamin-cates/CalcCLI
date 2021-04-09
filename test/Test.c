@@ -49,8 +49,61 @@ void error(const char* format, ...) {
     printf("\n");
 };
 #pragma region Random Generation
-char* randomEquation(int length, int base, bool isSquare) {
-    if(length == 0) {
+char* randomCodeBlock(int nest, char** args, char** localvars, bool isLoop);
+char* randomArgList(bool allowNoParenthesis) {
+    char* out = calloc(20, 1);
+    bool useParenthesis = rand() % 2;
+    if(useParenthesis || (!allowNoParenthesis)) {
+        const char* acceptableChars = "0123456789..._____,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        int acceptableCharsLen = strlen(acceptableChars);
+        out[0] = '(';
+        //Generate each character
+        for(int i = 1;i < 18;i++) {
+            out[i] = acceptableChars[rand() % acceptableCharsLen];
+            //make sure arguments do not start with 0-9 or .
+            if(i == 1) out[1] = 'a';
+            else if(out[i - 1] == ',') if((out[i] >= '0' && out[i] <= '9') || out[i] == '.' || out[i] == ',') out[i] = acceptableChars[(rand() % 26) + 99];
+        }
+        //Confirm there isn't an empty arg at the end
+        if(out[17] == ',') out[17] = 'a';
+        //Add closing bracket
+        out[18] = ')';
+    }
+    else {
+        const char* acceptableChars = "0123456789...______abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+        int acceptableCharsLen = strlen(acceptableChars);
+        for(int i = 0;i < 10;i++)
+            out[i] = acceptableChars[rand() % acceptableCharsLen];
+        if((out[0] >= '0' && out[0] <= '9') || out[0] == '.') out[0] = 'a';
+    }
+    return out;
+}
+char* randomExpression(int nest, char** args, char** localvars, int base, bool useUnits) {
+    //Numbers, args, units, or localvars
+    if(nest == 0) {
+        //Units
+        if(useUnits && rand() % 3 == 0) {
+            int id = rand() % unitCount;
+            char prefix = 0;
+            if(unitList[id].multiplier < 0) prefix = metricNums[rand() % metricCount];
+            char* out = calloc(strlen(unitList[id].name) + 2, 1);
+            if(prefix != 0) out[0] = prefix;
+            strcat(out, unitList[id].name);
+            return out;
+        }
+        //Arguments and local variables
+        if((args || localvars) && rand() % 3 == 0) {
+            char** list;
+            if(args && localvars) list = (rand() % 2) ? args : localvars;
+            else if(args) list = args;
+            else list = localvars;
+            int listLen = argListLen(list);
+            int id = rand() % listLen;
+            char* out = calloc(strlen(list[id]) + 1, 1);
+            strcpy(out, list[id]);
+            if(useUnits) lowerCase(out);
+            return out;
+        }
         //Return number
         const char digits[] = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
         char* out = calloc(11, 1);
@@ -65,10 +118,9 @@ char* randomEquation(int length, int base, bool isSquare) {
         return out;
     }
     int type = rand() % 6;
-    //Parenthesis
     if(type == 0) {
         //Parenthesis with same length
-        char* inside = randomEquation(length, base, isSquare);
+        char* inside = randomExpression(nest, args, localvars, base, useUnits);
         char* out = calloc(strlen(inside) + 3, 1);
         out[0] = '(';
         memcpy(out + 1, inside, strlen(inside));
@@ -84,52 +136,38 @@ char* randomEquation(int length, int base, bool isSquare) {
         if(argCount == 0) {
             char* out = calloc(stdfunctions[id].nameLen + 1, 1);
             memcpy(out, stdfunctions[id].name, stdfunctions[id].nameLen);
+            if(useUnits) lowerCase(out);
             return out;
         }
-        char* args[argCount];
+        char* arguments[argCount];
         int size = stdfunctions[id].nameLen + 3;
         //Generate arguments
         for(int i = 0;i < argCount;i++) {
-            args[i] = randomEquation(length - 1, base, isSquare);
-            size += strlen(args[i]) + 1;
+            arguments[i] = randomExpression(nest - 1, args, localvars, base, useUnits);
+            size += strlen(arguments[i]) + 1;
         }
         //Generate out
         char* out = calloc(size, 1);
         memcpy(out, stdfunctions[id].name, stdfunctions[id].nameLen);
+        if(useUnits) lowerCase(out);
         out[strlen(out)] = '(';
         for(int i = 0;i < argCount;i++) {
-            strcat(out, args[i]);
-            free(args[i]);
+            strcat(out, arguments[i]);
+            free(arguments[i]);
             if(i + 1 != argCount) strcat(out, ",");
         }
         strcat(out, ")");
         return out;
     }
-    //Units
-    if(type == 2) {
-        //Do an operator if it is not inside a square bracket
-        if(!isSquare) {
-            type = 3;
-        }
-        else {
-            int id = rand() % unitCount;
-            char prefix = 0;
-            if(unitList[id].multiplier < 0) prefix = metricNums[rand() % metricCount];
-            char* out = calloc(strlen(unitList[id].name) + 2, 1);
-            if(prefix != 0) out[0] = prefix;
-            strcat(out, unitList[id].name);
-            return out;
-        }
-    }
     //Operators
-    if(type == 3) {
+    if(type == 2) {
         //Operator
         const char* operators[] = { "+","-","*","/","^","%","=","==","!=",">","<",">=","<=",
         "+-","--","*-","/-","^-","%-","=-","==-","!=-",">-","<-",">=-","<=-" };
         int op = rand() % (sizeof(operators) / sizeof(char*));
         bool useParenthesis = (op % 13 >= 9 && op % 13 <= 12);
-        char* p1 = randomEquation(length - 1, base, isSquare);
-        char* p2 = randomEquation(length - 1, base, isSquare);
+        char* p1 = randomExpression(nest - 1, args, localvars, base, useUnits);
+        char* p2 = randomExpression(nest - 1, args, localvars, base, useUnits);
         char* out = calloc(strlen(p1) + strlen(operators[op]) + strlen(p2) + 1 + useParenthesis * 2, 1);
         if(useParenthesis) strcat(out, "(");
         strcat(out, p1);
@@ -140,14 +178,14 @@ char* randomEquation(int length, int base, bool isSquare) {
         free(p2);
         return out;
     }
-    //Square Brackets
-    if(type == 4) {
+    //Square brackets
+    if(type == 3) {
         //Unit bracket
         char* baseStr = NULL;
         int newBase = base;
         //Generate base
         if(rand() % 3 == 1) {
-            baseStr = randomEquation(1, 10, false);
+            baseStr = randomExpression(1, NULL, NULL, 10, false);
             ignoreError++;
             Value base = calculate(baseStr, 0);
             ignoreError--;
@@ -162,7 +200,7 @@ char* randomEquation(int length, int base, bool isSquare) {
             }
             freeValue(base);
         }
-        char* inside = randomEquation(length - 1, newBase, true);
+        char* inside = randomExpression(nest - 1, args, localvars, newBase, true);
         //Get length
         int len = strlen(inside) + 6;
         if(baseStr != NULL) len += strlen(baseStr);
@@ -186,13 +224,13 @@ char* randomEquation(int length, int base, bool isSquare) {
         return out;
     }
     //Vectors
-    if(type == 5) {
+    if(type == 4) {
         int count = rand() % 5;
         char* cells[count];
         int semicolonsFlags = rand();
         int len = 3;
         for(int i = 0;i < count;i++) {
-            cells[i] = randomEquation(length - 1, base, isSquare);
+            cells[i] = randomExpression(nest - 1, args, localvars, base, useUnits);
             len += strlen(cells[i]) + 1;
         }
         char* out = calloc(len, 1);
@@ -205,6 +243,109 @@ char* randomEquation(int length, int base, bool isSquare) {
         strcat(out, ">");
         return out;
     }
+    //Anonymous functions
+    if(type == 5) {
+        bool isCodeBlock = rand() % 2;
+        char* argList = randomArgList(true);
+        char** parsedList = parseArgumentList(argList);
+        char** newArgs = mergeArgList(args, parsedList);
+        char* expression;
+        if(isCodeBlock) {
+            expression = randomCodeBlock(nest - 1, newArgs, NULL, false);
+        }
+        else {
+            expression = randomExpression(nest - 1, newArgs, NULL, 10, false);
+        }
+        char* out = calloc(strlen(argList) + 4 + strlen(expression) + 1, 1);
+        strcat(out, argList);
+        strcat(out, "=>");
+        if(isCodeBlock) strcat(out, "{");
+        strcat(out, expression);
+        free(expression);
+        if(isCodeBlock) strcat(out, "}");
+        free(argList);
+        freeArgList(parsedList);
+        free(newArgs);
+        return out;
+    }
+}
+char* randomCodeBlock(int nest, char** args, char** localvars, bool isLoop) {
+    char** localvarCopy = argListCopy(localvars);
+    int localvarsize = argListLen(localvarCopy);
+    int outSize = 100;
+    int outLen = 0;
+    char* out = calloc(100, 1);
+    for(int i = 0;i < 3;i++) {
+        int type = rand() % 5;
+        char line[1000];
+        memset(line, 0, 1000);
+        //Local variables
+        if(type == 0) {
+            //Generate variable name
+            char* varName = calloc(6, 1);
+            const char* acceptableChars = "0123456789...______abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+            varName[0] = acceptableChars[(rand() % 52) + 19];
+            for(int i = 1;i < 5;i++) varName[i] = acceptableChars[rand() % strlen(acceptableChars)];
+            char* expression = randomExpression(1, args, localvarCopy, 10, false);
+            //Write the line
+            strcat(line, varName);
+            strcat(line, "=");
+            strcat(line, expression);
+            free(expression);
+            //Append variable name
+            argListAppend(&localvarCopy, varName, &localvarsize);
+        }
+        //Make sure there are no sub blocks when nest is 0
+        if(nest == 0 && (type == 1 || type == 2)) type = 3;
+        //If and while
+        if(type == 1 || type == 2) {
+            if(type == 1) strcpy(line, "if(");
+            else strcpy(line, "while(");
+            //Write conditional
+            char* expression = randomExpression(1, args, localvarCopy, 10, false);
+            strcat(line, expression);
+            free(expression);
+            strcat(line, ")");
+            //Write code block
+            strcat(line, "{");
+            char* code = randomCodeBlock(nest - 1, args, localvarCopy, type == 2 ? true : isLoop);
+            strcat(line, code);
+            free(code);
+            strcat(line, "}");
+        }
+        //Expression
+        if(type == 3) {
+            char* expression = randomExpression(1, args, localvarCopy, 10, false);
+            //Check if line starts with if, while, break...
+            if(startsWith(expression, "if") || startsWith(expression, "while") || startsWith(expression, "else") || startsWith(expression, "break") || startsWith(expression, "continue")) {
+                type = 4;
+            }
+            else strcpy(line, expression);
+            free(expression);
+        }
+        //break, continue, and return
+        if(type == 4) {
+            if(isLoop && rand() % 2) {
+                bool isBreak = rand() % 2;
+                if(isBreak) strcpy(line, "break");
+                else strcpy(line, "continue");
+            }
+            else {
+                strcpy(line, "return");
+                char* expression = randomExpression(1, args, localvars, 10, false);
+                strcat(line, expression);
+                free(expression);
+            }
+        }
+        strcat(line, ";");
+        //If length of the line will not fit in the buffer, expand it
+        if(strlen(line) + outLen + 4 > outSize) out = recalloc(out, &outSize, strlen(line) + 5, 1);
+        strcat(out, line);
+        outLen += strlen(line);
+        if(type == 4) break;
+    }
+    freeArgList(localvarCopy);
+    return out;
 }
 #pragma endregion
 #pragma region Constants
@@ -473,7 +614,7 @@ void test_singleRandomParse() {
 void test_singleRandomExpressionHighlight() {
     //Generate a random expression and highlight it. Fail if any characters are red
     //Generate random expression
-    char* test = randomEquation(2, 10, false);
+    char* test = randomExpression(2, NULL, NULL, 10, false);
     //Color it
     char colors[strlen(test) + 1];
     memset(colors, 0, strlen(test) + 1);
@@ -482,13 +623,13 @@ void test_singleRandomExpressionHighlight() {
     for(int i = 0;i < strlen(test);i++) {
         //Test if coloring is an error
         if(colors[i] == 12 || colors[i] == 13 || colors[i] == 4 || colors[i] == 0) {
-            failedTest(testIndex, test, "%s error at position %d", syntaxTypes[colors[i]], i);
+            failedTest(testIndex, test, "%s error at position %d (%c)", syntaxTypes[colors[i]], i, test[i]);
         }
     }
     free(test);
 }
 void test_singleRandomCompute() {
-    char* test = randomEquation(3, 10, 0);
+    char* test = randomExpression(2, NULL, NULL, 10, false);
     currentTest = test;
     //Parse tree
     Tree tree = generateTree(test, NULL, NULL, 0);
