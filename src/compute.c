@@ -1062,9 +1062,9 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 int width = getR(args[1]);
                 int height = 1;
                 if(tree.argCount > 2) height = getR(args[2]);
-                if(width * height >= 0x7FFF || width * height < 0) {
+                if(width * height >= 0x7FFF || width * height < 1) {
                     if(width * height > 0) error("vector size too large");
-                    else error("vector size cannot be negative");
+                    else error("vector size cannot be negative or zero");
                     goto ret;
                 }
                 out;
