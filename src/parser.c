@@ -9,9 +9,12 @@ int isLocalVariableStatement(const char* eq) {
     while(eq[++i] != '\0') {
         char ch = eq[i];
         if(ch == '=') {
-            if(eq[i + 1] == '>') return 0;
             if(isFirstChar) return 0;
-            else return i;
+            int next = i + 1;
+            while(eq[next] == ' ') next++;
+            // => or == is not an asignment
+            if(eq[next] == '>' || eq[next] == '=') return 0;
+            return i;
         }
         if(ch == ' ' || ch == '\n') continue;
         bool isDigit = ch >= '0' && ch <= '9';
