@@ -555,7 +555,7 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
         return NULLCODE;
     }
     if(freeVariables) {
-        //free(*localVars);
+        free(*localVars);
         free(localVars);
     }
     return out;
