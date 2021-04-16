@@ -25,7 +25,7 @@ char* doubleToString(double num, double base) {
         return out;
     }
     //Allocate string
-    char* out = calloc(24, 1);
+    char* out = calloc(25, 1);
     if(out == NULL) { error(mallocError);return NULL; }
     int outPos = 0;
     //Negative numbers
@@ -67,19 +67,15 @@ char* doubleToString(double num, double base) {
     }
     //Append exponent suffix
     if(exp != 0) strcat(out, expString);
-
     return out;
 }
 char* toStringNumber(Number num, double base) {
     char* real = doubleToString(num.r, base);
-    if(real == NULL) real = "NULL";
     char* imag = doubleToString(num.i, base);
-    if(imag == NULL) imag = "NULL";
     char* unit = toStringUnit(num.u);
     int outLength = (num.u != 0 ? strlen(unit) + 2 : 0) + (num.i == 0 ? 0 : strlen(imag)) + strlen(real) + 3;
     char* out = calloc(outLength, 1);
     if(out == NULL) { error(mallocError);return NULL; }
-    memset(out, 0, outLength);
     if(num.r != 0 || num.i == 0) strcat(out, real);
     if(num.r != 0 && num.i > 0) strcat(out, "+");
     if(num.i != 0) {
