@@ -483,7 +483,7 @@ char* argListToString(char** argList) {
         totalLen += strlen(argList[i]) + 1;
     }
     if(i == 1) {
-        char* out = calloc(strlen(argList[0]), 1);
+        char* out = calloc(strlen(argList[0]) + 1, 1);
         if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argList[0]);
         return out;
