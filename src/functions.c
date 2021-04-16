@@ -254,6 +254,8 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
 #define vec 0b100
 #define func 0b1000
 #define arb 0b10000
+#define string 0b100000
+#define any 0b111110
     emptyFunction,
     function("i",{0}),
     function("neg",{num | vec,0}),
@@ -261,7 +263,7 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     function("mod",{num | vec,num | vec,0}),
     function("mult",{num | vec,num | vec,0}),
     function("div",{num | vec,num | vec,0}),
-    function("add",{num | vec,num | vec,0}),
+    function("add",{num | vec | string,num | vec | string,0}),
     function("sub",{num | vec,num | vec,0}),
     emptyFunction,
     emptyFunction,
@@ -307,12 +309,12 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     function("getr",{num | vec | func,0}),
     function("geti",{num | vec | func,0}),
     function("getu",{num | vec | func,0}),
-    function("equal",{num | vec,num | vec,0}),
-    function("not_equal",{num | vec,num | vec,0}),
-    function("lt",{num | vec,num | vec,0}),
-    function("gt",{num | vec,num | vec,0}),
-    function("lt_equal",{num | vec,num | vec,0}),
-    function("gt_equal",{num | vec,num | vec,0}),
+    function("equal",{num | vec | string,num | vec | string,0}),
+    function("not_equal",{num | vec | string,num | vec | string,0}),
+    function("lt",{num | vec | string,num | vec | string,0}),
+    function("gt",{num | vec | string,num | vec | string,0}),
+    function("lt_equal",{num | vec | string,num | vec | string,0}),
+    function("gt_equal",{num | vec | string,num | vec | string,0}),
     function("min",{num | vec,num | vec,0}),
     function("max",{num | vec,num | vec,0}),
     function("lerp",{num | vec,num | vec,num,0}),
@@ -344,7 +346,7 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     function("rand",{0}),
     emptyFunction,
     emptyFunction,
-    function("run",{func,0}),
+    function("run",{func | string,0}),
     function("sum",{func,num,num,num,0}),
     function("product",{func,num,num,num,0}),
     emptyFunction,
@@ -353,14 +355,27 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     emptyFunction,
     function("width",{vec | num,0}),
     function("height",{vec | num,0}),
-    function("length",{vec | num,0}),
-    function("ge",{vec | num,num,num | optional,0}),
+    function("length",{vec | num | string,0}),
+    function("ge",{vec | num | string,num,num | optional,0}),
     function("fill",{num | vec | func,num,num | optional,0}),
-    function("map",{vec,func,0}),
+    function("map",{vec | string,func,0}),
     function("det",{vec | num,0}),
     function("transpose",{vec | num,0}),
     function("mat_mult",{vec,vec,0}),
     function("mat_inv",{vec,0}),
+    emptyFunction,
+    emptyFunction,
+    emptyFunction,
+    emptyFunction,
+    function("string",{any,num | optional,0}),
+    function("eval",{string,num | optional,0}),
+    function("print",{any,0}),
+    function("error",{any,0}),
+    function("replace",{string,string,string,num | optional,0}),
+    function("indexof",{string,string,num | optional,0}),
+    function("substr",{string,num,num | optional,0}),
+    function("lowercase",{string,0}),
+    function("uppercase",{string,0}),
 #undef function
 #undef emptyFunction
 #undef optional
@@ -368,6 +383,8 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
 #undef vec
 #undef func
 #undef arb
+#undef string
+#undef any
 };
 void appendGlobalLocalVariable(char* name, Value value) {
     int place = 0;

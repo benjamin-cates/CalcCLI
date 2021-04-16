@@ -5,7 +5,7 @@
 //Number of optional functions
 #define includeFuncsLen 16
 //Number of immutable functions
-#define immutableFunctions 107
+#define immutableFunctions 120
 //Number of custom functions
 extern int numFunctions;
 //Array length of functions

@@ -404,6 +404,17 @@ Value valAdd(Value one, Value two) {
         if(freeType & 2) freeValue(two);
         return out;
     }
+    if(one.type == value_string) {
+        int len = strlen(one.string) + strlen(two.string) + 1;
+        Value out;
+        out.string = calloc(len, 1);
+        out.type = value_string;
+        strcpy(out.string, one.string);
+        strcat(out.string, two.string);
+        if(freeType & 1) freeValue(one);
+        if(freeType & 2) freeValue(two);
+        return out;
+    }
     return NULLVAL;
 }
 Value valNegate(Value one) {
@@ -561,6 +572,11 @@ double flattenVal(Value one) {
     return 0;
 }
 int valCompare(Value one, Value two) {
+    if(one.type == value_string) {
+        if(two.type == value_string) return strcmp(one.string, two.string);
+        else return 2;
+    }
+    else if(two.type == value_string) return 2;
     double oneAbs = flattenVal(one);
     double twoAbs = flattenVal(two);
     if(oneAbs < twoAbs) return -1;
@@ -622,7 +638,15 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                         if(tree.op == op_height) return newValNum(vec.vec.height, 0, 0);
                         if(tree.op == op_length) return newValNum(vec.vec.total, 0, 0);
                     }
+                    if(vec.type == value_string) {
+                        int out = 0;
+                        if(tree.op == op_length || tree.op == op_width) out = strlen(vec.string);
+                        if(tree.op == op_height) out = 1;
+                        if(freeVec) freeValue(vec);
+                        return newValNum(out, 0, 0);
+                    }
                     if(freeVec) freeValue(vec);
+                    return newValNum(1, 0, 0);
                 }
                 if(tree.op == op_width) return newValNum(width, 0, 0);
                 if(tree.op == op_height) return newValNum(height, 0, 0);
@@ -676,7 +700,7 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                     vec = history[i];
                 }
                 else if(tree.branch[0].optype == optype_builtin && tree.branch[0].op == op_ans) {
-                    if(historyCount!=0) vec = history[historyCount - 1];
+                    if(historyCount != 0) vec = history[historyCount - 1];
                 }
                 else {
                     freeVec = true;
@@ -701,6 +725,14 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                         if(x >= width || y >= vec.vec.height) return NULLVAL;
                     return out;
                 }
+                if(vec.type == value_string) {
+                    int out = 0;
+                    if(y != 0);
+                    else if(x<0 || x>strlen(vec.string));
+                    else out = vec.string[x];
+                    if(freeVec) freeValue(vec);
+                    return newValNum(out, 0, 0);
+                }
                 if(freeVec) freeValue(vec);
                 return NULLVAL;
             }
@@ -713,9 +745,13 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         memset(args, 0, sizeof(args));
         const unsigned char* acceptableArgs = stdfunctions[tree.op].inputs;
         for(int i = 0;i < tree.argCount;i++) {
-            const char* type[] = { "number","vector","anonymous function","arbitrary-precision number" };
+            const char* type[] = { "number","vector","anonymous function","arbitrary-precision number","string" };
             args[i] = computeTree(tree.branch[i], arguments, argLen, localVars);
             if(globalError) goto ret;
+            if(args[i].type<0 || args[i].type>value_string) {
+                error("Invalid error value in call to %s", stdfunctions[tree.op].name);
+                goto ret;
+            }
             if((acceptableArgs[i] & (2 << args[i].type)) == 0) {
                 if(tree.op == op_run && i != 0) continue;
                 error("Invalid %s in call to %s", type[args[i].type], stdfunctions[tree.op].name);
@@ -1008,6 +1044,26 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
         //Run, Sum, and Product
         if(tree.op < 93) {
             if(tree.op == op_run) {
+                if(args[0].type == value_string) {
+                    char name[strlen(args[0].string) + 1];
+                    strcpy(name, args[0].string);
+                    lowerCase(name);
+                    Tree op = findFunction(name, false, NULL, NULL);
+                    if(op.optype == optype_builtin) {
+                        //TODO: this unecessarily recomputes args[1], args[2]...
+                        Tree toCompute = NULLOPERATION;
+                        toCompute.op = op.op;
+                        toCompute.argCount = tree.argCount - 1;
+                        toCompute.branch = tree.branch + 1;
+                        out = computeTree(toCompute, arguments, argLen, localVars);
+                    }
+                    else if(op.optype == optype_custom) {
+                        if(customfunctions[op.op].argCount > tree.argCount - 1) error("not enough args in run function");
+                        else out = runFunction(customfunctions[op.op], args + 1);
+                    }
+                    else error("function '%s' not found", args[0].string);
+                    goto ret;
+                }
                 int argCount = tree.argCount - 1;
                 int requiredArgs = argListLen(args[0].argNames);
                 if(argCount < requiredArgs) {
@@ -1017,7 +1073,9 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 out = runAnonymousFunction(args[0], args + 1);
                 goto ret;
             }
-            Value tempArgs[2];
+            int argCount = argListLen(args[0].argNames);
+            if(argCount < 2) argCount = 2;
+            Value tempArgs[argCount];
             memset(tempArgs, 0, sizeof(tempArgs));
             double loopArgs[3];
             loopArgs[0] = getR(args[1]);
@@ -1074,10 +1132,10 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 out.type = value_vec;
                 out.vec = newVec(width, height);
                 if(args[0].type == value_func) {
-                    Value funcArgs[3];
-                    funcArgs[0] = NULLVAL;
-                    funcArgs[1] = NULLVAL;
-                    funcArgs[2] = NULLVAL;
+                    int argCount = argListLen(args[0].argNames);
+                    if(argCount < 3) argCount = 3;
+                    Value funcArgs[argCount];
+                    memset(funcArgs, 0, sizeof(funcArgs));
                     for(int j = 0;j < height;j++) for(int i = 0;i < width;i++) {
                         funcArgs[0].r = i;
                         funcArgs[1].r = j;
@@ -1099,8 +1157,10 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 if(args[0].type == value_num) {
                     args[0] = newValMatScalar(value_vec, args[0].num);
                 }
-                out.type = value_vec;
-                out.vec = newVec(args[0].vec.width, args[0].vec.height);
+                bool isString = args[0].type == value_string;
+                out.type = isString ? value_string : value_vec;
+                if(isString) out.string = calloc(strlen(args[0].string) + 1, 1);
+                else out.vec = newVec(args[0].vec.width, args[0].vec.height);
                 Value funcArgs[5];
                 funcArgs[0] = NULLVAL;
                 funcArgs[1] = NULLVAL;
@@ -1108,13 +1168,18 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 funcArgs[3] = NULLVAL;
                 funcArgs[4] = args[0];
                 int i, j;
-                for(int i = 0;i < args[0].vec.total;i++) {
-                    funcArgs[0].num = args[0].vec.val[i];
-                    funcArgs[1].r = i % args[0].vec.width;
-                    funcArgs[2].r = i / args[0].vec.width;
+                int length = 0, width = 0;
+                if(isString) length = strlen(args[0].string), width = length;
+                else length = args[0].vec.total, width = args[0].vec.width;
+                for(int i = 0;i < length;i++) {
+                    if(isString) funcArgs[0].r = args[0].string[i];
+                    else funcArgs[0].num = args[0].vec.val[i];
+                    funcArgs[1].r = i % width;
+                    funcArgs[2].r = i / width;
                     funcArgs[3].r = i;
                     Value cell = runAnonymousFunction(args[1], funcArgs);
-                    out.vec.val[i] = getNum(cell);
+                    if(isString) out.string[i] = getR(cell);
+                    else out.vec.val[i] = getNum(cell);
                     freeValue(cell);
                 }
             }
@@ -1151,6 +1216,144 @@ Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
                 }
                 out.type = value_vec;
                 out.vec = matInv(args[0].vec);
+            }
+            goto ret;
+        }
+        //String functions
+        if(tree.op < 120) {
+            if(tree.op == op_string) {
+                if(args[0].type == value_string) {
+                    out = args[0];
+                    args[0] = NULLVAL;
+                }
+                else {
+                    //Get base
+                    int base = 10;
+                    if(tree.argCount > 1) base = getR(args[1]);
+                    if(base < 2 || base > 36) {
+                        error("base out of bounds");
+                        goto ret;
+                    }
+                    //Convert to string
+                    out.type = value_string;
+                    out.string = valueToString(args[0], base);
+                }
+            }
+            else if(tree.op == op_eval) {
+                int base = 0;
+                if(tree.argCount > 1) base = getR(args[0]);
+                out = calculate(args[0].string, base);
+            }
+            else if(tree.op == op_print) {
+                if(args[0].type == value_string) printString(args[0]);
+                else {
+                    Value toPrint = NULLVAL;
+                    toPrint.type = value_string;
+                    toPrint.string = valueToString(args[0], 10);
+                    printString(toPrint);
+                    free(toPrint.string);
+                }
+            }
+            else if(tree.op == op_error) {
+                out = NULLVAL;
+                if(args[0].type == value_string) error("%s", args[0].string);
+                else {
+                    char* message = valueToString(args[0], 10);
+                    error("%s", message);
+                    free(message);
+                }
+                goto ret;
+            }
+            else if(tree.op == op_replace) {
+                int stringLen = strlen(args[0].string);
+                int searchLen = strlen(args[1].string);
+                int replaceLen = strlen(args[2].string);
+                int matches[stringLen + 1];
+                int matchCount = 0;
+                //Find matches
+                for(int i = 0;i < stringLen - searchLen;i++)
+                    if(memcmp(args[0].string + i, args[1].string, searchLen) == 0)
+                        matches[++matchCount] = i;
+                //Set maximum replace count
+                if(tree.argCount > 3) if(matchCount > getR(args[3])) matchCount = getR(args[3]);
+                matches[0] = -searchLen;
+                matches[matchCount + 1] = stringLen;
+                //Create return buffer
+                out.string = calloc(stringLen + matchCount * (replaceLen - searchLen) + 1, 1);
+                int outPos = 0;
+                int readPos = 0;
+                for(int i = 0;i <= matchCount;i++) {
+                    //Copy unreplaced section
+                    int len = matches[i + 1] - matches[i] - searchLen;
+                    memcpy(out.string + outPos, args[0].string + readPos, len);
+                    outPos += len;
+                    readPos += len;
+                    //Copy section to replace
+                    if(i != matchCount) {
+                        strcpy(out.string + outPos, args[2].string);
+                        outPos += replaceLen;
+                        readPos += searchLen;
+                    }
+                }
+                out.type = value_string;
+            }
+            else if(tree.op == op_indexof) {
+                int searchLen = strlen(args[0].string);
+                int matchLen = strlen(args[1].string);
+                //Find start (if argument is present)
+                int start = 0;
+                if(tree.argCount > 2) start = getR(args[2]);
+                if(start < 0) start += searchLen;
+                if(start < 0) { error("start index out of bounds");goto ret; }
+                //Main loop
+                out.r = -1;
+                for(int i = start;i < searchLen - matchLen + 1;i++) {
+                    if(memcmp(args[0].string + i, args[1].string, matchLen) == 0) { out.r = i;break; }
+                }
+            }
+            else if(tree.op == op_substr) {
+                int stringLen = strlen(args[0].string);
+                //Get Range
+                int start = getR(args[1]);
+                int end = stringLen;
+                if(tree.argCount > 2) end = getR(args[2]);
+                //Negative indices
+                if(start < 0) start += stringLen;
+                if(end < 0) start += stringLen;
+                //If indices out of range
+                if(end < 0 || start < 0 || start >= stringLen || end > stringLen) {
+                    error("substring range out of bounds");
+                    goto ret;
+                }
+                //If start is before end
+                if(end < start) {
+                    int temp = start;
+                    start = end;
+                    end = temp;
+                }
+                //Copy string
+                int len = end - start;
+                out.string = calloc(len + 1, 1);
+                memcpy(out.string, args[0].string + start, len);
+                out.type = value_string;
+            }
+            else if(tree.op == op_lowercase) {
+                //Copy string
+                out.type = value_string;
+                out.string = calloc(strlen(args[0].string) + 1, 1);
+                strcpy(out.string, args[0].string);
+                //Replace characters
+                for(int i = 0;out.string[i] != 0;i++)
+                    if(out.string[i] >= 'A' && out.string[i] <= 'Z') out.string[i] += 32;
+            }
+            else if(tree.op == op_uppercase) {
+                //Copy string
+                out.type = value_string;
+                out.string = calloc(strlen(args[0].string) + 1, 1);
+                strcpy(out.string, args[0].string);
+                //Replace characters
+                for(int i = 0;out.string[i] != 0;i++)
+                    if(out.string[i] >= 'a' && out.string[i] <= 'z') out.string[i] -= 32;
             }
             goto ret;
         }

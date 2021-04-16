@@ -82,6 +82,7 @@ typedef struct ValueStruct {
             char** argNames;
         };
         ArbNum* numArb;
+        char* string;
     };
 } Value;
 /**
@@ -233,6 +234,10 @@ extern char* emptyArg;
  * Arguments are similar to printf
  */
 void error(const char* format, ...);
+/**
+ * prints a string, this is called when the builtin function print()
+ */
+void printString(Value string);
 /**
  * Cleans input, generates tree, and computes it
  * @param eq Equation
@@ -555,7 +560,8 @@ typedef enum ValueType {
     value_num = 0,
     value_vec = 1,
     value_func = 2,
-    value_arb = 3
+    value_arb = 3,
+    value_string = 4
 } ValueType;
 typedef enum OpType {
     optype_builtin = 0,
@@ -646,6 +652,15 @@ typedef enum Op {
     op_transpose = 104,
     op_mat_mult = 105,
     op_mat_inv = 106,
+    op_string = 111,
+    op_eval = 112,
+    op_print = 113,
+    op_error = 114,
+    op_replace = 115,
+    op_indexof = 116,
+    op_substr = 117,
+    op_lowercase = 118,
+    op_uppercase = 119,
 } Op;
 #pragma endregion
 #endif

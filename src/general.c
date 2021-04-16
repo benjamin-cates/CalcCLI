@@ -41,6 +41,17 @@ void inputClean(char* input) {
     for(i = 0; input[i] != 0; i++) {
         if(input[i] == '\n') offset++;
         else if(input[i] == ' ') offset++;
+        else if(input[i] == '"') {
+            bool isEscape = false;
+            while(i++) {
+                input[i - offset] = input[i];
+                if(input[i] == 0) break;
+                if(isEscape) isEscape = false;
+                else if(input[i] == '\\') isEscape = true;
+                else if(input[i] == '"') break;
+            }
+            if(input[i] == 0) break;
+        }
         else {
             input[i - offset] = input[i];
         }
@@ -113,6 +124,16 @@ int findNext(const char* str, int start, char find) {
         }
         if(ch == '>' && i != 0 && str[i - 1] != '=') {
             if(bracket != 0 && brackets[bracket - 1] == '<') bracket--;
+        }
+        if(ch == '"') {
+            bool isEscape = false;
+            while(++i) {
+                if(str[i] == '\\') isEscape = true;
+                else if(isEscape) isEscape = false;
+                else if(str[i] == '"') break;
+                else if(str[i] == 0) break;
+            }
+            ch = str[i];
         }
         if(bracket == 0 && ch == find) return i;
     }
@@ -241,6 +262,16 @@ int valueConvert(int type, Value* one, Value* two) {
             *two = newValMatScalar(value_vec, two->num);
             return 2;
         }
+        if(one->type == value_string && two->type != value_string) {
+            two->string = valueToString(*two, 10);
+            two->type = value_string;
+            return 2;
+        }
+        if(two->type == value_string && one->type != value_string) {
+            one->string = valueToString(*one, 10);
+            one->type = value_string;
+            return 1;
+        }
     }
     return 0;
 }
@@ -283,6 +314,10 @@ Value copyValue(Value val) {
             memcpy(out.numArb->i.mantissa, val.numArb->i.mantissa, val.numArb->i.len);
         }
     }
+    if(val.type == value_string) {
+        out.string = calloc(strlen(val.string) + 1, 1);
+        strcpy(out.string, val.string);
+    }
     return out;
 }
 double getR(Value val) {
@@ -322,6 +357,9 @@ void freeValue(Value val) {
             free(val.numArb->i.mantissa);
         }
         free(val.numArb);
+    }
+    if(val.type == value_string) {
+        free(val.string);
     }
 }
 //Trees

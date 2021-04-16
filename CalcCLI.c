@@ -13,7 +13,7 @@
 #if defined __WIN32 || defined _WIN64 || defined _WIN32
 #define USE_CONIO_H
 #endif
-char* currentInput=NULL;
+char* currentInput = NULL;
 #pragma region Command Line Arguments
 double useColors = 1;
 double rawMode = 0;
@@ -64,9 +64,10 @@ void CLI_cleanup() {
     exit(0);
 }
 #pragma region Printing
+bool prevWasNewline = true;
 void printWithHighlighting(char* str) {
     const char* colorCodes[] = {
-        "0;0","37;1","33","32","31","0","30;1","31;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
+        "0;0","37;1","33","32","31","0","30;1","33;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
     };
     int strLen = strlen(str);
     char* colors = highlightLine(str);
@@ -190,7 +191,7 @@ void printHelpPage(struct HelpPage page) {
     printf("\n");
     //Generated help pages
     if(page.type == 8) {
-        char* content=getGeneratedPage(page);
+        char* content = getGeneratedPage(page);
         printHTML(content);
         putchar('\n');
         free(content);
@@ -199,6 +200,16 @@ void printHelpPage(struct HelpPage page) {
         char contentCopy[strlen(page.content) + 1];
         strcpy(contentCopy, page.content);
         printHTML(contentCopy);
+        printf("\n");
+    }
+}
+void printString(Value string) {
+    printf("%s", string.string);
+    if(string.string[strlen(string.string) - 1] != '\n') prevWasNewline = false;
+}
+void confirmNewLine() {
+    if(!prevWasNewline) {
+        prevWasNewline = true;
         printf("\n");
     }
 }
@@ -297,7 +308,7 @@ void printInput(char* string, int cursorPos) {
 char* readLine(bool erasePrevious) {
     if(rawMode) return readLineRaw();
     char* input = calloc(11, 1);
-    currentInput=input;
+    currentInput = input;
     if(input == NULL) { error(mallocError);return NULL; }
     int strLenAllocated = 10;
     int strLen = 0;
@@ -492,6 +503,7 @@ char* readLine(bool erasePrevious) {
 void error(const char* format, ...) {
     if(ignoreError) return;
     //Print error
+    confirmNewLine();
     if(useColors) printf("\033[1;31m");
     printf("Error: ");
     if(useColors) printf("\033[0m");
@@ -613,6 +625,7 @@ void runLine(char* input) {
         char* output = runCommand(input);
         if(globalError) return;
         if(output != NULL) {
+            confirmNewLine();
             if(output[0] != '\0') {
                 //Highligh history
                 if(output[0] == '$') {
@@ -740,6 +753,7 @@ void runLine(char* input) {
             if(startsWith(input, "-darb")) {
                 input += 5;
                 Value out = calculate(input, 0);
+                confirmNewLine();
                 if(out.type != value_arb || out.numArb == NULL) {
                     error("Returned value is not arbitrary precision");
                     return;
@@ -951,6 +965,7 @@ void runLine(char* input) {
         if(globalError) return;
         //Print output highlighted
         char* output = appendToHistory(out, 10, false);
+        confirmNewLine();
         int i = 1;
         while(output[++i] != '=');
         output[i + 1] = '\0';
@@ -1018,7 +1033,7 @@ int main(int argc, char** argv) {
         if(input == NULL) break;
         globalError = false;
         runLine(input);
-        currentInput=NULL;
+        currentInput = NULL;
         free(input);
     }
     cleanup();

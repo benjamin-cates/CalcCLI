@@ -12,6 +12,7 @@ double printCommands = 0;
 double seed = 0;
 double estimatedTime = 3;
 double useColors = 1;
+double verbose=0;
 const struct CommandArg {
     const char* name;
     double* location;
@@ -21,6 +22,7 @@ const struct CommandArg {
     {"--seed",&seed},
     {"--time",&estimatedTime},
     {"--color",&useColors},
+    {"--verbose",&verbose},
 };
 #pragma endregion
 #pragma region Global Variables
@@ -48,6 +50,16 @@ void error(const char* format, ...) {
     va_end(argptr);
     printf("\n");
 };
+void printString(Value string) {
+
+}
+void flushedPrint(const char* format,...) {
+    va_list argptr;
+    va_start(argptr, format);
+    vprintf(format, argptr);
+    va_end(argptr);
+    fflush(stdout);
+}
 #pragma region Random Generation
 char* randomCodeBlock(int nest, char** args, char** localvars, bool isLoop);
 char* randomArgList(bool allowNoParenthesis) {
@@ -117,7 +129,7 @@ char* randomExpression(int nest, char** args, char** localvars, int base, bool u
         if(out[0] >= '9' && out[0] != '.') out[0] = '0';
         return out;
     }
-    int type = rand() % 6;
+    int type = rand() % 7;
     if(type == 0) {
         //Parenthesis with same length
         char* inside = randomExpression(nest, args, localvars, base, useUnits);
@@ -266,6 +278,24 @@ char* randomExpression(int nest, char** args, char** localvars, int base, bool u
         free(argList);
         freeArgList(parsedList);
         free(newArgs);
+        return out;
+    }
+    //Strings
+    if(type == 6) {
+        char validChars[] = " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+        char* out = calloc(10, 1);
+        out[0] = '"';
+        for(int i = 1;i < 8;i++) {
+            char ch = validChars[rand() % (sizeof(validChars) - 1)];
+            if(i == 7 && ch == '\\') ch = 'a';
+            if(i == 1 && ch == '"') ch = 'b';
+            if(ch == '"') {
+                out[i - 1] = '\\';
+                if(i != 1 && out[i - 2] == '\\') out[i - 2] = 'a';
+            }
+            out[i] = ch;
+        }
+        out[8] = '"';
         return out;
     }
 }
@@ -582,6 +612,7 @@ void test_singleRandomHighlight() {
     char test[50];
     for(int j = 0;j < 49;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
     test[49] = 0;
+    if(verbose) flushedPrint("highlight: \"%s\"\n",test);
     char* out = highlightLine(test);
     //Check for an uncaught error
     if(globalError) {
@@ -604,6 +635,7 @@ void test_singleRandomParse() {
     char test[11];
     for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
     test[9] = '\0';
+    if(verbose) flushedPrint("parse: \"%s\"\n",test);
     //Test parsing and computing
     inputClean(test);
     Tree tree = generateTree(test, NULL, NULL, 0);
@@ -615,6 +647,7 @@ void test_singleRandomExpressionHighlight() {
     //Generate a random expression and highlight it. Fail if any characters are red
     //Generate random expression
     char* test = randomExpression(2, NULL, NULL, 10, false);
+    if(verbose) flushedPrint("highlight: \"%s\"\n",test);
     //Color it
     char colors[strlen(test) + 1];
     memset(colors, 0, strlen(test) + 1);
@@ -630,6 +663,7 @@ void test_singleRandomExpressionHighlight() {
 }
 void test_singleRandomCompute() {
     char* test = randomExpression(2, NULL, NULL, 10, false);
+    if(verbose) flushedPrint("compute: \"%s\"\n",test);
     currentTest = test;
     //Parse tree
     Tree tree = generateTree(test, NULL, NULL, 0);

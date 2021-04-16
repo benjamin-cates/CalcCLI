@@ -173,6 +173,20 @@ int nextSection(const char* eq, int start, int* end, int base) {
         *end = next - 1;
         return sec_operator;
     }
+    //Strings
+    if(eq[start] == '"') {
+        *end = start;
+        bool isEscape = false;
+        while(true) {
+            start++;
+            if(eq[start] == 0) break;
+            if(isEscape) { isEscape = false;continue; }
+            if(eq[start] == '\\') { isEscape = true;continue; }
+            if(eq[start] == '"') break;
+        }
+        *end = start;
+        return sec_string;
+    }
     return sec_undef;
 }
 double parseNumber(const char* num, double base) {
@@ -238,6 +252,10 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         if(eq[end] == 0) {
             if(type == sec_function || type == sec_parenthesis || type == sec_square || type == sec_vector || type == sec_anonymousMultilineFunction) {
                 error("bracket mismatch");
+                return NULLOPERATION;
+            }
+            if(type == sec_string) {
+                error("no closing quotes on string");
                 return NULLOPERATION;
             }
         }
@@ -481,7 +499,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         if(type == sec_anonymousFunction) {
             char** argList = parseArgumentList(section);
             if(globalError) goto error;
-            char** argListMerged = mergeArgList(argList, argNames);
+            char** argListMerged = mergeArgList(argNames, argList);
             int eqPos = findNext(section, 0, '=');
             if(eqPos == -1) { freeArgList(argList);free(argListMerged);error("could not find anonymous function operator");goto error; }
             ops[i] = NULLOPERATION;
@@ -501,7 +519,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         if(type == sec_anonymousMultilineFunction) {
             char** argList = parseArgumentList(section);
             if(globalError) goto error;
-            char** argListMerged = mergeArgList(argList, argNames);
+            char** argListMerged = mergeArgList(argNames, argList);
             int eqPos = findNext(section, 0, '=');
             if(eqPos == -1) { freeArgList(argList);free(argListMerged);error("could not find anonymous function operator");goto error; }
             if(section[sectionLen - 1] == 0) { error("curly bracket error");goto error; }
@@ -515,6 +533,28 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             ops[i].argNames = argList;
             ops[i].argCount = argListLen(argList);
             ops[i].argWidth = argListLen(argNames);
+        }
+        if(type == sec_string) {
+            char* string = calloc(sectionLen + 1, 1);
+            int stringPos = 0;
+            bool isEscape = false;
+            for(int i = 1;i < sectionLen;i++) {
+                if(isEscape) {
+                    isEscape = false;
+                    if(section[i] == 'n') string[stringPos++] = '\n';
+                    else if(section[i] == 'r') string[stringPos++] = '\r';
+                    else if(section[i] == 't') string[stringPos++] = '\t';
+                    else string[stringPos++] = section[i];
+                }
+                else if(section[i] == '\\') {
+                    isEscape = true;
+                    continue;
+                }
+                else if(section[i] == '"') break;
+                else string[stringPos++] = section[i];
+            }
+            ops[i].value.type = value_string;
+            ops[i].value.string = string;
         }
         if(nextNegative && type != sec_operator) {
             nextNegative = false;

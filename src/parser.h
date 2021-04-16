@@ -4,17 +4,18 @@
 #include <stdbool.h>
 typedef struct TreeStruct Tree;
 typedef enum Section {
-    sec_undef=-1,
-    sec_number=0,
-    sec_variable=1,
-    sec_function=2,
-    sec_parenthesis=3,
-    sec_square=4,
-    sec_squareWithBase=5,
-    sec_operator=6,
-    sec_vector=7,
-    sec_anonymousFunction=8,
-    sec_anonymousMultilineFunction=9,
+    sec_undef = -1,
+    sec_number = 0,
+    sec_variable = 1,
+    sec_function = 2,
+    sec_parenthesis = 3,
+    sec_square = 4,
+    sec_squareWithBase = 5,
+    sec_operator = 6,
+    sec_vector = 7,
+    sec_anonymousFunction = 8,
+    sec_anonymousMultilineFunction = 9,
+    sec_string = 10,
 } Section;
 /**
  * Returns the type of a section and when it ends

@@ -247,6 +247,12 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                             break;
                         }
                     }
+                    if(ch == '"') {
+                        int end = newEnd;
+                        nextSection(eq, newEnd, &end, 10);
+                        newEnd = end;
+                        continue;
+                    }
                     if(ch == ',' || ch == ';' || ch == 0) {
                         break;
                     }
@@ -274,6 +280,18 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             }
             freeArgList(newArgs);
             free(mergedArgs);
+        }
+        if(type == sec_string) {
+            bool isEscape = false;
+            out[start] = hl_string;
+            for(int i = start + 1;i < start + len;i++) {
+                if(isEscape) { isEscape = false;out[i] = hl_escape; }
+                else if(eq[i] == '\\') { isEscape = true;out[i] = hl_escape; }
+                else {
+                    out[i] = hl_string;
+                    if(eq[i] == '"') break;
+                }
+            }
         }
         start = end + 1;
         if(eq[end] == 0) break;

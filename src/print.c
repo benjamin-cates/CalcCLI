@@ -217,6 +217,25 @@ char* valueToString(Value val, double base) {
         if(u != NULL) free(u);
         return out;
     }
+    if(val.type == value_string) {
+        char* string = val.string;
+        int strLen = strlen(string);
+        char* out = calloc(strLen * 2 + 3, 1);
+        out[0]='"';
+        int outPos = 1;
+#define printEscape(char) {out[outPos++]='\\';out[outPos++]=char;}
+        for(int i = 0;i < strLen;i++) {
+            if(string[i] == '\\') printEscape('\\')
+            else if(string[i] == '"') printEscape('"')
+            else if(string[i] == '\r') printEscape('r')
+            else if(string[i] == '\t') printEscape('t')
+            else if(string[i] == '\n') printEscape('n')
+            else out[outPos++] = string[i];
+        }
+#undef printEscape
+        out[outPos]='"';
+        return out;
+    }
     return NULL;
 }
 char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
