@@ -115,6 +115,7 @@ int nextSection(const char* eq, int start, int* end, int base) {
             if(ch >= '0' && ch <= '9') continue;
             if(ch >= 'A' && ch < maxChar) continue;
             if(ch == 'e' && (eq[(*end) + 1] >= '0' && eq[(*end) - 1] <= '9')) continue;
+            if(ch == 'e' && eq[(*end) + 1] == '-') { (*end)++;continue; }
             break;
         }
         (*end)--;
@@ -223,14 +224,19 @@ double parseNumber(const char* num, double base) {
         power /= base;
     }
     //Parse exponent
-    double exponent = 0;
-    for(i = exponentPlace + 1;i < numLength;i++) {
-        exponent *= base;
-        double n = num[i] - 48;
-        if(n > 10) n -= 7;
-        exponent += n;
+    if(exponentPlace != numLength) {
+        double exponent = 0;
+        bool isNegative = num[exponentPlace + 1] == '-';
+        if(isNegative) exponentPlace++;
+        for(i = exponentPlace + 1;i < numLength;i++) {
+            exponent *= base;
+            double n = num[i] - 48;
+            if(n > 10) n -= 7;
+            exponent += n;
+        }
+        if(isNegative) exponent = -exponent;
+        out *= pow(base, exponent);
     }
-    if(exponent != 0) out *= pow(base, exponent);
     return out;
 }
 Tree generateTree(const char* eq, char** argNames, char** localVars, double base) {
