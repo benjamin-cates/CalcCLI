@@ -47,13 +47,14 @@ char* doubleToString(double num, double base) {
     }
     //Calculate power of highest digit
     double power;
-    if(exp == 0) power = magnitudeFloor;
+    if(exp == 0) power = pow(base, magnitudeFloor);
     else power = 1;
     if(power < 1) power = 1;
     //Main loop
     int i;
     for(i = 0;i < 20;i++) {
-        if(num < 0.000000000001) {
+        //If num is zero, fill with zeroes until the one's place is reached
+        if(num / power < 0.000000000000099) {
             power /= base;
             if(power * base < 0.9) break;
             out[outPos++] = '0';
