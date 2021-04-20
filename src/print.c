@@ -35,10 +35,11 @@ char* doubleToString(double num, double base) {
     }
     //calculate log(num,base)
     double magnitude = log(num) / log(base);
+    int magnitudeFloor = floor(magnitude + abs(magnitude) * 0.0000000000001);
     //Create exponent suffix, if necessary
     int expLen = 0, exp = 0;
     char expString[8];
-    if(magnitude > 14 || magnitude < -14) exp = floor(magnitude * 1.000000000000001);
+    if(magnitude > 14 || magnitude < -14) exp = magnitudeFloor;
     if(exp != 0) {
         snprintf(expString, 7, "e%d", exp);
         expLen = strlen(expString);
@@ -46,7 +47,7 @@ char* doubleToString(double num, double base) {
     }
     //Calculate power of highest digit
     double power;
-    if(exp == 0) power = pow(base, floor(magnitude * 1.000000000000001));
+    if(exp == 0) power = magnitudeFloor;
     else power = 1;
     if(power < 1) power = 1;
     //Main loop
@@ -60,7 +61,7 @@ char* doubleToString(double num, double base) {
         }
         int digit = floor(num / power + 0.000000001);
         num -= power * digit;
-        if(power * base < 1.01 && power * base>0.99) out[outPos++] = '.';
+        if(power * base < 1.01 && power * base > 0.99) out[outPos++] = '.';
         out[outPos++] = numberChars[digit];
         power /= base;
         if(outPos + expLen >= 24) break;
@@ -221,7 +222,7 @@ char* valueToString(Value val, double base) {
         char* string = val.string;
         int strLen = strlen(string);
         char* out = calloc(strLen * 2 + 3, 1);
-        out[0]='"';
+        out[0] = '"';
         int outPos = 1;
 #define printEscape(char) {out[outPos++]='\\';out[outPos++]=char;}
         for(int i = 0;i < strLen;i++) {
@@ -233,7 +234,7 @@ char* valueToString(Value val, double base) {
             else out[outPos++] = string[i];
         }
 #undef printEscape
-        out[outPos]='"';
+        out[outPos] = '"';
         return out;
     }
     return NULL;
