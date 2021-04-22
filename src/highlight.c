@@ -26,7 +26,7 @@
     18 - Local Variable (blue)
     19 - Control Flow (bold purple)
 */
-const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Delimiter","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable","Control Flow" };
+const char* syntaxTypes[] = { "Null","Numeral","Variable","Comment","Error","Bracket","Operator","String","Command","Space","Escape","Delimiter","Invalid Operator","Invalid Variable","Builtin","Custom","Argument","Unit","Local Variable","Control Flow","History Accessor" };
 typedef enum Color {
     hl_null = 0,
     hl_number = 1,
@@ -47,7 +47,8 @@ typedef enum Color {
     hl_argument = 16,
     hl_unit = 17,
     hl_localvar = 18,
-    hl_controlFlow = 19
+    hl_controlFlow = 19,
+    hl_hist = 20,
 } Color;
 int getVariableType(const char* name, bool useUnits, char** argNames, char** localVars) {
     Tree tree = findFunction(name, useUnits, argNames, localVars);
@@ -293,6 +294,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
                 }
             }
         }
+        if(type == sec_hist) memset(out + start, hl_hist, len);
         start = end + 1;
         if(eq[end] == 0) break;
     }

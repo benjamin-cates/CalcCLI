@@ -909,7 +909,8 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
                         error("history too short", NULL);
                         goto ret;
                     }
-                    out = history[historyCount - i];
+                    out = history[historyCount + i];
+                    goto ret;
                 }
                 if(i >= historyCount) {
                     error("history too short", NULL);

@@ -67,7 +67,7 @@ void CLI_cleanup() {
 bool prevWasNewline = true;
 void printWithHighlighting(char* str) {
     const char* colorCodes[] = {
-        "0;0","37;1","33","32","31","0","30;1","33;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1"
+        "0;0","37;1","33","32","31","0","30;1","33;1","34;1","0","30;1","0","31","31","33;1","35;1","36;1","36","36","35;1","36",
     };
     int strLen = strlen(str);
     char* colors = highlightLine(str);

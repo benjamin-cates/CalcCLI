@@ -16,6 +16,7 @@ typedef enum Section {
     sec_anonymousFunction = 8,
     sec_anonymousMultilineFunction = 9,
     sec_string = 10,
+    sec_hist = 11,
 } Section;
 /**
  * Returns the type of a section and when it ends

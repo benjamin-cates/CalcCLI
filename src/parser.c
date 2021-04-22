@@ -121,6 +121,18 @@ int nextSection(const char* eq, int start, int* end, int base) {
         (*end)--;
         return sec_number;
     }
+    //History accessor $1...
+    if(eq[start] == '$') {
+        if((eq[start + 1] >= '0' && eq[start + 1] <= '9') || eq[start + 1] == '-') {
+            *end = start + 1;
+            while((eq[*end] >= '0' && eq[*end] <= '9') || eq[*end] == '-') {
+                if(eq[*end] == 0) break;
+                (*end)++;
+            }
+            (*end)--;
+            return sec_hist;
+        }
+    }
     //Variables and units
     if(eq[start] == '_' || eq[start] == '$' || (eq[start] >= 'a' && eq[start] <= 'z') || (eq[start] >= 'A' && eq[start] <= 'Z')) {
         *end = start;
@@ -561,6 +573,17 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
             }
             ops[i].value.type = value_string;
             ops[i].value.string = string;
+        }
+        if(type == sec_hist) {
+            int sign = 1;
+            int start = 1;
+            //Negative numbers
+            if(section[1] == '-') {
+                sign = -1;
+                start++;
+            }
+            double id = parseNumber(section + start, 10) * sign;
+            ops[i] = newOp(allocArg(newOpVal(id, 0, 0), 0), 1, op_hist, optype_builtin);
         }
         if(nextNegative && type != sec_operator) {
             nextNegative = false;
