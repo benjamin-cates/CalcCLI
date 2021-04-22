@@ -12,7 +12,7 @@ double printCommands = 0;
 double seed = 0;
 double estimatedTime = 3;
 double useColors = 1;
-double verbose=0;
+double verbose = 0;
 const struct CommandArg {
     const char* name;
     double* location;
@@ -53,7 +53,7 @@ void error(const char* format, ...) {
 void printString(Value string) {
 
 }
-void flushedPrint(const char* format,...) {
+void flushedPrint(const char* format, ...) {
     va_list argptr;
     va_start(argptr, format);
     vprintf(format, argptr);
@@ -591,6 +591,7 @@ void test_highlighting() {
         }
         free(out);
     }
+    totalNumberOfTests += sizeof(syntax) / sizeof(char*);
 }
 void test_help() {
     for(int i = 0;i < helpPageCount;i++) {
@@ -608,12 +609,29 @@ void test_help() {
         }
         if(bracket != 0) failedTest(i, pages[i].name, "page content has mismatching brackets (%d)", bracket);
     }
+    totalNumberOfTests += helpPageCount;
+}
+void test_includableFunctions() {
+    int count = sizeof(includeFuncs) / sizeof(struct LibraryFunction);
+    for(int i = 0;i < count;i++) {
+        //Parse arguments
+        char** arguments = parseArgumentList(includeFuncs[i].arguments);
+        //Parse equation
+        Tree tree = generateTree(includeFuncs[i].equation, arguments, NULL, 0);
+        if(globalError) {
+            failedTest(i, includeFuncs[i].equation, "");
+            globalError = false;
+        }
+        freeTree(tree);
+        freeArgList(arguments);
+    }
+    totalNumberOfTests += count;
 }
 void test_singleRandomHighlight() {
     char test[50];
     for(int j = 0;j < 49;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
     test[49] = 0;
-    if(verbose) flushedPrint("highlight: \"%s\"\n",test);
+    if(verbose) flushedPrint("highlight: \"%s\"\n", test);
     char* out = highlightLine(test);
     //Check for an uncaught error
     if(globalError) {
@@ -636,7 +654,7 @@ void test_singleRandomParse() {
     char test[11];
     for(int j = 0;j < 10;j++) test[j] = validChars[rand() % (sizeof(validChars) - 1)];
     test[9] = '\0';
-    if(verbose) flushedPrint("parse: \"%s\"\n",test);
+    if(verbose) flushedPrint("parse: \"%s\"\n", test);
     //Test parsing and computing
     inputClean(test);
     Tree tree = generateTree(test, NULL, NULL, 0);
@@ -648,7 +666,7 @@ void test_singleRandomExpressionHighlight() {
     //Generate a random expression and highlight it. Fail if any characters are red
     //Generate random expression
     char* test = randomExpression(2, NULL, NULL, 10, false);
-    if(verbose) flushedPrint("highlight: \"%s\"\n",test);
+    if(verbose) flushedPrint("highlight: \"%s\"\n", test);
     //Color it
     char colors[strlen(test) + 1];
     memset(colors, 0, strlen(test) + 1);
@@ -664,7 +682,7 @@ void test_singleRandomExpressionHighlight() {
 }
 void test_singleRandomCompute() {
     char* test = randomExpression(2, NULL, NULL, 10, false);
-    if(verbose) flushedPrint("compute: \"%s\"\n",test);
+    if(verbose) flushedPrint("compute: \"%s\"\n", test);
     currentTest = test;
     //Parse tree
     Tree tree = generateTree(test, NULL, NULL, 0);
@@ -696,6 +714,7 @@ const struct Test {
     {&test_units,"units",testtype_constant},
     {&test_highlighting,"highlighting",testtype_constant},
     {&test_help,"help",testtype_constant},
+    {&test_includableFunctions,"includable functions",testtype_constant},
     {&test_singleRandomExpressionHighlight,"random expression highlighting",testtype_random},
     {&test_singleRandomHighlight,"random highlighting",testtype_random},
     {&test_singleRandomParse,"random parsing",testtype_random},
