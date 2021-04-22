@@ -895,6 +895,7 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
             if(tree.op == op_pi) out = newValNum(3.1415926535897932, 0, 0);
             else if(tree.op == op_e) out = newValNum(2.718281828459045, 0, 0);
             else if(tree.op == op_phi) out = newValNum(1.618033988749894, 0, 0);
+            else if(tree.op == op_typeof) out.r = args[0].type;
             else if(tree.op == op_ans) {
                 if(historyCount == 0) {
                     error("no previous answer", NULL);

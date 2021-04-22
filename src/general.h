@@ -634,6 +634,7 @@ typedef enum Op {
     op_pi = 75,
     op_phi = 76,
     op_e = 77,
+    op_typeof = 83,
     op_ans = 84,
     op_hist = 85,
     op_histnum = 86,

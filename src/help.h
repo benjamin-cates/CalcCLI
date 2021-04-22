@@ -12,7 +12,7 @@ struct HelpPage {
     //Page content
     const char* content;
 };
-#define helpPageCount 170
+#define helpPageCount 171
 extern const struct HelpPage pages[helpPageCount];
 //Returns a JSON parsable string of the help page. Return value must be freed
 char* helpPageToJSON(struct HelpPage page);

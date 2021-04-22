@@ -339,7 +339,7 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
     emptyFunction,
     emptyFunction,
     emptyFunction,
-    emptyFunction,
+    function("typeof",{any,0}),
     function("ans",{0}),
     function("hist",{num,0}),
     function("histnum",{0}),
