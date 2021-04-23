@@ -264,7 +264,7 @@ Tree generateTree(const char* eq, char** argNames, char** localVars, double base
         int end = -1;
         int type = nextSection(eq, sections[i] + 1, &end, base);
         if(type == sec_undef) {
-            error("fatal parsing error (next section not found)");
+            error("could not parse '%.5s%s'", eq + sections[i] + 1, strlen(eq) - sections[i] > 6 ? "..." : "");
             return NULLOPERATION;
         }
         if(eq[end] == 0) {
