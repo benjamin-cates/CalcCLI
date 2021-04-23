@@ -469,9 +469,14 @@ char* valueToString(Value val, double base);
 double getR(Value val);
 //Returns the value converted to a number
 Number getNum(Value val);
-//one and two will be altered to be similar types depending on what (int type) is. (int type) can be op_mult, op_add, or op_div
-// The (return & 1) is whether one has been altered. The (return &2) is whether two has been altered
-int valueConvert(int type, Value* one, Value* two);
+/**
+ * Returns the free pattern of one and two after they have been converted to the same type.
+ * @param free whether one and two needs to be freed (free&1 refers to one, free&2 refers to two)
+ * @param one Pointer to first value
+ * @param two Pointer to second value
+ * @return Free pattern of the new values (see free input)
+*/
+int convertToSameType(int free, Value* one, Value* two);
 /**
  * Frees the op.args and runs freeTree on all arguments. Does not need to be called if the operation has no arguments.
  * @param op Operation to free

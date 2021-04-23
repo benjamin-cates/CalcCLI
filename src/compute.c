@@ -243,6 +243,73 @@ Number compBinRs(Number one, Number two) {
 }
 #pragma endregion
 #pragma region Vectors
+void applyUnaryToVector(Value* one, Number func(Number)) {
+    if(one->type == value_num) {
+        one->num = (*func)(one->num);
+    }
+    if(one->type == value_vec) {
+        for(int i = 0;i < one->vec.total;i++)
+            one->vec.val[i] = (*func)(one->vec.val[i]);
+    }
+}
+Value applyBinaryToVector(Value one, Value two, Number func(Number, Number), bool useMax, bool forceVectorConversion) {
+    int freeType = 0;
+    //Convert both to vectors if forced
+    if(one.type != two.type && forceVectorConversion) {
+        if(one.type == value_num) {
+            one.vec = newVecScalar(one.num);
+            one.type = value_vec;
+            freeType |= 1;
+        }
+        if(two.type == value_num) {
+            two.vec = newVecScalar(two.num);
+            two.type = value_vec;
+            freeType |= 2;
+        }
+    }
+    Value out = NULLVAL;
+    //num*num
+    if(one.type == value_num && two.type == value_num) {
+        out.num = (*func)(one.num, two.num);
+        return out;
+    }
+    out.type = value_vec;
+    //vec*num
+    if(one.type == value_vec && two.type == value_num) {
+        out.vec = newVec(one.vec.width, one.vec.height);
+        for(int i = 0;i < out.vec.total;i++)
+            out.vec.val[i] = (*func)(one.vec.val[i], two.num);
+        if(freeType & 1) freeValue(one);
+        return out;
+    }
+    //num*vec
+    if(one.type == value_num && two.type == value_vec) {
+        out.vec = newVec(two.vec.width, two.vec.height);
+        for(int i = 0;i < two.vec.total;i++)
+            out.vec.val[i] = (*func)(one.num, two.vec.val[i]);
+        if(freeType & 2) freeValue(two);
+        return out;
+    }
+    //vec*vec
+    int width = (one.vec.width < two.vec.width) ^ useMax ? one.vec.width : two.vec.width;
+    int height = (one.vec.height < two.vec.height) ^ useMax ? one.vec.height : two.vec.height;
+    int total = width * height;
+    if(total >= 0xEFFF) {
+        if(freeType & 1) freeValue(one);
+        if(freeType & 2) freeValue(two);
+        error("vector size overflow");
+        return NULLVAL;
+    }
+    out.vec = newVec(width, height);
+    for(int x = 0;x < width;x++) for(int y = 0;y < height;y++) {
+        Number oneNum = NULLNUM;
+        Number twoNum = NULLNUM;
+        if(x < one.vec.width && y < one.vec.height) oneNum = one.vec.val[x + y * one.vec.width];
+        if(x < two.vec.width && y < two.vec.height) twoNum = two.vec.val[x + y * two.vec.width];
+        out.vec.val[x + y * width] = (*func)(oneNum, twoNum);
+    }
+    return out;
+}
 Number determinant(Vector vec) {
     if(vec.width == 1) {
         return vec.val[0];
@@ -334,90 +401,21 @@ Vector matInv(Vector one) {
 #pragma endregion
 #pragma region Values
 Value valMult(Value one, Value two) {
-    int freeType = 0;
-    if(one.type != two.type) freeType = valueConvert(op_mult, &one, &two);
-    if(one.type == value_num) {
-        Value out;
-        out.type = 0;
-        out.r = one.r * two.r - one.i * two.i;
-        out.i = one.r * two.i + two.r * one.i;
-        out.u = unitInteract(one.u, two.u, '*', 0);
-        return out;
-    }
-    if(one.type == value_vec) {
-        if(two.type == value_num) {
-            Value out;
-            out.type = value_vec;
-            out.vec = newVec(one.vec.width, one.vec.height);
-            int i;
-            for(i = 0;i < out.vec.total;i++) {
-                out.vec.val[i] = compMultiply(one.vec.val[i], two.num);
-            }
-            if(freeType & 1) freeValue(one);
-            if(freeType & 2) freeValue(two);
-            return out;
-        }
-        if(two.type == value_vec) {
-            short width = two.vec.width < one.vec.width ? two.vec.width : one.vec.width;
-            short height = two.vec.height < one.vec.height ? two.vec.height : one.vec.height;
-            Value out;
-            out.type = value_vec;
-            out.vec = newVec(width, height);
-            int j, i;
-            for(i = 0;i < width;i++) for(j = 0;j < height;j++) {
-                out.vec.val[i + j * width] = compMultiply(one.vec.val[i + j * one.vec.width], two.vec.val[i + j * two.vec.width]);
-            }
-            if(freeType & 1) freeValue(one);
-            if(freeType & 2) freeValue(two);
-            return out;
-        }
-    }
-    if(one.type == value_arb) {
-
-    }
-    return NULLVAL;
+    return applyBinaryToVector(one, two, &compMultiply, false, false);
 }
 Value valAdd(Value one, Value two) {
-    int freeType = 0;
-    if(one.type != two.type) freeType = valueConvert(op_add, &one, &two);
-    if(one.type == value_num) {
-        Value out;
-        out.type = value_num;
-        out.r = one.r + two.r;
-        out.i = one.i + two.i;
-        if(one.u == two.u) out.u = one.u;
-        else if(one.u == 0) out.u = two.u;
-        else if(two.u == 0) out.u = one.u;
-        else error("cannot add two different units", NULL);
-        return out;
-    }
-    if(one.type == value_vec) {
-        int width = one.vec.width < two.vec.width ? two.vec.width : one.vec.width;
-        int height = one.vec.height < two.vec.height ? two.vec.height : one.vec.height;
-        Value out;
-        out.type = one.type;
-        out.vec = newVec(width, height);
-        int i, j;
-        for(i = 0;i < width;i++) for(j = 0;j < height;j++) {
-            Number* cell = out.vec.val + i + j * width;
-            if(i < one.vec.width && j < one.vec.height) {
-                Number* cellOne = one.vec.val + i + j * one.vec.width;
-                cell->r += cellOne->r;
-                cell->i += cellOne->i;
-                cell->u = cellOne->u;
-            }
-            if(i < two.vec.width && j < two.vec.height) {
-                Number* cellTwo = two.vec.val + i + j * two.vec.width;
-                cell->r += cellTwo->r;
-                cell->i += cellTwo->i;
-                if(cell->u == 0) cell->u = cellTwo->u;
-            }
+    if(one.type == value_string || two.type == value_string) {
+        int freeType = 0;
+        if(one.type != value_string) {
+            one.string = valueToString(one, 10);
+            one.type = value_string;
+            freeType |= 1;
         }
-        if(freeType & 1) freeValue(one);
-        if(freeType & 2) freeValue(two);
-        return out;
-    }
-    if(one.type == value_string) {
+        if(two.type != value_string) {
+            two.string = valueToString(two, 10);
+            two.type = value_string;
+            freeType |= 2;
+        }
         int len = strlen(one.string) + strlen(two.string) + 1;
         Value out;
         out.string = calloc(len, 1);
@@ -428,7 +426,7 @@ Value valAdd(Value one, Value two) {
         if(freeType & 2) freeValue(two);
         return out;
     }
-    return NULLVAL;
+    return applyBinaryToVector(one, two, &compAdd, true, true);
 }
 Value valNegate(Value one) {
     if(one.type == value_num) {
@@ -457,66 +455,14 @@ Value valNegate(Value one) {
     }
     return NULLVAL;
 }
-Value DivPowMod(Number(*function)(Number, Number), Value one, Value two, int type) {
-    int freeType = 0;
-    if(one.type != two.type) freeType = valueConvert(op_div, &one, &two);
-    if(one.type == value_num) {
-        Value out;
-        out.type = two.type;
-        if(two.type == value_num) {
-            out.num = (*function)(one.num, two.num);
-            return out;
-        }
-        if(two.type == value_vec) {
-            out.vec = newVec(two.vec.width, two.vec.height);
-            int i;
-            for(i = 0;i < out.vec.total;i++) {
-                out.vec.val[i] = (*function)(one.num, two.vec.val[i]);
-            }
-            if(freeType & 2) freeValue(two);
-            return out;
-        }
-    }
-    if(one.type == value_vec) {
-        Value out;
-        out.type = value_vec;
-        if(two.type == value_num) {
-            out.vec = newVec(one.vec.width, one.vec.height);
-            int i;
-            for(i = 0;i < out.vec.total;i++) {
-                out.vec.val[i] = (*function)(one.vec.val[i], two.num);
-            }
-            if(freeType & 1) freeValue(one);
-            return out;
-        }
-        // max width if type is 0, min width if type is 1
-        int newWidth = (one.vec.width > two.vec.width) ^ type ? one.vec.width : two.vec.width;
-        int newHeight = (one.vec.height > two.vec.height) ^ type ? one.vec.height : two.vec.height;
-        out.vec = newVec(newWidth, newHeight);
-        int i, j;
-        for(i = 0;i < newWidth;i++) {
-            for(j = 0;j < newHeight;j++) {
-                Number oneNum = NULLNUM;
-                Number twoNum = NULLNUM;
-                if(i < one.vec.width && j < one.vec.height) oneNum = one.vec.val[i + j * one.vec.width];
-                if(i < two.vec.width && j < two.vec.height) twoNum = two.vec.val[i + j * two.vec.width];
-                out.vec.val[i + j * newWidth] = (*function)(oneNum, twoNum);
-            }
-        }
-        if(freeType & 1) freeValue(one);
-        if(freeType & 2) freeValue(two);
-        return out;
-    }
-    return NULLVAL;
-}
 Value valDivide(Value one, Value two) {
-    return DivPowMod(&compDivide, one, two, 1);
+    return applyBinaryToVector(one, two, &compDivide, false, false);
 }
 Value valPower(Value one, Value two) {
-    return DivPowMod(&compPower, one, two, 0);
+    return applyBinaryToVector(one, two, &compPower, true, false);
 }
 Value valModulo(Value one, Value two) {
-    return DivPowMod(&compModulo, one, two, 1);
+    return applyBinaryToVector(one, two, &compModulo, false, false);
 }
 Value valAbs(Value one) {
     if(one.type == value_num) {
@@ -587,15 +533,6 @@ int valCompare(Value one, Value two) {
     if(valEqual(one, two)) return 0;
     return 2;
 }
-void applyUnaryToVector(Value* one, Number func(Number)) {
-    if(one->type == value_num) {
-        one->num = (*func)(one->num);
-    }
-    if(one->type == value_vec) {
-        for(int i = 0;i < one->vec.total;i++)
-            one->vec.val[i] = (*func)(one->vec.val[i]);
-    }
-}
 #pragma endregion
 Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* localVars, int* isFree);
 Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {
@@ -635,9 +572,9 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
         if(tree.op < 9) {
             if(tree.op == op_i) out = newValNum(0, 1, 0);
             else if(tree.op == op_neg) out = valNegate(args[0]);
-            else if(tree.op == op_pow) out = DivPowMod(&compPower, args[0], args[1], 0);
-            else if(tree.op == op_mod) out = DivPowMod(&compModulo, args[0], args[1], 1);
-            else if(tree.op == op_div) out = DivPowMod(&compDivide, args[0], args[1], 1);
+            else if(tree.op == op_pow) out = valPower(args[0], args[1]);
+            else if(tree.op == op_mod) out = valModulo(args[0], args[1]);
+            else if(tree.op == op_div) out = valDivide(args[0], args[1]);
             else if(tree.op == op_mult) out = valMult(args[0], args[1]);
             else if(tree.op == op_add) out = valAdd(args[0], args[1]);
             else if(tree.op == op_sub) {
@@ -811,9 +748,9 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
                 goto ret;
             }
             if(args[0].type != args[1].type) {
-                int frees = valueConvert(op_add, args, args + 1);
-                if(frees & 1) needsFree[0] = 1;
-                if(frees & 2) needsFree[1] = 1;
+                int frees = convertToSameType(needsFree[0] + 2 * needsFree[1], args, args + 1);
+                needsFree[0] = frees & 1;
+                needsFree[1] = frees & 2;
             }
             if(tree.op == op_min || tree.op == op_max) {
                 if(args[0].type == value_num) {
@@ -886,7 +823,9 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
             }
             //Apply the binary operations properly with vectors
             const Number(*funcs[])(Number, Number) = { &compBinAnd,&compBinOr,&compBinXor,&compBinLs,&compBinRs };
-            out = DivPowMod(funcs[tree.op - op_and], args[0], args[1], op_div);
+            const bool useMax[] = { false,true,true,true,true };
+            int op = tree.op - op_and;
+            out = applyBinaryToVector(args[0], args[1], funcs[op], useMax[op], false);
             *isFree = 1;
             goto ret;
         }
