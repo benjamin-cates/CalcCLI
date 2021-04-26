@@ -903,7 +903,8 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
             double loopArgs[3];
             loopArgs[0] = getR(args[1]);
             loopArgs[1] = getR(args[2]);
-            loopArgs[2] = getR(args[3]);
+            if(tree.argCount > 3) loopArgs[2] = getR(args[3]);
+            else loopArgs[2] = 1;
             double i;
             int loopCount = 0;
             if(tree.op == op_sum) {
