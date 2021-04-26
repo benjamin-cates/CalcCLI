@@ -212,8 +212,8 @@ struct LibraryFunction {
 extern double degrat;
 //Error has occured
 extern bool globalError;
-//Whether to ignore errors or not
-extern bool ignoreError;
+//Whether to ignore errors or not, works as a counter, so wrap error-prone statements in ignoreError++ and ignoreError--. Ignore error only prevents error printing, globalError will still be set to true.
+extern int ignoreError;
 //Number with r=0, i=0, and u=0
 extern Number NULLNUM;
 //Value with number 0

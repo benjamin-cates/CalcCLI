@@ -157,9 +157,9 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             double base = 0;
             char charAfterEndOfBase = eq[end + 1];
             eq[end + 1] = 0;
-            ignoreError = true;
+            ignoreError++;
             Value baseVal = calculate(eq + underscore + 1, 10);
-            ignoreError = false;
+            ignoreError--;
             eq[end + 1] = charAfterEndOfBase;
             if(globalError) {
                 globalError = false;
@@ -223,9 +223,9 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             int eqPos = highlightArgumentList(eq + start, out + start) + start;
             out[eqPos] = hl_operator;
             out[eqPos + 1] = hl_operator;
-            ignoreError = true;
+            ignoreError++;
             char** newArgs = parseArgumentList(eq + start);
-            ignoreError = false;
+            ignoreError--;
             if(globalError) {
                 freeArgList(newArgs);
                 newArgs = NULL;

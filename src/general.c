@@ -7,7 +7,7 @@
 #pragma region Global Variables
 double degrat = 1;
 bool globalError = false;
-bool ignoreError = false;
+int ignoreError = 0;
 Number NULLNUM;
 Tree NULLOPERATION;
 Value NULLVAL;
@@ -562,7 +562,7 @@ char** parseArgumentList(const char* list) {
             else error("invalid '%c' in argument list", list[j]);
         }
         if(out[i][0] < 'a' && out[i][0] != '_') error("argument name '%s' starts with a numeral", out[i]);
-        if(globalError && !ignoreError) {
+        if(globalError && ignoreError != 0) {
             for(;i >= 0;i--) free(out[i]);
             free(out);
             return NULL;
