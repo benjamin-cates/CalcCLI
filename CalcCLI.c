@@ -621,7 +621,7 @@ void graphEquation(const char* equation, double left, double right, double top, 
 void runLine(char* input) {
     int i;
     //If command
-    if(input[0] == '-') {
+    if(input[0] == '-' && input[1] >= 'a' && input[1] <= 'z') {
         char* output = runCommand(input);
         if(globalError) return;
         if(output != NULL) {

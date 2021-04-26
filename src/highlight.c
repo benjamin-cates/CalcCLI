@@ -366,7 +366,7 @@ char* highlightLine(char* eq) {
         }
         return out;
     }
-    if(eq[0] == '-') {
+    if(eq[0] == '-' && eq[1] >= 'a' && eq[1] <= 'z') {
         //Find the position of the space
         while(eq[start] != ' ' && eq[start] != 0) start++;
         memset(out, hl_command, start);
