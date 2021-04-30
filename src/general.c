@@ -43,6 +43,7 @@ void inputClean(char* input) {
         else if(input[i] == ' ') offset++;
         else if(input[i] == '"') {
             bool isEscape = false;
+            input[i - offset] = input[i];
             while(i++) {
                 input[i - offset] = input[i];
                 if(input[i] == 0) break;
