@@ -9,7 +9,7 @@ struct Preference preferences[preferenceCount] = {
     {"raw",0,0},//CLI only
     {"autostart",0,0},//CLI: location of autostart file, Web: newline separated autostart file
 };
-Value getPreference(char* name) {
+Value getPreference(const char* name) {
     int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
     for(int i = 0;i < preferenceLen;i++) if(allowedPreferences[i]) {
         if(strcmp(name, preferences[i].name) == 0) {
@@ -18,7 +18,7 @@ Value getPreference(char* name) {
     }
     return NULLVAL;
 }
-int setPreference(char* name, Value val, bool save) {
+int setPreference(const char* name, Value val, bool save) {
     int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
     for(int i = 0;i < preferenceLen;i++) if(allowedPreferences[i]) {
         if(strcmp(name, preferences[i].name) == 0) {
