@@ -4,8 +4,9 @@
 #include "functions.h"
 #include "parser.h"
 #include "arb.h"
+#include "misc.h"
 //Header files for all of these functions are in general.h
-int historySize=0;
+int historySize = 0;
 int historyCount = 0;
 Value* history;
 char* appendToHistory(Value num, double base, bool print) {
@@ -445,5 +446,23 @@ char* runCommand(char* input) {
         strcpy(out, "Function included");
         return out;
     }
-    else return NULL;
+    else if(startsWith(input, "-pref")) {
+        int eqPos = 5;
+        while(input[eqPos] != '=' && input[eqPos] != 0) eqPos++;
+        if(input[eqPos] != '=') {
+            error("could not find assignment");
+            return NULL;
+        }
+        Value val = calculate(input + eqPos + 1, 10);
+        if(globalError) return NULL;
+        char name[eqPos];
+        memcpy(name, input + 6, eqPos - 6);
+        name[eqPos - 6] = 0;
+        if(setPreference(name, val, true) == 0) {
+            freeValue(val);
+            error("preference '%s' not found",name);
+        }
+        return calloc(1,1);
+    }
+    return NULL;
 }

@@ -22,7 +22,7 @@ The CalcCLI source code is split into several different files under the `src/` d
 `highlight.c` is solely composed of functions that return a color map in exchange for an expression. Some functions return an allocated string, and others accept a pointer to an empty string that is equal in length to the expression.
 
 ## misc.c
-`misc.c` contains miscellaneous code like `derivative`, factoring functions, and `getRatio`.
+`misc.c` contains miscellaneous code like `derivative`, factoring functions, and `getRatio`. It also contains the code that manages preferences.
 
 ## parser.c
 `parser.c` contains `generateTree` and code frequently used by both `generateTree` and `highlight.c`.

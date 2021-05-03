@@ -4,6 +4,7 @@
 #include "compute.h"
 #include "arb.h"
 #include "functions.h"
+#include "misc.h"
 #pragma region Global Variables
 double degrat = 1;
 bool globalError = false;
@@ -167,6 +168,8 @@ void startup() {
         sortedBuiltin[sortedBuiltinLen++] = i;
     }
     mergeSort(sortedBuiltin, sortedBuiltinLen, &cmpFunctionNames);
+    //Preferences
+    loadPreferences();
 }
 void cleanup() {
     int i;
@@ -191,6 +194,12 @@ void cleanup() {
     }
     free(globalLocalVariableValues);
     free(globalLocalVariables);
+    //Delete preferences
+    int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
+    for(int i = 0;i < preferenceLen;i++) {
+        freeValue(preferences[i].current);
+    }
+
 }
 #pragma endregion
 #pragma region Constructors, Copiers, and Freers

@@ -1,7 +1,47 @@
-
 #include "general.h"
+#include "misc.h"
 #include <string.h>
 #include <math.h>
+#pragma region Preferences
+struct Preference preferences[preferenceCount] = {
+    {"color",{0,1},{0,1}},
+    {"darkmode",{0,1},{0,1}},//Web version only
+    {"raw",0,0},//CLI only
+    {"autostart",0,0},//CLI: location of autostart file, Web: newline separated autostart file
+};
+Value getPreference(char* name) {
+    int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
+    for(int i = 0;i < preferenceLen;i++) if(allowedPreferences[i]) {
+        if(strcmp(name, preferences[i].name) == 0) {
+            return copyValue(preferences[i].current);
+        }
+    }
+    return NULLVAL;
+}
+int setPreference(char* name, Value val, bool save) {
+    int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
+    for(int i = 0;i < preferenceLen;i++) if(allowedPreferences[i]) {
+        if(strcmp(name, preferences[i].name) == 0) {
+            //Free current one
+            freeValue(preferences[i].current);
+            //Copy val to current
+            preferences[i].current = copyValue(val);
+            updatePreference(i);
+            if(save) savePreferences();
+            return 1;
+        }
+    }
+    return 0;
+}
+void resetPreferences() {
+    int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
+    //Free current preferences
+    for(int i = 0;i < preferenceLen;i++) freeValue(preferences[i].current);
+    //Copy current from default
+    for(int i = 0;i < preferenceLen;i++) preferences[i].current = copyValue(preferences[i].defaultVal);
+    return;
+}
+#pragma endregion
 #pragma region Factors
 int* primeFactors(int num) {
     int* out = calloc(11, sizeof(int));

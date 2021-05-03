@@ -4,6 +4,7 @@
 #include "src/help.h"
 #include "src/functions.h"
 #include "src/parser.h"
+#include "src/misc.h"
 #include <stdarg.h>
 #include <time.h>
 #if defined __linux__ || defined unix || defined __unix__ || defined __APPLE__
@@ -14,6 +15,7 @@
 #define USE_CONIO_H
 #endif
 char* currentInput = NULL;
+void runLine(char* input);
 #pragma region Command Line Arguments
 double useColors = 1;
 double rawMode = 0;
@@ -54,6 +56,113 @@ void showUsage(char** argv) {
         printf("Could not find help type '%s'", type);
     }
     exit(0);
+}
+#pragma endregion
+#pragma region Preferences
+char preferencePath[1000];
+int hasPreferencePath = false;
+#if defined USE_CONIO_H
+void generatePreferencePath() {
+    hasPreferencePath = true;
+    snprintf(preferencePath, 1000, "%s\\AppData\\Roaming\\CalcCLI\\preferences.conf", getenv("USERPROFILE"));
+}
+#else
+void generatePreferencePath() {
+    hasPreferencePath = true;
+    snprintf(preferencePath, 1000, "%s/.config/calccli.conf", getenv("HOME"));
+}
+#endif
+const bool allowedPreferences[preferenceCount] = { 1,0,1,1 };
+void savePreferences() {
+    //Generate preference path if it doesn't exists
+    if(!hasPreferencePath) generatePreferencePath();
+    int preferenceLen = sizeof(preferences) / sizeof(struct Preference);
+    //Check if file exists
+    FILE* testRead = fopen(preferencePath, "r");
+    if(testRead == NULL) printf("Notice: creating preferences file at %s\n", preferencePath);
+    else fclose(testRead);
+    FILE* f = fopen(preferencePath, "w");
+    if(f == NULL) {
+        error("could not create preferences file");
+        globalError = false;
+        return;
+    }
+    for(int i = 0;i < preferenceLen;i++) if(allowedPreferences[i]) {
+        char* val = valueToString(preferences[i].current, 10);
+        fprintf(f, "%s=%s\n", preferences[i].name, val);
+        free(val);
+    }
+    fclose(f);
+}
+void loadPreferences() {
+    //Generate preference path if it doesn't exists
+    if(!hasPreferencePath) generatePreferencePath();
+    char line[10000];
+    FILE* f = fopen(preferencePath, "r");
+    //Create default preferences file if it doesn't exist
+    if(f == NULL) {
+        printf("Preference file missing, creating new one\n");
+        savePreferences();
+        return;
+    }
+    int lineCount = 0;
+    //Iterate over each line
+    while(fgets(line, 10000, f) != NULL) {
+        lineCount++;
+        int eqPos = 0;
+        //If line is empty or comment
+        if(line[0] == '#' || line[0] == 0 || line[0] == '\n') continue;
+        //Find equal sign position
+        while(line[eqPos] != '=' && line[eqPos] != 0) eqPos++;
+        if(line[eqPos] == 0) {
+            error("missing assignment in line %d of preferences", lineCount);
+            globalError = false;
+            continue;
+        }
+        //Remove final newline
+        for(int i = 0;line[i];i++) if(line[i] == '\n') line[i] = 0;
+        //Calculate value
+        Value val = calculate(line + eqPos + 1, 10);
+        if(globalError) {
+            printf("in line %d of preferences\n", lineCount);
+            globalError = false;
+            continue;
+        }
+        //Set preference
+        line[eqPos] = 0;
+        if(setPreference(line, val, false) == 0) {
+            freeValue(val);
+            error("No preference named %s (line %d)", line, lineCount);
+            globalError = false;
+            continue;
+        }
+    }
+}
+void updatePreference(int id) {
+    Value val = preferences[id].current;
+    if(id == 0) useColors = getR(val);
+    if(id == 2) rawMode = getR(val);
+}
+void readAutostart() {
+    if(preferences[3].current.type != value_string) return;
+    char* string = preferences[3].current.string;
+    FILE* f = fopen(string, "r");
+    if(f == NULL) {
+        error("could not find autostart file");
+        globalError = false;
+        return;
+    }
+    char line[1000];
+    int lineCount = 0;
+    while(fgets(line, 1000, f) != NULL) {
+        lineCount++;
+        for(int i = 0;line[i];i++) if(line[i] == '\n') line[i] = 0;
+        runLine(line);
+        if(globalError) {
+            printf("in line %d of autostart file\n", lineCount);
+            globalError = false;
+        }
+    }
 }
 #pragma endregion
 void CLI_cleanup() {
@@ -977,6 +1086,8 @@ void runLine(char* input) {
     }
 }
 int main(int argc, char** argv) {
+    //Startup
+    startup();
     //Set cleanup on interupt
     signal(SIGINT, CLI_cleanup);
     //Parse command line arguments
@@ -996,12 +1107,12 @@ int main(int argc, char** argv) {
             }
         }
     }
+    readAutostart();
     //Show help
     if(showHelp) showUsage(argv);
-    startup();
 #ifdef USE_FANCY_INPUT
     if(!rawMode) enableUnixRawRead();
-#elif
+#else
     rawMode = 1;
 #endif
     if(!rawMode) {
