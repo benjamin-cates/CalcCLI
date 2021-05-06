@@ -828,15 +828,14 @@ char* codeBlockToString(CodeBlock code, char** localVariables, char** arguments)
         cumulativeLength += strlen(lines[i]);
     }
     //Compile lines
-    bool useBrackets = code.listLen == 1;
-    char* out = calloc(cumulativeLength + code.listLen + (useBrackets ? 3 : 0) + 2, 1);
-    if(useBrackets)out[0] = '{';
+    char* out = calloc(cumulativeLength + code.listLen + 5, 1);
+    out[0] = '{';
     for(int i = 0;i < code.listLen;i++) {
         strcat(out, lines[i]);
         strcat(out, ";");
         free(lines[i]);
     }
-    if(useBrackets) strcat(out, "}");
+    strcat(out, "}");
     free(localVars);
     return out;
 }
