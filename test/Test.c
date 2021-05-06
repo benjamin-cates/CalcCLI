@@ -4,6 +4,7 @@
 #include "../src/general.h"
 #include "../src/parser.h"
 #include "../src/help.h"
+#include "../src/misc.h"
 #include <stdarg.h>
 #include <time.h>
 #pragma region Commandline arguments
@@ -402,6 +403,15 @@ void segFaultHandler(int nSignum, siginfo_t* info, void* p) {
     exit(0);
 }
 #endif
+#pragma region Preferences
+void savePreferences() {
+};
+void loadPreferences() {
+};
+void updatePreference(int id) {
+};
+const bool allowedPreferences[preferenceCount] = { 0,0,0,0,0 };
+#pragma endregion
 #pragma region Tests
 void test_standard() {
     const char* regularTestText[] = {
@@ -616,13 +626,21 @@ void test_includableFunctions() {
     for(int i = 0;i < count;i++) {
         //Parse arguments
         char** arguments = parseArgumentList(includeFuncs[i].arguments);
-        //Parse equation
-        Tree tree = generateTree(includeFuncs[i].equation, arguments, NULL, 0);
+        char clean[strlen(includeFuncs[i].equation) + 1];
+        strcpy(clean, includeFuncs[i].equation);
+        inputClean(clean);
+        if(includeFuncs[i].equation[0] == '{') {
+            clean[strlen(clean) - 1] = 0;
+            freeCodeBlock(parseToCodeBlock(clean + 1, arguments, NULL, NULL, NULL));
+        }
+        else {
+            //Parse equation
+            freeTree(generateTree(includeFuncs[i].equation, arguments, NULL, 0));
+        }
         if(globalError) {
             failedTest(i, includeFuncs[i].equation, "");
             globalError = false;
         }
-        freeTree(tree);
         freeArgList(arguments);
     }
     totalNumberOfTests += count;
