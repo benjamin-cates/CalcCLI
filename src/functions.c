@@ -784,7 +784,7 @@ char* codeBlockToString(CodeBlock code, char** localVariables, char** arguments)
         else if(action.id == action_localvaraccessor) {
             char* var = localVars[action.localVarID];
             char* statement = treeToString(action.tree[1], false, arguments, localVars);
-            char* key = treeToString(action.tree[1], false, arguments, localVars);
+            char* key = treeToString(action.tree[0], false, arguments, localVars);
             lines[i] = calloc(strlen(var) + strlen(key) + strlen(statement) + 5, 1);
             strcpy(lines[i], var);
             strcat(lines[i], "[");
