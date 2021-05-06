@@ -533,6 +533,72 @@ int valCompare(Value one, Value two) {
     if(valEqual(one, two)) return 0;
     return 2;
 }
+void setKey(Value* one, Value key, Value val) {
+    //Strings
+    if(one->type == value_string) {
+        if(key.i != 0 || key.r < 0) return;
+        int index = key.r;
+        if(index > strlen(one->string)) return;
+        if(index == strlen(one->string)) {
+            char* oldString = one->string;
+            one->string = calloc(strlen(one->string) + 2, 1);
+            strcpy(one->string, oldString);
+            free(oldString);
+        }
+        if(val.type == value_num) one->string[index] = val.r;
+        else if(val.type == value_string) one->string[index] = val.string[0];
+        else one->string[index] = getR(val);
+        return;
+    }
+    if(key.type != value_num || key.r < 0 || key.i < 0) {
+        error("accessor out of bounds");
+        return;
+    }
+    //Vectors
+    if(one->type == value_vec) {
+        key.r = floor(key.r);
+        key.i = floor(key.i);
+        if(key.r >= one->vec.width || key.i >= one->vec.height) {
+            int newWidth = one->vec.width;
+            if(key.r >= one->vec.width) newWidth = key.r + 1;
+            int newHeight = one->vec.height;
+            if(key.i >= one->vec.height) newHeight = key.i + 1;
+            if(newWidth * newHeight >= 0xEFFF) {
+                error("vector too large");
+                return;
+            }
+            int oldWidth = one->vec.width, oldHeight = one->vec.height;
+            Number* oldVec = one->vec.val;
+            one->vec = newVec(newWidth, newHeight);
+            for(int i = 0;i < oldWidth;i++) for(int j = 0;j < oldHeight;j++) {
+                one->vec.val[i + j * newWidth] = oldVec[i + j * oldWidth];
+            }
+            free(oldVec);
+        }
+        one->vec.val[(int)(key.r + key.i * one->vec.width)] = getNum(val);
+        return;
+    }
+    //If key is zero
+    if(key.r == 0 && key.i == 0) {
+        freeValue(*one);
+        *one = copyValue(val);
+        return;
+    }
+    //Convert to vector if number or arb
+    if(one->type == value_num || one->type == value_arb) {
+        if((key.r + 1) * (key.i + 1) >= 0xEFFF) {
+            error("vector too large");
+            return;
+        }
+        Number num = getNum(*one);
+        freeValue(*one);
+        one->type = value_vec;
+        one->vec = newVec(key.r + 1, key.i + 1);
+        one->vec.val[0] = num;
+        one->vec.val[(int)(key.r + key.i * (key.r + 1))] = getNum(val);
+        return;
+    }
+}
 #pragma endregion
 Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* localVars, int* isFree);
 Value computeTree(Tree tree, const Value* args, int argLen, Value* localVars) {

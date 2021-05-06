@@ -3,7 +3,7 @@
 #define FUNCTIONS_H 1
 #include "general.h"
 //Number of optional functions
-#define includeFuncsLen 16
+#define includeFuncsLen 17
 //Number of immutable functions
 #define immutableFunctions 120
 //Number of custom functions
@@ -70,8 +70,9 @@ void generateFunction(const char* eq);
 void deleteCustomFunction(int id);
 /*
  * Add a global local variable
+ * Returns it's position
  */
-void appendGlobalLocalVariable(char* name, Value value);
+int appendGlobalLocalVariable(char* name, Value value, bool overwrite);
 /**
  * Creates a new code block that just returns tree
  * @param tree The return expression for the code block
@@ -115,14 +116,15 @@ extern const FunctionReturn return_null;
 extern const FunctionReturn return_break;
 extern const FunctionReturn return_continue;
 typedef enum FunctionActionTypes {
-    action_statement=0,
-    action_return=1,
-    action_localvar=2,
-    action_if=3,
-    action_else=4,
-    action_while=5,
-    action_for=6,
-    action_break=7,
-    action_continue=8,
+    action_statement = 0,
+    action_return = 1,
+    action_localvar = 2,
+    action_if = 3,
+    action_else = 4,
+    action_while = 5,
+    action_for = 6,
+    action_break = 7,
+    action_continue = 8,
+    action_localvaraccessor = 9,
 } FunctionActionTypes;
 #endif

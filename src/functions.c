@@ -386,15 +386,18 @@ const struct stdFunction stdfunctions[immutableFunctions] = {
 #undef string
 #undef any
 };
-void appendGlobalLocalVariable(char* name, Value value) {
+int appendGlobalLocalVariable(char* name, Value value, bool overwrite) {
     int place = 0;
     for(place = 0;true;place++) {
         if(globalLocalVariables[place] == NULL) break;
-        if(globalLocalVariables[place] == emptyArg) break;
+        if(globalLocalVariables[place] == emptyArg) continue;
         if(strcmp(globalLocalVariables[place], name) == 0) {
             free(name);
-            globalLocalVariableValues[place] = value;
-            return;
+            if(overwrite) {
+                freeValue(globalLocalVariableValues[place]);
+                globalLocalVariableValues[place] = value;
+            }
+            return place;
         }
     }
     //Resize if necessary
@@ -405,6 +408,7 @@ void appendGlobalLocalVariable(char* name, Value value) {
     }
     globalLocalVariables[place] = name;
     globalLocalVariableValues[place] = value;
+    return place;
 }
 Value runFunction(Function func, Value* args) {
     int size = 1;
@@ -437,6 +441,7 @@ CodeBlock codeBlockFromTree(Tree tree) {
 CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* localVarSize, int* localVarCount) {
     int zero = 0, two = 2;
     bool freeVariables = false;
+    //Allocate local variables if none are provided
     if(localVars == NULL) {
         freeVariables = true;
         localVars = calloc(1, sizeof(char**));
@@ -446,6 +451,7 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
     }
     int localVarStackStart = *localVarCount;
     int eqLen = strlen(eq);
+    //Find semicolons
     int semicolons[eqLen + 1];
     memset(semicolons, 0, sizeof(int) * (eqLen + 1));
     semicolons[0] = -1;
@@ -457,6 +463,7 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
     }
     if(semicolons[semicolonId - 1] != eqLen - 1) semicolons[semicolonId] = eqLen;
     else semicolonId--;
+    //Create action list
     FunctionAction* list = calloc(semicolonId, sizeof(FunctionAction));
     bool prevIf = false;
     for(int i = 0;i < semicolonId;i++) {
@@ -468,17 +475,29 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
         int eqPos = isLocalVariableStatement(section);
         if(eqPos != 0) {
             char* name = calloc(eqPos + 1, 1);
-            memcpy(name, section, eqPos);
+            bool hasAccessor = section[eqPos - 1] == ']';
+            if(hasAccessor) {
+                int bracket = 0;
+                while(section[bracket] != '[') bracket++;
+                memcpy(name, section, eqPos - 1);
+                name[bracket] = 0;
+                list[i].id = action_localvaraccessor;
+                list[i].tree = malloc(sizeof(Tree) * 2);
+                list[i].tree[0] = generateTree(name + bracket + 1, args, *localVars, 0);
+            }
+            else {
+                memcpy(name, section, eqPos);
+                list[i].id = action_localvar;
+                list[i].tree = malloc(sizeof(Tree));
+            }
             lowerCase(name);
             if(*localVarSize == (*localVarCount) - 1) {
                 *localVars = recalloc(*localVars, localVarSize, 5, sizeof(char*));
             }
-            list[i].tree = malloc(sizeof(Tree));
-            list[i].tree[0] = generateTree(section + eqPos + 1, args, *localVars, 0);
+            list[i].tree[hasAccessor ? 1 : 0] = generateTree(section + eqPos + 1, args, *localVars, 0);
             list[i].localVarID = argListAppend(localVars, name, localVarSize);
             if(globalError) break;
             if(localVars[0][(*localVarCount)] == name) (*localVarCount)++;
-            list[i].id = action_localvar;
             continue;
         }
         if(startsWith(section, "return")) {
@@ -599,7 +618,16 @@ FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Valu
         }
         //Set local variable
         else if(action.id == action_localvar) {
+            Value old = (*localVars)[action.localVarID];
             (*localVars)[action.localVarID] = computeTree(*action.tree, arguments, argCount, *localVars);
+            freeValue(old);
+        }
+        else if(action.id == action_localvaraccessor) {
+            Value index = computeTree(*action.tree, arguments, argCount, *localVars);
+            Value val = computeTree(action.tree[1], arguments, argCount, *localVars);
+            setKey((*localVars) + action.localVarID, index, val);
+            freeValue(val);
+            freeValue(index);
         }
         //If statement
         else if(action.id == action_if) {
@@ -693,8 +721,15 @@ CodeBlock copyCodeBlock(CodeBlock code, const Tree* replaceArgs, int replaceCoun
         FunctionAction action = code.list[i];
         FunctionAction outAction = action;
         if(action.tree != NULL) {
-            outAction.tree = malloc(sizeof(Tree));
-            *outAction.tree = copyTree(*action.tree, replaceArgs, replaceCount, unfold);
+            if(action.id == action_localvaraccessor) {
+                outAction.tree = malloc(sizeof(Tree) * 2);
+                outAction.tree[0] = copyTree(action.tree[0], replaceArgs, replaceCount, unfold);
+                outAction.tree[1] = copyTree(action.tree[1], replaceArgs, replaceCount, unfold);
+            }
+            else {
+                outAction.tree = malloc(sizeof(Tree));
+                *outAction.tree = copyTree(*action.tree, replaceArgs, replaceCount, unfold);
+            }
         }
         if(action.code != NULL) {
             outAction.code = malloc(sizeof(CodeBlock));
@@ -711,6 +746,7 @@ void freeCodeBlock(CodeBlock code) {
         FunctionAction action = code.list[i];
         if(action.tree != NULL) {
             freeTree(*action.tree);
+            if(action.id == action_localvaraccessor) freeTree(action.tree[1]);
             free(action.tree);
         }
         if(action.code != NULL) {
@@ -745,6 +781,20 @@ char* codeBlockToString(CodeBlock code, char** localVariables, char** arguments)
             strcat(lines[i], "=");
             strcat(lines[i], statement);
             free(statement);
+        }
+        else if(action.id == action_localvaraccessor) {
+            char* var = localVars[action.localVarID];
+            char* statement = treeToString(action.tree[1], false, arguments, localVars);
+            char* key = treeToString(action.tree[1], false, arguments, localVars);
+            lines[i] = calloc(strlen(var) + strlen(key) + strlen(statement) + 5, 1);
+            strcpy(lines[i], var);
+            strcat(lines[i], "[");
+            strcat(lines[i], key);
+            strcat(lines[i], "]");
+            strcat(lines[i], "=");
+            strcat(lines[i], statement);
+            free(statement);
+            free(key);
         }
         else if(action.id == action_if || action.id == action_while) {
             char* statement = treeToString(*action.tree, false, arguments, localVars);

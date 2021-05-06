@@ -1048,19 +1048,41 @@ void runLine(char* input) {
     }
     //Else compute it as a value
     else {
-        int locVarPos = isLocalVariableStatement(input);
-        if(locVarPos != 0) {
-            Value out = calculate(input + locVarPos + 1, 0);
+        int eqPos = isLocalVariableStatement(input);
+        if(eqPos != 0) {
+            Value out = calculate(input + eqPos + 1, 0);
             if(globalError) return;
-            char* name = calloc(locVarPos + 1, 1);
-            memcpy(name, input, locVarPos);
-            appendGlobalLocalVariable(name, out);
-            char* output = valueToString(out, 10);
-            char outStr[strlen(output) + locVarPos + 3];
-            strcpy(outStr, name);
-            outStr[locVarPos] = '=';
-            strcpy(outStr + locVarPos + 1, output);
-            outStr[locVarPos + 1 + strlen(output) + 1] = '\0';
+            char* name = calloc(eqPos + 1, 1);
+            int varIndex = -1;
+            //The name variable may be freed when appendGlobalLocalVariable is called
+            int nameEnd = eqPos;
+            //Accessors
+            if(input[eqPos - 1] == ']') {
+                int bracket = 0;
+                while(input[bracket] != '[') bracket++;
+                memcpy(name, input, bracket);
+                nameEnd = bracket;
+                //Create variable if it doesn't exist
+                varIndex = appendGlobalLocalVariable(name, NULLVAL, false);
+                //Calculate key
+                input[eqPos - 1] = 0;
+                Value key = calculate(input + bracket + 1, 0);
+                input[eqPos - 1] = ']';
+                //Set key
+                setKey(globalLocalVariableValues + varIndex, key, out);
+                if(globalError) { freeValue(out);return; }
+            }
+            else {
+                memcpy(name, input, eqPos);
+                varIndex = appendGlobalLocalVariable(name, out, true);
+            }
+            //Print output
+            char* output = valueToString(globalLocalVariableValues[varIndex], 10);
+            char outStr[strlen(output) + nameEnd + 3];
+            memcpy(outStr, input, nameEnd);
+            outStr[nameEnd] = 0;
+            strcat(outStr, "=");
+            strcat(outStr, output);
             printWithHighlighting(outStr);
             putchar('\n');
             free(output);

@@ -16,6 +16,12 @@ int isLocalVariableStatement(const char* eq) {
             if(eq[next] == '>' || eq[next] == '=') return 0;
             return i;
         }
+        if(ch == '[' && !isFirstChar) {
+            int end = findNext(eq, i, ']');
+            if(end == -1) return 0;
+            if(eq[end + 1] == '=') return end + 1;
+            return 0;
+        }
         if(ch == ' ' || ch == '\n') continue;
         bool isDigit = ch >= '0' && ch <= '9';
         if(isDigit && isFirstChar) return 0;

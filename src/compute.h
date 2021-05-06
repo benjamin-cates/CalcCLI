@@ -88,6 +88,7 @@ Value valPower(Value one, Value two);
 Value valModulo(Value one, Value two);
 Value valNegate(Value one);
 Value valLn(Value one);
+void setKey(Value* one, Value key, Value val);
 #pragma endregion
 /**
  * Computes the operation tree

@@ -456,7 +456,23 @@ char* highlightLine(char* eq) {
     }
     int isLocalVariable = isLocalVariableStatement(eq);
     if(isLocalVariable) {
-        memset(out, hl_localvar, isLocalVariable);
+        if(eq[isLocalVariable - 1] == ']') {
+            //Find '['
+            int bracket = 0;
+            while(eq[bracket] != '[') bracket++;
+            //Highlight bracket
+            out[bracket] = hl_command;
+            out[isLocalVariable - 1] = hl_command;
+            eq[isLocalVariable - 1] = 0;
+            //Hightlight inside bracket
+            highlightSyntax(eq + bracket + 1, out + bracket + 1, NULL, globalLocalVariables, 10, false);
+            eq[isLocalVariable - 1] = ']';
+            //Highlight local variable
+            memset(out, hl_localvar, bracket);
+        }
+        else {
+            memset(out, hl_localvar, isLocalVariable);
+        }
         out[isLocalVariable] = hl_command;
         start = isLocalVariable + 1;
     }
@@ -481,9 +497,23 @@ void highlightCodeBlock(char* eq, char* out, char** args, char** localVars) {
         int isEqual = isLocalVariableStatement(eq + i);
         if(isEqual) {
             char* name = calloc(isEqual + 1, 1);
-            memset(out + i, hl_localvar, isEqual);
+            //If has accessor
+            if(eq[i + isEqual - 1] == ']') {
+                int bracket = i;
+                while(eq[bracket] != '[') bracket++;
+                out[bracket] = hl_command;
+                out[i + isEqual - 1] = hl_command;
+                eq[i + isEqual - 1] = 0;
+                highlightSyntax(eq + bracket + 1, out + bracket + 1, args, localVarCopy, 10, false);
+                eq[i + isEqual - 1] = ']';
+                memset(out + i, hl_localvar, bracket - i);
+                memcpy(name, eq + i, bracket - i);
+            }
+            else {
+                memset(out + i, hl_localvar, isEqual);
+                memcpy(name, eq + i, isEqual);
+            }
             out[i + isEqual] = hl_command;
-            memcpy(name, eq + i, isEqual);
             lowerCase(name);
             i += isEqual + 1;
             highlightSyntax(eq + i, out + i, args, localVarCopy, 10, false);
