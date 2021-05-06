@@ -75,6 +75,8 @@ struct LibraryFunction includeFuncs[includeFuncsLen] = {
     {"vol_sphere","(r)","4*pi*r^3/3",4},
     //pythag(a,b)=c
     {"pythag","(a,b)","sqrt(a^2+b^2)",4},
+    //sort vector
+    {"sort","(vec)","{out=vec;j=0;len=width(vec);while(j<len) {k=0;while(k<len-j-1) {if(ge(out,k)>ge(out,k+1)) {temp=ge(out,k);out[k]=ge(out,k+1);out[k+1]=temp;};k=k+1};j=j+1;};return out;}"},
 };
 Function* customfunctions;
 Value runAnonymousFunction(Value val, Value* args) {
