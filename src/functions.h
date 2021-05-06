@@ -94,7 +94,7 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
  *     Value* localVars=calloc(1,sizeof(Value));
  *     runCodeBlock(block,args,argsCount,&localVars,&localVarCount,&localVarSize);
  */
-FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int* localVarCount, int* localVarSize);
+FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int localVarCount, int* localVarSize);
 /**
  * Copies a code block, replacing the first replaceCount arguments with replace args
  * Arg replace example: copyCodeBlock(arg1=>{return arg1+arg0;},[2],1,false) = arg0=>{return arg0+2;}

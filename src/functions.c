@@ -80,13 +80,12 @@ Function* customfunctions;
 Value runAnonymousFunction(Value val, Value* args) {
     int argCount = argListLen(val.argNames);
     int size = 1;
-    int count = 0;
     if(val.code == NULL) {
         error("Anonymous function code missing");
         return NULLVAL;
     }
     Value* localVars = calloc(1, sizeof(Value));
-    FunctionReturn out = runCodeBlock(*val.code, args, argCount, &localVars, &count, &size);
+    FunctionReturn out = runCodeBlock(*val.code, args, argCount, &localVars, 0, &size);
     if(globalError) return NULLVAL;
     free(localVars);
     if(out.type > 1) {
@@ -412,9 +411,8 @@ int appendGlobalLocalVariable(char* name, Value value, bool overwrite) {
 }
 Value runFunction(Function func, Value* args) {
     int size = 1;
-    int count = 0;
     Value* localVars = calloc(size, sizeof(Value));
-    FunctionReturn out = runCodeBlock(func.code, args, func.argCount, &localVars, &count, &size);
+    FunctionReturn out = runCodeBlock(func.code, args, func.argCount, &localVars, 0, &size);
     if(out.type == 2 || out.type == 3) {
         error("Reached illegal %s statement", out.type == 2 ? "break" : "continue");
         return NULLVAL;
@@ -599,9 +597,10 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
 const FunctionReturn return_null = { 0,0 };
 const FunctionReturn return_break = { 2,0 };
 const FunctionReturn return_continue = { 3,0 };
-FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int* localVarCount, int* localVarSize) {
-    int localVarCountPrev = *localVarCount;
+FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Value** localVars, int localVarCount, int* localVarSize) {
+    int stackSize = localVarCount;
     if(func.localVarCount != 0) *localVars = recalloc(*localVars, localVarSize, func.localVarCount, sizeof(Value));
+    localVarCount += func.localVarCount;
     bool prevIf = false;
     FunctionReturn toReturn = return_null;
     for(int i = 0;i < func.listLen;i++) {
@@ -708,8 +707,8 @@ FunctionReturn runCodeBlock(CodeBlock func, Value* arguments, int argCount, Valu
             break;
         }
     }
-    for(int i = 0;i < func.localVarCount;i++) {
-        freeValue((*localVars)[localVarCountPrev + i]);
+    for(int i = stackSize;i < localVarCount;i++) {
+        freeValue((*localVars)[i]);
     }
     //Free localvariables
     return toReturn;
