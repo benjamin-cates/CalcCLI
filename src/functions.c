@@ -77,6 +77,7 @@ struct LibraryFunction includeFuncs[includeFuncsLen] = {
     {"pythag","(a,b)","sqrt(a^2+b^2)",4},
     //sort vector
     {"sort","(vec)","{out=vec;j=0;len=width(vec);while(j<len) {k=0;while(k<len-j-1) {if(ge(out,k)>ge(out,k+1)) {temp=ge(out,k);out[k]=ge(out,k+1);out[k+1]=temp;};k=k+1};j=j+1;};return out;}"},
+    {"filter","(vec,func)","{out=<>;y=0;while(y<height(vec)) {x=0;while(x<width(vec)) {if(run(func,ge(vec,x,y),x+y*i)) {out[x+y*i]=ge(vec,x,y);};x=x+1;};y=y+1;};return out;}"},
 };
 Function* customfunctions;
 Value runAnonymousFunction(Value val, Value* args) {

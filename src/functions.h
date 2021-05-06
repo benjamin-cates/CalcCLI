@@ -3,7 +3,7 @@
 #define FUNCTIONS_H 1
 #include "general.h"
 //Number of optional functions
-#define includeFuncsLen 17
+#define includeFuncsLen 18
 //Number of immutable functions
 #define immutableFunctions 120
 //Number of custom functions
