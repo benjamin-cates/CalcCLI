@@ -584,9 +584,8 @@ CodeBlock parseToCodeBlock(const char* eq, char** args, char*** localVars, int* 
     out.list = list;
     out.listLen = semicolonId;
     out.localVarCount = *localVarCount - localVarStackStart;
-    if(out.localVarCount != 0) out.localVariables = calloc(out.localVarCount + 1, sizeof(char*));
+    if(out.localVarCount != 0) out.localVariables = argListCopy((*localVars) + localVarStackStart);
     else out.localVariables = NULL;
-    memcpy(out.localVariables, (*localVars) + localVarStackStart, out.localVarCount * sizeof(char*));
     if(globalError) {
         freeCodeBlock(out);
         return NULLCODE;
