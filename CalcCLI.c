@@ -1060,7 +1060,9 @@ void runLine(char* input) {
             if(input[eqPos - 1] == ']') {
                 int bracket = 0;
                 while(input[bracket] != '[') bracket++;
-                memcpy(name, input, bracket);
+                strncpy(name, input, bracket);
+                lowerCase(name);
+                inputClean(name);
                 nameEnd = bracket;
                 //Create variable if it doesn't exist
                 varIndex = appendGlobalLocalVariable(name, NULLVAL, false);
@@ -1073,7 +1075,9 @@ void runLine(char* input) {
                 if(globalError) { freeValue(out);return; }
             }
             else {
-                memcpy(name, input, eqPos);
+                strncpy(name, input, eqPos);
+                lowerCase(name);
+                inputClean(name);
                 varIndex = appendGlobalLocalVariable(name, out, true);
             }
             //Print output
