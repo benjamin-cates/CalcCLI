@@ -129,15 +129,17 @@ int nextSection(const char* eq, int start, int* end, int base) {
     }
     //History accessor $1...
     if(eq[start] == '$') {
-        if((eq[start + 1] >= '0' && eq[start + 1] <= '9') || eq[start + 1] == '-') {
+        if(eq[start + 1] == '-') start++;
+        if(eq[start + 1] >= '0' && eq[start + 1] <= '9') {
             *end = start + 1;
-            while((eq[*end] >= '0' && eq[*end] <= '9') || eq[*end] == '-') {
+            while(eq[*end] >= '0' && eq[*end] <= '9') {
                 if(eq[*end] == 0) break;
                 (*end)++;
             }
             (*end)--;
             return sec_hist;
         }
+        if(eq[start] != '$') start--;
     }
     //Variables and units
     if(eq[start] == '_' || eq[start] == '$' || (eq[start] >= 'a' && eq[start] <= 'z') || (eq[start] >= 'A' && eq[start] <= 'Z')) {
