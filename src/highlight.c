@@ -114,6 +114,7 @@ void highlightSyntax(char* eq, char* out, char** args, char** localVars, int bas
             }
             name[len - offset] = 0;
             Tree op = findFunction(name, false, NULL, NULL);
+            if(op.optype == 0 && op.op == 0) op.optype = -1;
             memset(out + start, op.optype + 14, len);
             if(eq[end] == 0) {
                 start = firstParenth + 1;
