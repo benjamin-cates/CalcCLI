@@ -153,6 +153,7 @@ char* runCommand(char* input) {
     else if(startsWith(input, "-del")) {
         char* name = input + 5;
         int nameLen = strlen(name);
+        lowerCase(name);
         Tree func = findFunction(name, false, NULL, globalLocalVariables);
         if(func.optype == optype_custom) {
             char* out = calloc(nameLen + 33, 1);
