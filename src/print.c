@@ -250,15 +250,13 @@ char* treeToString(Tree tree, bool bracket, char** argNames, char** localVars) {
             code = treeToString(*(*tree.code).list[0].tree, true, newArgNames, localVars);
             isBlock = false;
         }
-        else code = codeBlockToString(*tree.code, localVars, newArgNames);
+        else code = codeBlockToString(*tree.code, NULL, newArgNames);
         int argListLen = strlen(argListString);
         char* out = calloc(argListLen + 2 + strlen(code) + 3, 1);
         if(out == NULL) { error(mallocError);return NULL; }
         strcpy(out, argListString);
         strcpy(out + argListLen, "=>");
-        if(isBlock) strcpy(out + argListLen + 2, "{");
         strcat(out + argListLen + 2, code);
-        if(isBlock) strcat(out + argListLen + 2, "}");
         free(argListString);
         free(code);
         free(newArgNames);
