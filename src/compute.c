@@ -861,18 +861,19 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
             if(tree.op == op_dist) {
                 if(args[0].type == value_num) out = newValNum(sqrt(pow(fabs(args[0].r - args[1].r), 2) + pow(fabs(args[0].i - args[1].i), 2)), 0, 0);
                 if(args[0].type == value_vec) {
-                    int i;
                     Vector one = args[0].vec;
                     Vector two = args[1].vec;
-                    int length = one.total > two.total ? one.total : two.total;
-                    for(i = 0;i < length;i++) {
+                    int width = one.width > two.width ? one.width : two.width;
+                    int height = one.height > two.height ? one.height : two.height;
+                    for(int i = 0;i < width;i++) for(int j = 0;j < height;j++) {
                         Number oneNum, twoNum;
-                        if(i < one.total) oneNum = one.val[i];
+                        if(i < one.width && j < one.height) oneNum = one.val[i + j * one.width];
                         else oneNum = NULLNUM;
-                        if(i < two.total) twoNum = two.val[i];
+                        if(i < two.width && j < two.height) twoNum = two.val[i + j * two.width];
                         else twoNum = NULLNUM;
                         out.r += pow(oneNum.r - twoNum.r, 2) + pow(oneNum.i - twoNum.i, 2);
                     }
+                    out.r = sqrt(out.r);
                 }
             }
             goto ret;
