@@ -981,9 +981,13 @@ Value computeTreeMicro(Tree tree, const Value* arguments, int argLen, Value* loc
                     tempArgs[0].r = i;
                     tempArgs[1].r = loopCount;
                     Value current = runAnonymousFunction(args[0], tempArgs);
-                    Value new = valAdd(out, current);
-                    freeValue(out);
-                    freeValue(current);
+                    Value new;
+                    if(current.type == value_string && i == loopArgs[0])  new = current;
+                    else {
+                        new = valAdd(out, current);
+                        freeValue(out);
+                        freeValue(current);
+                    }
                     if(globalError) { freeValue(new);goto ret; }
                     out = new;
                     loopCount++;
