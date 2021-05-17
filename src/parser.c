@@ -217,7 +217,8 @@ double parseNumber(const char* num, double base) {
     int exponentPlace = numLength;
     //Find the position of 'e' and '.'
     for(i = 0; i < numLength; i++) {
-        if(num[i] == '.' && periodPlace == numLength) {
+        if(num[i] == '.') {
+            if(periodPlace != numLength) { error("number cannot have more than one period");return 0; }
             periodPlace = i;
         }
         if(num[i] == 'e') {
