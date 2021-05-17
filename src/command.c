@@ -82,16 +82,13 @@ char* runCommand(char* input) {
             for(int i = 0;i < includeFuncsLen;i++) {
                 outLen += strlen(includeFuncs[i].name);
                 outLen += strlen(includeFuncs[i].arguments);
-                outLen += strlen(includeFuncs[i].equation);
                 outLen += 5;
             }
             char* out = calloc(outLen, 1);
             for(int i = 0;i < includeFuncsLen;i++) {
-                strcat(out, includeFuncs[i].name);
-                strcat(out, includeFuncs[i].arguments);
-                strcat(out, " = ");
-                strcat(out, includeFuncs[i].equation);
-                strcat(out, "\n");
+                char header[200];
+                snprintf(header,200,"%s%s\n",includeFuncs[i].name,includeFuncs[i].arguments);
+                strcat(out,header);
             }
             char* message = calloc(50, 1);
             snprintf(message, 50, "There are %d includable functions", includeFuncsLen);
