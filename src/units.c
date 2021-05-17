@@ -155,9 +155,9 @@ unit_t unitInteract(unit_t one, unit_t two, char op, double twor) {
     }
     if(one == 0)
         return two;
-    if(op == '+') {
+    if(op == '+' || op == '%') {
         if(one != two) {
-            error("Cannot add different units", NULL);
+            error(op == '+' ? "cannot add different units" : "cannot modulo different units", NULL);
         }
         return one;
     }

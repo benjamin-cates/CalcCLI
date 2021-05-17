@@ -47,7 +47,7 @@ Number compModulo(Number one, Number two) {
     double i = fmod(one.i, two.i);
     if(isnan(r)) r = 0.0;
     if(isnan(i)) i = 0.0;
-    return newNum(r, i, unitInteract(one.u, two.u, '+', 0));
+    return newNum(r, i, unitInteract(one.u, two.u, '%', 0));
 }
 Number compSine(Number one) {
     double sinhi = sinh(one.i);
